@@ -40,6 +40,26 @@ else
   rm -rf "$tmp"
 fi
 
+echo "== 3b) libxcb-cursor (WAJIB agar jendela tampil di X11/Qt6) =="
+if ldconfig -p 2>/dev/null | grep -q "libxcb-cursor.so.0"; then
+  echo "   libxcb-cursor OK"
+else
+  tmp2="$(mktemp -d)"
+  for p in libxcb-cursor0; do
+    (cd "$tmp2" && apt-get download "$p" >/dev/null 2>&1) || true
+  done
+  d="$(ls "$tmp2"/libxcb-cursor0*.deb 2>/dev/null | head -1 || true)"
+  if [ -n "$d" ]; then
+    dpkg-deb -x "$d" "$tmp2/x"
+    mkdir -p "$GUI/tools/xcb"
+    cp "$tmp2/x/usr/lib/x86_64-linux-gnu/"*.so* "$GUI/tools/xcb/" 2>/dev/null || true
+    echo "   libxcb-cursor dibundel ke $GUI/tools/xcb/ (run_console_real.sh memakai otomatis)"
+  else
+    echo "   GAGAL ambil paket — pasang manual: sudo apt install libxcb-cursor0"
+  fi
+  rm -rf "$tmp2"
+fi
+
 echo "== 4) uji cepat (opsional, tanpa hardware) =="
 echo "   jalankan: $GUI/run_console_real.sh   (konsol)"
 echo "   uji     : cd $GUI && .venv/bin/python ../tests/test_video.py"

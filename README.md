@@ -6,6 +6,7 @@ TIDAK disentuh; semua eksperimen & kode T1 hidup di sini.
 Repo GitHub (privat): `DeepVertex-Underwater-Drone-GUI-Installer` — kode T1 ber-versi di sini.
 Repo ini WAJIB tetap privat (closed-source); artefak distribusi ke klien (binary-only +
 lisensi) disiapkan terpisah saat packaging; `-SBC-Installer` di-park.
+Cara push: rsync `work/` → klon `repos/DeepVertex-Underwater-Drone-GUI-Installer` → commit/push.
 
 - `gui_t1/` — **konsol nyata T1** (salinan kerja GUI sim → migrasi PySide6 SELESAI
   + modul baru: `video.py`, `rawcap.py`, `rov_console_real.py`).

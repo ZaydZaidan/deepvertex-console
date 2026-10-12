@@ -16,3 +16,6 @@ plugins/
 *.yuv
 *.log
 .DS_Store
+
+# libxcb-cursor (Qt6 xcb) hasil ekstraksi tanpa sudo (installer yang mengurus)
+tools/

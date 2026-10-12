@@ -13,6 +13,13 @@ agen `../onboard/raw_agent.py`). AUTONOMOUS dan VIO = *coming soon* (Tahap 2, mo
 Opsi: `--front-port/--left-port/--right-port` (default 5600/5601/5602 — port UDP
 stream dari BlueOS camera manager), `--raw-agent http://127.0.0.1:8765`.
 
+## Demo tampilan (tanpa hardware)
+
+    bash demo_local.sh                 # 3 stream dummy + MAVLink palsu + agen RAW → konsol
+    bash demo_local.sh --shot cek.png  # + screenshot otomatis (--shot-after detik)
+
+Tutup jendela konsol = semua helper demo ikut dimatikan; data RAW demo di /tmp/dv_raw_demo.
+
 ## Dependensi
 
 - `.venv` (PySide6 6.12 + `--system-site-packages`: GStreamer & pymavlink dari sistem).
@@ -22,6 +29,8 @@ stream dari BlueOS camera manager), `--raw-agent http://127.0.0.1:8765`.
   Opsi tanpa sudo: ekstrak paketnya lalu taruh `libgstvideoparsersbad.so` di
   `plugins/gstreamer-1.0/` (+ lib pendukung di `plugins/lib/`) — dibaca otomatis
   oleh `run_console_real.sh`.
+- `libxcb-cursor0` **wajib** agar jendela tampil di X11 (Qt6 xcb). Installer
+  membundelnya ke `tools/xcb/` (tanpa sudo); alternatif: `sudo apt install libxcb-cursor0`.
 
 ## Uji (tanpa hardware)
 

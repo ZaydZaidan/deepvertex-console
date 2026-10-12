@@ -380,6 +380,8 @@ def main():
     ap.add_argument("--right-port", type=int, default=5602)
     ap.add_argument("--raw-agent", default="http://127.0.0.1:8765")
     ap.add_argument("--outdir", default=os.path.expanduser("~/DeepVertex-ROV-Captures"))
+    ap.add_argument("--shot", default=None, help="simpan screenshot jendela ke PATH (uji tampilan)")
+    ap.add_argument("--shot-after", type=float, default=6.0, help="detik sebelum screenshot")
     # nama atribut dipakai konsol: port_front / port_stereo_L / port_stereo_R
     args = ap.parse_args()
     args.port_front = args.front_port
@@ -390,6 +392,11 @@ def main():
     _terapkan_tema(app)
     w = RovConsole(args)
     w.show()
+    if args.shot:
+        def _ambil_shot():
+            ok = w.grab().save(args.shot)
+            print("shot:", args.shot, "ok" if ok else "GAGAL", flush=True)
+        QtCore.QTimer.singleShot(int(args.shot_after * 1000), _ambil_shot)
     return app.exec()
 
 
