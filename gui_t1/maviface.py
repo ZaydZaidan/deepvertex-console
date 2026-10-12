@@ -46,6 +46,8 @@ WANTED = [
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "HEARTBEAT"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "NAMED_VALUE_FLOAT"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "SERVO_OUTPUT_RAW"),
+    ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "MAG_CAL_PROGRESS"),
+    ("MAV_CMD_SET_MESSAGE_INTERVAL", 1, "MAG_CAL_REPORT"),
 ]
 
 
@@ -191,7 +193,8 @@ class MavBridge(QtCore.QObject):
                     self.mav.mav.command_long_send(self.mav.target_system,
                                                    self.mav.target_component,
                                                    cmd, 0, p1, p2, p3, p4, p5, p6, p7)
-                    self._ack_wait.append((cmd, tag))
+                    self._ack_wait.append([cmd, tag, (p1, p2, p3, p4, p5, p6, p7),
+                                           time.monotonic(), 0])
                     self.sig_status.emit("cmd %d dikirim (%s)" % (cmd, tag or "perintah"))
             except Exception as e:
                 self.sig_status.emit("vehicle command failed: %r" % e)
@@ -218,6 +221,27 @@ class MavBridge(QtCore.QObject):
                             self.mav.target_system, self.mav.target_component, *ch[:8])
             except Exception as e:
                 self.sig_status.emit("fast cmd failed: %r" % e)
+
+    _RETRY_SKIP = (209, 241, 42424, 42425, 42426, 42429)   # motor test & kalibrasi
+
+    def _retry_ack_wait(self, now):
+        """COMMAND_LONG tanpa ACK > 2 dtk dikirim ulang SEKALI (pola command protocol
+        MAVLink). Motor test & kalibrasi DIKECUALIKAN (tidak boleh terulang otomatis)."""
+        for item in list(self._ack_wait):
+            cmd, tag, params, t0, retried = item
+            if retried or cmd in self._RETRY_SKIP or now - t0 < 2.0:
+                continue
+            try:
+                self.mav.mav.command_long_send(self.mav.target_system,
+                                               self.mav.target_component,
+                                               cmd, 0, *params)
+                item[4] = 1
+                self.sig_status.emit("cmd %d tanpa ACK — dikirim ulang sekali (%s)"
+                                     % (cmd, tag or "perintah"))
+            except Exception:                              # noqa: BLE001
+                pass
+        if len(self._ack_wait) > 40:
+            del self._ack_wait[:20]
 
     def _send_gcs_heartbeat(self):
         """WAJIB: tanpa paket dari GCS, ArduPilot tidak membuka stream telemetri."""
@@ -264,10 +288,10 @@ class MavBridge(QtCore.QObject):
 
     def _stream(self, url) -> bool:
         try:
-            self.mav = mavutil.mavlink_connection(url, source_system=250,
+            self.mav = mavutil.mavlink_connection(url, source_system=255,
                                                   source_component=190,
                                                   dialect="ardupilotmega")
-            self.mav.mav.srcSystem = 250
+            self.mav.mav.srcSystem = 255
             self.mav.mav.srcComponent = 190
             if getattr(self, "tlog_path", None):
                 try:
@@ -339,6 +363,7 @@ class MavBridge(QtCore.QObject):
             if now - t_hb > 1.0:                     # jaga link tetap hidup
                 self._send_gcs_heartbeat()
                 t_hb = now
+                self._retry_ack_wait(now)
             if now - t_req > 20.0:                   # segarkan permintaan rate
                 self._request_rates()
                 t_req = now
@@ -365,6 +390,12 @@ class MavBridge(QtCore.QObject):
             elif t == "SYS_STATUS":
                 v = msg.voltage_battery / 1000.0
                 self.state["volt"] = v if v > 1.0 else None      # sim sering kirim 0
+                try:
+                    self.state["prearm_ok"] = bool(
+                        msg.onboard_control_sensors_health
+                        & mavutil.mavlink.MAV_SYS_STATUS_PREARM_CHECK)
+                except Exception:                              # noqa: BLE001
+                    pass
                 c = msg.current_battery / 100.0
                 self.state["curr"] = c if c > 0.05 else None
                 self.state["remaining"] = msg.battery_remaining if msg.battery_remaining != -1 else None
@@ -398,9 +429,9 @@ class MavBridge(QtCore.QObject):
                 cmd = int(msg.command)
                 hasil = int(msg.result)
                 tag = ""
-                for i, (c, tg) in enumerate(self._ack_wait):
-                    if c == cmd:
-                        tag = tg
+                for i, item in enumerate(self._ack_wait):
+                    if item[0] == cmd:
+                        tag = str(item[1])
                         del self._ack_wait[i]
                         break
                 self.sig_ack.emit(cmd, hasil, tag)

@@ -821,6 +821,21 @@ class RovConsole(QtWidgets.QMainWindow):
         VO.MotorTestDialog(self.bridge, self).exec()
 
     def _arm(self, on):
+        if on:
+            pf = getattr(self, "pf", None)
+            try:
+                total = len(pf.cb) if pf is not None else 0
+                belum = sum(1 for c in pf.cb.values() if not c.isChecked()) if total else 0
+                if belum:
+                    r = QtWidgets.QMessageBox.question(
+                        self, "Pre-dive checklist",
+                        "Checklist pre-dive %d/%d tercentang.\n"
+                        "Lanjut ARM? (ala 'Enforce Preflight' QGC)" % (total - belum, total))
+                    if r != QtWidgets.QMessageBox.Yes:
+                        self._catat("ARM dibatalkan — checklist pre-dive belum lengkap")
+                        return
+            except Exception:                              # noqa: BLE001
+                pass
         self.bridge.queue_arm(bool(on))
         self._catat("perintah %s dikirim (uji kolam dulu)" % ("ARM" if on else "DISARM"))
 

@@ -33,6 +33,8 @@ CMD_PREFLIGHT_CALIBRATION = 241
 CMD_DO_START_MAG_CAL = 42424
 CMD_ACCELCAL_VEHICLE_POS = 42429
 CMD_DO_MOTOR_TEST = 209
+CMD_DO_ACCEPT_MAG_CAL = 42425
+CMD_DO_CANCEL_MAG_CAL = 42426
 
 ACCEL_POSISI = (
     (1, "DATAR (LEVEL)", "Posisi normal ROV — kaki menghadap bawah, tahan diam."),
@@ -109,7 +111,9 @@ class SimpleCalDialog(QtWidgets.QDialog):
         elif self.jenis == "level":
             self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION, p5=2, tag="level-cal")
         elif self.jenis == "mag":
-            # VERIFY: p1=0 (semua kompas), p2=1 (retry), p3=1 (autosave), p4=0
+            # pola QGC: cancel dulu (flush report lama), lalu start.
+            # p1=0 semua kompas · p2=1 retry internal · p3=1 autosave · p4=0 delay.
+            self.bridge.queue_command(CMD_DO_CANCEL_MAG_CAL, p1=0, tag="mag-cancel")
             self.bridge.queue_command(CMD_DO_START_MAG_CAL, p1=0, p2=1, p3=1, p4=0,
                                       tag="mag-cal")
         self.lbl.setText("perintah dikirim — tunggu umpan balik kendaraan …")
@@ -136,15 +140,26 @@ class SimpleCalDialog(QtWidgets.QDialog):
         self.lbl.setText("kalibrasi kompas … %d%%" % int(pct))
 
     def _mag_report(self, d):
-        status = {0: "belum mulai", 1: "berjalan", 2: "SUKSES", 3: "GAGAL",
-                  4: "ORIENTASI BURUK", 5: "RADIUS BURUK"}.get(d.get("cal_status"), "?")
+        # MAG_CAL_STATUS (MAVLink): 0 NOT_STARTED · 1/2 RUNNING · 3 SUCCESS ·
+        # 4 FAILED · 5 BAD_ORIENTATION · 6 BAD_RADIUS · 7 BAD_FIT
+        status = {0: "belum mulai", 1: "berjalan (1)", 2: "berjalan (2)", 3: "SUKSES",
+                  4: "GAGAL", 5: "ORIENTASI BURUK", 6: "RADIUS BURUK",
+                  7: "FIT BURUK"}.get(d.get("cal_status"), "?")
         try:
-            self.bar.setValue(100 if d.get("cal_status") == 2 else self.bar.value())
+            self.bar.setValue(100 if d.get("cal_status") == 3 else self.bar.value())
         except Exception:                                  # noqa: BLE001
             pass
         self.lbl.setText("hasil kalibrasi kompas: %s" % status)
-        if d.get("cal_status") == 2:
-            self.b_start.setEnabled(False)
+        if d.get("cal_status") == 3:
+            if not d.get("autosaved", 1):
+                # sukses tapi BELUM tersimpan -> terima eksplisit (pola QGC)
+                self.bridge.queue_command(CMD_DO_ACCEPT_MAG_CAL, p1=0, tag="mag-accept")
+                self.lbl.setText("kompas SUKSES — menyimpan paksa (DO_ACCEPT_MAG_CAL) …")
+            else:
+                self.lbl.setText("kompas SUKSES & tersimpan. Disarankan reboot autopilot "
+                                 "sebelum arming.")
+            self.b_start.setEnabled(True)
+            self._selesai = True
 
 
 class AccelCalDialog(QtWidgets.QDialog):
@@ -284,15 +299,17 @@ class MotorTestDialog(QtWidgets.QDialog):
         self.b_test.setObjectName("BtnTiny")
         self.b_detect = QtWidgets.QPushButton("MODE MOTOR DETECT")
         self.b_detect.setObjectName("BtnTiny")
-        self.b_detect.setToolTip("ubah mode ke MOTOR_DETECT (20) untuk deteksi arah otomatis di air")
+        self.b_detect.setToolTip("ubah mode MOTOR_DETECT (20): deteksi arah otomatis di AIR, "
+                                 "ROV armed — hasil lewat notifikasi")
         self.b_close = QtWidgets.QPushButton("TUTUP")
         self.b_close.setObjectName("BtnTiny")
         row.addStretch(1)
         row.addWidget(self.b_test)
         row.addWidget(self.b_detect)
         row.addWidget(self.b_close)
-        self.lbl = QtWidgets.QLabel("catatan: bila autopilot menolak (DENIED) saat disarmed, "
-                                    "coba saat mode MANUAL & mengikuti prosedur keamanan — VERIFY di kolam.")
+        self.lbl = QtWidgets.QLabel(
+            "catatan: ArduSub mewajibkan ROV ARMED + safety switch dilepas; perintah dikirim "
+            "ulang otomatis tiap 0,4 dtk (watchdog 500 ms). Nomor motor 0/1-based: VERIFY di bench.")
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         v.addWidget(t)
@@ -310,11 +327,40 @@ class MotorTestDialog(QtWidgets.QDialog):
         if not self.cb_aman.isChecked():
             self.lbl.setText("tandai 'area aman' dulu.")
             return
+        # ArduSub: p6=2 (ORDER_BOARD) WAJIB; p4 (timeout) DIABAIKAN Sub -> durasi
+        # dijalankan di GUI, dengan kiriman ulang tiap 0,4 dtk (watchdog 500 ms).
+        self._sisa = max(3, int(self.sp_dur.value() * 3))
+        self.b_test.setEnabled(False)
+        if not hasattr(self, "_timer_motor"):
+            self._timer_motor = QtCore.QTimer(self)
+            self._timer_motor.setInterval(400)
+            self._timer_motor.timeout.connect(self._kirim_motor)
+        self._kirim_motor()
+        self._timer_motor.start()
+
+    def _kirim_motor(self):
+        if getattr(self, "_sisa", 0) <= 0:
+            self._timer_motor.stop()
+            self._hentikan_motor()
+            self.b_test.setEnabled(True)
+            return
+        self._sisa -= 1
         self.bridge.queue_command(
             CMD_DO_MOTOR_TEST,
             p1=self.sp_motor.value(), p2=0, p3=self.sp_thr.value(),
-            p4=self.sp_dur.value(), p5=1, tag="motor-%d" % self.sp_motor.value())
-        self.lbl.setText("perintah motor %d dikirim …" % self.sp_motor.value())
+            p4=self.sp_dur.value(), p5=1, p6=2,
+            tag="motor-%d" % self.sp_motor.value())
+        self.lbl.setText("motor %d @ %d%% — %d kiriman lagi …" %
+                         (self.sp_motor.value(), self.sp_thr.value(), self._sisa))
+
+    def _hentikan_motor(self):
+        """Kirim perintah stop (throttle 0) — pengaman tambahan di atas watchdog."""
+        try:
+            self.bridge.queue_command(CMD_DO_MOTOR_TEST, p1=self.sp_motor.value(),
+                                      p2=0, p3=0, p4=1, p5=1, p6=2, tag="motor-stop")
+        except Exception:                                  # noqa: BLE001
+            pass
+        self.lbl.setText("motor test selesai.")
 
     def _ack(self, cmd, hasil, tag):
         if cmd != CMD_DO_MOTOR_TEST:
@@ -437,9 +483,11 @@ class FailsafePanel(QtWidgets.QWidget):
         ("BATT_FS_CRT_ACT", "Aksi baterai kritis", "combo",
          [("Nonaktif", 0), ("Peringatan", 1), ("Disarm", 2), ("SURFACE", 3)],
          "VERIFY: opsi Surface di firmware Anda."),
-        ("ARMING_CHECK", "Arming check", "combo",
-         [("Nonaktif", 0), ("Aktif (disarankan)", 1)],
-         "Pemeriksaan pra-arm; biarkan aktif."),
+        ("ARMING_SKIPCHK", "Arming checks to SKIP", "combo",
+         [("Run ALL checks (recommended)", 0), ("Skip barometer", 1),
+          ("Skip compass", 2), ("Skip INS", 8), ("Skip battery", 128)],
+         "ArduSub 4.7+: bitmask pemeriksaan yang DILEWATI (0 = jalankan semua). "
+         "Firmware lama memakai ARMING_CHECK dengan makna TERBALIK — VERIFY."),
     )
 
     def __init__(self, bridge, parent=None):
@@ -701,11 +749,16 @@ class PreflightPanel(QtWidgets.QWidget):
         hidup = sum(1 for p in players.values() if p._qimg is not None)
         self._set("kamera", "ok" if hidup >= 2 else ("warn" if hidup else "err"),
                   "%d/%d" % (hidup, len(players)))
-        # pre-arm (pesan warning terbaru yang mengandung prearm/fail)
+        # pre-arm: bit kesehatan SYS_STATUS (MAV_SYS_STATUS_PREARM_CHECK) = pola QGC;
+        # pesan "PreArm:" terbaru menang bila severity warning/lebih buruk.
         if ("prearm" in txt or "pre-arm" in txt) and s.get("last_text_sev", 6) <= 4:
             self._set("prearm", "err", "cek notifikasi")
+        elif s.get("prearm_ok") is False:
+            self._set("prearm", "warn", "belum siap")
+        elif s.get("prearm_ok"):
+            self._set("prearm", "ok", "siap")
         else:
-            self._set("prearm", "ok", "ok")
+            self._set("prearm", "ink_faint", "—")
 
         # ringkasan
         kurang = [k for k, c in self.cb.items() if not c.isChecked()]

@@ -47,7 +47,8 @@ def main():
         m.mav.vfr_hud_send(0.4, 0.0, int((t * 12) % 360), 30, 5.0, 0.0)
         # press_diff ~ 502 hPa → depth ≈ 5 m (temp 21.00 °C)
         m.mav.scaled_pressure2_send(ms, 1013.25, 502.0, 2100)
-        m.mav.sys_status_send(0, 0, 0, 500, 14800, 150, 75, 0, 0, 0, 0, 0, 0)
+        # health bit PREARM_CHECK (MAV_SYS_STATUS_PREARM_CHECK = 268435456) -> uji [16]
+        m.mav.sys_status_send(0, 268435456, 268435456, 500, 14800, 150, 75, 0, 0, 0, 0, 0, 0)
         # nilai sub ala ArduSub (NAMED_VALUE_FLOAT) + servo outputs (PWM ch16 tilt)
         for nm, val in ((b"CamTilt", 0.62), (b"Lights1", 0.35),
                         (b"PilotGain", 0.50), (b"TetherTrn", 0.0)):
@@ -87,7 +88,8 @@ def main():
                                        mavutil.mavlink.MAV_PARAM_TYPE_REAL32,
                                        len(PARAMS), 0)
             elif tp == "COMMAND_LONG":
-                stats["cmd"].append([int(msg.command), float(msg.param1)])
+                stats["cmd"].append([int(msg.command), float(msg.param1),
+                                     float(msg.param6)])
                 m.mav.command_ack_send(int(msg.command), 0)      # ACCEPTED
             elif tp == "MANUAL_CONTROL":
                 stats["manual"] += 1

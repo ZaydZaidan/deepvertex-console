@@ -126,7 +126,8 @@ def main():
     w.bridge.sig_ack.connect(lambda c, r, t: acks.append((c, r, t)))
     w.bridge.queue_command(VO.CMD_PREFLIGHT_CALIBRATION, p1=1, tag="gyro-cal")
     ok_cal = tunggu(lambda: any(c == 241 for c, _r, _t in acks), 8)
-    w.bridge.queue_command(VO.CMD_DO_MOTOR_TEST, p1=1, p2=0, p3=15, p4=2, p5=1, tag="motor-1")
+    w.bridge.queue_command(VO.CMD_DO_MOTOR_TEST, p1=1, p2=0, p3=15, p4=2, p5=1, p6=2,
+                           tag="motor-1")
     ok_mot = tunggu(lambda: any(c == 209 for c, _r, _t in acks), 8)
     print("[7] ACK kalibrasi(241)=%s ACK motor(209)=%s" % (ok_cal, ok_mot))
     lulus &= bool(ok_cal and ok_mot)
@@ -168,6 +169,23 @@ def main():
     ok_keep = tunggu(lambda: baca_stats().get("rc", 0) >= n0 + 2, 6)
     print("[15] RC override tilt dipertahankan (keep-alive):", ok_keep)
     lulus &= bool(ok_keep)
+
+    ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
+    print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
+    lulus &= bool(ok_pre)
+
+    d = VO.MotorTestDialog(w.bridge, w)
+    d.cb_aman.setChecked(True)
+    d.sp_dur.setValue(1)
+    n209 = len([c for c in baca_stats().get("cmd", []) if c[0] == 209])
+    d._test()
+    jalan(2.8)
+    cmds = baca_stats().get("cmd", [])
+    baru = [c for c in cmds if c[0] == 209][n209:]
+    ok_mot2 = len(baru) >= 2 and all(len(c) > 2 and c[2] == 2 for c in baru)
+    print("[17] motor test berulang >=2x & p6=2:", ok_mot2, "(kiriman: %d)" % len(baru))
+    lulus &= bool(ok_mot2)
+    d.close()
 
     hasil = {}
     w.rawpanel.client.sig_result.connect(lambda tag, d: hasil.__setitem__(tag, d))
