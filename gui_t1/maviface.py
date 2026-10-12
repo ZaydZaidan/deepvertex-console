@@ -26,6 +26,7 @@ PIXHAWK = {
     "mode": "--", "armed": False, "ekf_ok": None, "volt": None, "curr": None,
     "remaining": None, "temp": None, "press_abs": None, "press_diff": None,
     "heading": None, "throttle": None, "depth": None, "last_text": "", "last_text_sev": 6,
+    "nvf": {}, "servo": {},
     "msgs": 0, "link": False, "endpoint": "--",
 }
 
@@ -39,6 +40,8 @@ WANTED = [
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "EKF_STATUS_REPORT"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 5, "STATUSTEXT"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "HEARTBEAT"),
+    ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "NAMED_VALUE_FLOAT"),
+    ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "SERVO_OUTPUT_RAW"),
 ]
 
 
@@ -47,6 +50,11 @@ class MavBridge(QtCore.QObject):
     sig_vehicle = QtCore.Signal(dict)
     sig_text = QtCore.Signal(str, int)                  # teks, severity
     sig_status = QtCore.Signal(str)
+    sig_param = QtCore.Signal(str, float)               # nama, nilai (PARAM_VALUE)
+    sig_params_done = QtCore.Signal(int)                # jumlah param selesai diunduh
+    sig_ack = QtCore.Signal(int, int, str)              # command, result, tag
+    sig_mag_progress = QtCore.Signal(int)               # 0..100
+    sig_mag_report = QtCore.Signal(dict)                # hasil akhir kalibrasi kompas
 
     def __init__(self, url="auto", parent=None):
         super().__init__(parent)
@@ -64,6 +72,12 @@ class MavBridge(QtCore.QObject):
         # antrian perintah dari GUI (mode/arm) -> dikirim dari thread MAVLink ini
         self._cmdq = []
         self._cmd_lock = threading.Lock()
+        self._fastq = []           # antrian cepat (~20 Hz): manual control / RC override
+        self._fast_lock = threading.Lock()
+        self.params = {}           # cache parameter (PARAM_VALUE)
+        self.param_count = 0
+        self._params_done = False
+        self._ack_wait = []        # (command, tag) menunggu COMMAND_ACK
 
     # ------------------------------------------------------------------ #
     def start(self):
@@ -103,6 +117,36 @@ class MavBridge(QtCore.QObject):
         with self._cmd_lock:
             self._cmdq.append(("arm", bool(on)))
 
+    # ---- perluasan T1: parameter, perintah umum, kalibrasi, manual control -------
+    def queue_param_set(self, nama, nilai):
+        with self._cmd_lock:
+            self._cmdq.append(("param", (str(nama), float(nilai))))
+
+    def queue_param_list(self):
+        with self._cmd_lock:
+            self._cmdq.append(("paramlist", None))
+
+    def queue_command(self, cmd, p1=0.0, p2=0.0, p3=0.0, p4=0.0, p5=0.0, p6=0.0, p7=0.0,
+                      tag=""):
+        """COMMAND_LONG umum (kalibrasi, motor test). ACK -> sig_ack(cmd, result, tag)."""
+        with self._cmd_lock:
+            self._cmdq.append(("cmdlong", (int(cmd), (p1, p2, p3, p4, p5, p6, p7), str(tag))))
+
+    def send_manual_control(self, x=0, y=0, z=500, r=0, buttons=0):
+        """MANUAL_CONTROL gaya QGC. PENTING (ArduSub): z 0..1000, NETRAL = 500."""
+        with self._fast_lock:
+            self._fastq.append(("manual", (int(x), int(y), int(z), int(r), int(buttons))))
+
+    def rc_override(self, kanal_nilai):
+        """RC override selektif: {kanal (1..18): pwm}. Kanal lain 0 = tidak menimpa."""
+        with self._fast_lock:
+            self._fastq.append(("rc", dict(kanal_nilai)))
+
+    def rc_release(self):
+        """Lepas seluruh RC override (18 kanal = 0)."""
+        with self._fast_lock:
+            self._fastq.append(("rc", {}))
+
     def _drain_cmds(self):
         with self._cmd_lock:
             cmds, self._cmdq = self._cmdq, []
@@ -122,8 +166,47 @@ class MavBridge(QtCore.QObject):
                         mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
                         1 if val else 0, 0, 0, 0, 0, 0, 0)
                     self.sig_status.emit("%s requested" % ("ARM" if val else "DISARM"))
+                elif kind == "param":
+                    nama, nilai = val
+                    self.mav.mav.param_set_send(self.mav.target_system,
+                                                self.mav.target_component,
+                                                nama.encode("utf-8"), float(nilai),
+                                                mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+                    self.sig_status.emit("PARAM_SET %s = %s" % (nama, nilai))
+                elif kind == "paramlist":
+                    self.params = {}
+                    self.param_count = 0
+                    self._params_done = False
+                    self.mav.mav.param_request_list_send(self.mav.target_system,
+                                                         self.mav.target_component)
+                    self.sig_status.emit("meminta daftar parameter ...")
+                elif kind == "cmdlong":
+                    cmd, (p1, p2, p3, p4, p5, p6, p7), tag = val
+                    self.mav.mav.command_long_send(self.mav.target_system,
+                                                   self.mav.target_component,
+                                                   cmd, 0, p1, p2, p3, p4, p5, p6, p7)
+                    self._ack_wait.append((cmd, tag))
+                    self.sig_status.emit("cmd %d dikirim (%s)" % (cmd, tag or "perintah"))
             except Exception as e:
                 self.sig_status.emit("vehicle command failed: %r" % e)
+
+    def _drain_fast(self):
+        """Antrian cepat (~20 Hz): manual control & RC override — bukan jalur 1 Hz."""
+        with self._fast_lock:
+            cmds, self._fastq = self._fastq, []
+        if not cmds or self.mav is None:
+            return
+        for kind, val in cmds:
+            try:
+                if kind == "manual":
+                    x, y, z, r, b = val
+                    self.mav.mav.manual_control_send(self.mav.target_system, x, y, z, r, b)
+                elif kind == "rc":
+                    ch = [int(val.get(i, 0)) for i in range(1, 19)]
+                    self.mav.mav.rc_channels_override_send(
+                        self.mav.target_system, self.mav.target_component, *ch)
+            except Exception as e:
+                self.sig_status.emit("fast cmd failed: %r" % e)
 
     def _send_gcs_heartbeat(self):
         """WAJIB: tanpa paket dari GCS, ArduPilot tidak membuka stream telemetri."""
@@ -200,22 +283,30 @@ class MavBridge(QtCore.QObject):
 
         self.state["link"] = True
         self.state["endpoint"] = url
+        self.params = {}
+        self.param_count = 0
+        self._params_done = False
+        self.state["nvf"] = {}
+        self.state["servo"] = {}
         self.sig_status.emit(f"MAVLink connected via {url} (sys {got.get_srcSystem()})")
         self._request_rates()
-        t_req = t_hb = time.monotonic()
+        t_req = t_hb = t_cmd = time.monotonic()
         t_att = t_veh = 0.0
 
         while not self._stop.is_set():
             now = time.monotonic()
+            self._drain_fast()                       # manual control / RC override
+            if now - t_cmd > 0.2:                    # antrian perintah GUI
+                self._drain_cmds()
+                t_cmd = now
             if now - t_hb > 1.0:                     # jaga link tetap hidup
                 self._send_gcs_heartbeat()
-                self._drain_cmds()
                 t_hb = now
             if now - t_req > 20.0:                   # segarkan permintaan rate
                 self._request_rates()
                 t_req = now
             try:
-                msg = self.mav.recv_match(blocking=True, timeout=1.0)
+                msg = self.mav.recv_match(blocking=True, timeout=0.05)
             except Exception:
                 msg = None
             if msg is None:
@@ -251,6 +342,46 @@ class MavBridge(QtCore.QObject):
                 if msg.battery_remaining != -1:
                     self.state["remaining"] = msg.battery_remaining
 
+            elif t == "PARAM_VALUE":
+                pid = msg.param_id
+                if isinstance(pid, bytes):
+                    pid = pid.decode("utf-8", "ignore")
+                pid = str(pid).rstrip("\x00")
+                val = float(msg.param_value)
+                self.params[pid] = val
+                self.param_count = int(msg.param_count)
+                self.sig_param.emit(pid, val)
+                if (not self._params_done and self.param_count > 0
+                        and len(self.params) >= self.param_count):
+                    self._params_done = True
+                    self.sig_params_done.emit(len(self.params))
+
+            elif t == "COMMAND_ACK":
+                cmd = int(msg.command)
+                hasil = int(msg.result)
+                tag = ""
+                for i, (c, tg) in enumerate(self._ack_wait):
+                    if c == cmd:
+                        tag = tg
+                        del self._ack_wait[i]
+                        break
+                self.sig_ack.emit(cmd, hasil, tag)
+                nm = {0: "ACCEPTED", 1: "TEMPORARILY_REJECTED", 2: "DENIED", 3: "UNSUPPORTED",
+                      4: "FAILED", 5: "IN_PROGRESS"}.get(hasil, str(hasil))
+                self.sig_status.emit("ACK cmd %d: %s%s" % (cmd, nm,
+                                                           (" [" + tag + "]") if tag else ""))
+
+            elif t == "MAG_CAL_PROGRESS":
+                self.sig_mag_progress.emit(int(msg.completion_pct))
+
+            elif t == "MAG_CAL_REPORT":
+                self.sig_mag_report.emit({
+                    "compass_id": int(msg.compass_id),
+                    "cal_status": int(msg.cal_status),
+                    "autosaved": int(getattr(msg, "autosaved", 0)),
+                    "ofs": (float(msg.ofs_x), float(msg.ofs_y), float(msg.ofs_z)),
+                })
+
             elif t == "SCALED_PRESSURE2":
                 # di sim Stonefish nilai tekanan bisa tidak realistis -> simpan apa adanya
                 # tapi jangan tampilkan angka mustahil sebagai kedalaman
@@ -271,6 +402,19 @@ class MavBridge(QtCore.QObject):
             elif t == "VFR_HUD":
                 self.state["heading"] = msg.heading
                 self.state["throttle"] = msg.throttle
+
+            elif t == "NAMED_VALUE_FLOAT":
+                nm = msg.name
+                if isinstance(nm, bytes):
+                    nm = nm.decode("utf-8", "ignore")
+                self.state["nvf"][str(nm).rstrip("\x00")] = float(msg.value)
+
+            elif t == "SERVO_OUTPUT_RAW":
+                d = self.state["servo"]
+                for i in range(1, 17):
+                    v = getattr(msg, "servo%d_output" % i, None)
+                    if v:
+                        d[i] = int(v)
 
             elif t == "EKF_STATUS_REPORT":
                 flags = msg.flags

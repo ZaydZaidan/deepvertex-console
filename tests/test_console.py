@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Uji konsol T1 offscreen: 3 stream dummy + MAVLink palsu + agen RAW (--test).
+"""Uji konsol T1 offscreen (v2): 3 stream dummy + MAVLink palsu (PARAM/ACK) +
+agen RAW (--test) + teleop simulasi. Semua fitur inti diuji tanpa hardware.
 
 Prasyarat: agen RAW jalan di :8791 (lihat tests/test_raw.py docstring).
 Jalankan dari folder gui_t1:  .venv/bin/python ../tests/test_console.py
 """
 import glob
+import json
 import os
 import subprocess
 import sys
@@ -20,6 +22,7 @@ from PySide6 import QtWidgets          # noqa: E402
 
 SCRATCH = os.path.expanduser("~/.hermes/cache/scratch/t1test")
 os.makedirs(SCRATCH, exist_ok=True)
+STATS = os.path.join(SCRATCH, "fv_stats.json")
 
 
 def sumber(port):
@@ -30,21 +33,36 @@ def sumber(port):
         stderr=subprocess.DEVNULL)
 
 
+def baca_stats():
+    try:
+        with open(STATS, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:                                      # noqa: BLE001
+        return {}
+
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    srcs = [sumber(p) for p in (5600, 5601, 5602)]
+    try:
+        os.remove(STATS)
+    except OSError:
+        pass
+    srcs = [sumber(p) for p in (5620, 5621, 5622)]
     fake = subprocess.Popen([sys.executable, os.path.join(HERE, "fake_vehicle.py"),
-                             "--endpoint", "udpout:127.0.0.1:14550", "--secs", "30"])
+                             "--endpoint", "udpout:127.0.0.1:14560", "--secs", "90",
+                             "--stats", STATS])
     time.sleep(1.5)
 
     import rov_console_real as rc
+    import vehicleops as VO
 
     args = SimpleNamespace(
-        mavlink="udpin:0.0.0.0:14550",
-        front_port=5600, left_port=5601, right_port=5602,
-        port_front=5600, port_stereo_L=5601, port_stereo_R=5602,
+        mavlink="udpin:0.0.0.0:14560",
+        front_port=5620, left_port=5621, right_port=5622,
+        port_front=5620, port_stereo_L=5621, port_stereo_R=5622,
         raw_agent="http://127.0.0.1:8791",
-        outdir=os.path.join(SCRATCH, "cons"))
+        outdir=os.path.join(SCRATCH, "cons"),
+        preset="pilot-focus", no_pad=False)
     w = rc.RovConsole(args)
     w.show()
 
@@ -64,15 +82,15 @@ def main():
         return False
 
     lulus = True
+
     ok_frames = tunggu(lambda: all(w.players[n]._qimg is not None
                                    for n in ("front", "stereo L", "stereo R")), 15)
     print("[1] frame tiga stream:", ok_frames)
     lulus &= ok_frames
 
     ok_mav = tunggu(lambda: (w.last.get("mode") not in (None, "--")) and bool(w.last.get("volt")), 15)
-    print("[2] telemetri: mode=%s armed=%s volt=%s depth=%s head=%s" % (
-        w.last.get("mode"), w.last.get("armed"), w.last.get("volt"),
-        w.last.get("depth"), w.last.get("heading")))
+    print("[2] telemetri: mode=%s volt=%s depth=%s head=%s" % (
+        w.last.get("mode"), w.last.get("volt"), w.last.get("depth"), w.last.get("heading")))
     lulus &= bool(ok_mav)
 
     w.btn_rec["front"].setChecked(True)
@@ -82,8 +100,7 @@ def main():
     files = sorted(glob.glob(os.path.join(w.sesi, "front_*")))
     size = os.path.getsize(files[-1]) if files else 0
     ok_rec = bool(files) and size > 50000
-    print("[3] rekam front: stop_ok=%s file=%s size=%.0f B" % (
-        ok_stop, os.path.basename(files[-1]) if files else None, size))
+    print("[3] rekam front: stop_ok=%s size=%.0f B" % (ok_stop, size))
     lulus &= ok_rec
 
     w._snap("stereo L")
@@ -91,12 +108,63 @@ def main():
     print("[4] snapshot stereo L:", bool(snaps))
     lulus &= bool(snaps)
 
+    try:
+        for nm in ("setup", "capture", "mapping", "pilot-focus"):
+            w._apply_preset(nm)
+        jalan(0.5)
+        print("[5] preset berganti tanpa error: True")
+    except Exception as exc:                               # noqa: BLE001
+        print("[5] preset error:", exc)
+        lulus = False
+
+    w.bridge.queue_param_list()
+    ok_par = tunggu(lambda: len(w.bridge.params) >= 12, 10)
+    print("[6] parameter terunduh: %d (butuh>=12) ok=%s" % (len(w.bridge.params), ok_par))
+    lulus &= ok_par
+
+    acks = []
+    w.bridge.sig_ack.connect(lambda c, r, t: acks.append((c, r, t)))
+    w.bridge.queue_command(VO.CMD_PREFLIGHT_CALIBRATION, p1=1, tag="gyro-cal")
+    ok_cal = tunggu(lambda: any(c == 241 for c, _r, _t in acks), 8)
+    w.bridge.queue_command(VO.CMD_DO_MOTOR_TEST, p1=1, p2=0, p3=15, p4=2, p5=1, tag="motor-1")
+    ok_mot = tunggu(lambda: any(c == 209 for c, _r, _t in acks), 8)
+    print("[7] ACK kalibrasi(241)=%s ACK motor(209)=%s" % (ok_cal, ok_mot))
+    lulus &= bool(ok_cal and ok_mot)
+
+    w.bridge.queue_param_set("FS_GCS_TIMEOUT", 6)
+    ok_set = tunggu(lambda: any(n == "FS_GCS_TIMEOUT" for n, _v in baca_stats().get("param_set", [])), 8)
+    print("[8] PARAM_SET sampai ke kendaraan:", ok_set)
+    lulus &= bool(ok_set)
+
+    w.gamepad.sim_axes = {1: 0.8, 0: 0.0, 4: 0.0, 3: 0.0}
+    w.gamepad.sim_buttons = {4: True}
+    for _ in range(6):
+        w.gamepad._tick()
+        jalan(0.1)
+    ok_man = tunggu(lambda: baca_stats().get("manual", 0) > 0, 8)
+    print("[9] MANUAL_CONTROL terkirim (teleop simulasi):", ok_man)
+    lulus &= bool(ok_man)
+
+    ok_nvf = tunggu(lambda: (w.bridge.state.get("nvf") or {}).get("CamTilt") is not None, 8)
+    ro = w.ro_camtilt.val.text()
+    print("[12] nilai sub: nvf=%s CamTilt readout=%r" % (ok_nvf, ro))
+    lulus &= bool(ok_nvf and ro not in ("", "\u2014"))
+
     hasil = {}
     w.rawpanel.client.sig_result.connect(lambda tag, d: hasil.__setitem__(tag, d))
     w.rawpanel.client.status()
     ok_raw = tunggu(lambda: "status" in hasil, 8) and bool(hasil.get("status", {}).get("ok"))
-    print("[5] agen RAW dari panel:", ok_raw)
+    print("[10] agen RAW dari panel:", ok_raw)
     lulus &= bool(ok_raw)
+
+    try:
+        d1 = VO.SimpleCalDialog(w.bridge, "gyro", w); d1.close()
+        d2 = VO.AccelCalDialog(w.bridge, w); d2.close()
+        d3 = VO.MotorTestDialog(w.bridge, w); d3.close()
+        print("[11] dialog kalibrasi & motor test konstruksi: True")
+    except Exception as exc:                               # noqa: BLE001
+        print("[11] dialog error:", exc)
+        lulus = False
 
     print("HASIL-UJI-KONSOL:", "LULUS" if lulus else "GAGAL")
     w.close()

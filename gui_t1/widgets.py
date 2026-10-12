@@ -711,6 +711,93 @@ class Horizon(QtWidgets.QWidget):
         p.end()
 
 
+class Kompas(QtWidgets.QWidget):
+    """Kompas bulat ala QGC: kartu berputar (heading di atas) + lubber line + angka.
+
+    Gaya visual mengikuti Horizon: latar transparan, garis tipis, aksen tema.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.heading = 0.0
+        self.setMinimumSize(120, 120)
+
+    def set_heading(self, deg):
+        try:
+            self.heading = float(deg) % 360.0
+        except (TypeError, ValueError):
+            return
+        self.update()
+
+    def paintEvent(self, _):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        w, h = self.width(), self.height()
+        r = min(w, h) / 2 - 2
+        cx, cy = w / 2, h / 2
+
+        # kartu berputar: utara menghadap sesuai heading (heading di atas = lubber)
+        p.save()
+        p.translate(cx, cy)
+        p.rotate(-self.heading)
+        for a in range(0, 360, 15):
+            rad = math.radians(a - 90)
+            if a % 90 == 0:
+                r0, wpen = r - 11, 2
+            elif a % 45 == 0:
+                r0, wpen = r - 8, 1
+            else:
+                r0, wpen = r - 5, 1
+            col = theme.TEXT_DIM if a % 90 == 0 else theme.HAIRLINE_HI
+            p.setPen(QtGui.QPen(QtGui.QColor(col), wpen))
+            p.drawLine(QPointF(math.cos(rad) * r0, math.sin(rad) * r0),
+                       QPointF(math.cos(rad) * r, math.sin(rad) * r))
+        f = p.font()
+        f.setFamily(theme.FONT_UI)
+        f.setPixelSize(11)
+        f.setBold(True)
+        p.setFont(f)
+        fm = QtGui.QFontMetricsF(f)
+        for lab, a in (("N", 0), ("E", 90), ("S", 180), ("W", 270)):
+            rad = math.radians(a - 90)
+            p.setPen(QtGui.QColor(theme.ACCENT if lab == "N" else theme.TEXT))
+            p.drawText(QPointF(math.cos(rad) * (r - 23) - fm.horizontalAdvance(lab) / 2,
+                               math.sin(rad) * (r - 23) + 4), lab)
+        # panah utara (merah/aksen) di dalam huruf N
+        rad = math.radians(-90)
+        p.setPen(QtGui.QPen(QtGui.QColor(theme.ACCENT), 2))
+        p.drawLine(QPointF(math.cos(rad) * (r - 33), math.sin(rad) * (r - 33)),
+                   QPointF(math.cos(rad) * (r - 27), math.sin(rad) * (r - 27)))
+        p.restore()
+
+        # cincin luar + lubber line (tetap di atas)
+        p.setPen(QtGui.QPen(QtGui.QColor(theme.HAIRLINE_HI), 1))
+        p.setBrush(Qt.NoBrush)
+        p.drawEllipse(QPointF(cx, cy), r, r)
+        p.setPen(QtGui.QPen(QtGui.QColor(theme.ACCENT), 2))
+        p.drawLine(QPointF(cx, cy - r + 1), QPointF(cx - 5, cy - r + 11))
+        p.drawLine(QPointF(cx, cy - r + 1), QPointF(cx + 5, cy - r + 11))
+
+        # angka heading di tengah (tetap)
+        f2 = p.font()
+        f2.setFamily(theme.FONT_MONO)
+        f2.setPixelSize(15)
+        f2.setBold(True)
+        p.setFont(f2)
+        fm2 = QtGui.QFontMetricsF(f2)
+        teks = "%03d" % (int(round(self.heading)) % 360)
+        p.setPen(QtGui.QColor(theme.TEXT))
+        p.drawText(QPointF(cx - fm2.horizontalAdvance(teks) / 2, cy + 6), teks)
+        f3 = p.font()
+        f3.setFamily(theme.FONT_UI)
+        f3.setPixelSize(8)
+        p.setFont(f3)
+        fm3 = QtGui.QFontMetricsF(f3)
+        p.setPen(QtGui.QColor(theme.TEXT_FAINT))
+        p.drawText(QPointF(cx - fm3.horizontalAdvance("HDG") / 2, cy + 20), "HDG")
+        p.end()
+
+
 # --------------------------------------------------------------------------- #
 # Plot lintasan (tampak atas NED): VIO vs ground truth
 # --------------------------------------------------------------------------- #

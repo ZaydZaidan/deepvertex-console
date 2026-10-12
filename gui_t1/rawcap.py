@@ -191,6 +191,7 @@ class RawPanel(QtWidgets.QWidget):
         self._timer.timeout.connect(self.client.status)
         self._timer.start(10000)
         self.client.status()
+        self.client.files()          # muat daftar chunk langsung (isi panel sejak awal)
 
     # ------------------------------------------------------------------ aksi
     def _transfer(self):
