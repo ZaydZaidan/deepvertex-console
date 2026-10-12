@@ -3,9 +3,9 @@
 Wraps `raw_agent.py` (the onboard RAW recorder) as a BlueOS extension, so the
 installation on the Pi is tidy (can be stopped/removed without a trace).
 
-> **Status: scaffold.** The metadata/manifest format is verified against the official
-> BlueOS "Extensions" document ON HAND (Step C / once the Pi 4 arrives). The camera
-> device numbers & mounting path are also confirmed on the Pi.
+> **Status: scaffold.** The metadata/manifest format will be verified against the
+> official BlueOS "Extensions" documentation during Step C (once the Pi 4 is on hand),
+> together with the camera device numbers & mounting path.
 
 ## Contents
 

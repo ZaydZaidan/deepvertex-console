@@ -1,24 +1,56 @@
-# work/ — STAGE 1 workspace (Project Coral Mapping UAV)
+# DeepVertex — Underwater Drone GUI Installer (Stage 1 · ROV mode)
 
-Working hub for Step B (all without hardware first). The original sources in
-`~/ros2_ws/...` are NOT touched; all T1 experiments & code live here.
+Topside software package for the BlueROV2 coral-mapping delivery, Phase 1 (ROV mode):
+a QGroundControl-style mission console (PySide6) plus capture and onboard RAW support.
 
-GitHub repo (private): `DeepVertex-Underwater-Drone-GUI-Installer` — versioned T1 code lives here.
-This repo MUST stay private (closed-source); the distribution artifacts for the client (binary-only +
-license) are prepared separately during packaging; `-SBC-Installer` is parked.
-How to push: rsync `work/` → clone of `repos/DeepVertex-Underwater-Drone-GUI-Installer` → commit/push.
+**PRIVATE repo — closed-source.** Distribution artifacts for the client (binary-only +
+license) are prepared separately during packaging; the robot itself stays on stock
+BlueOS (its only custom component, the RAW recorder, is deployed as a BlueOS extension).
 
-- `gui_t1/` — **the real T1 console** (working copy of the sim GUI → PySide6 migration DONE
-  + new modules: `video.py`, `rawcap.py`, `rov_console_real.py`).
-  How to run & key recipes: `gui_t1/README_T1.md`.
-- `onboard/` — **raw_agent.py**: onboard RAW recorder (production on Pi/BlueOS;
-  local test: `--test`). Its HTTP protocol is used by `gui_t1/rawcap.py`.
-- `tests/` — hardware-free tests:
-  - `test_video.py` (display/record/snapshot vs dummy stream),
-  - `test_raw.py` (agent + transfer/verify/delete),
-  - `test_console.py` (full offscreen console + `fake_vehicle.py` fake MAVLink).
-- `migrate_pyqt5_to_pyside6.py` — binding migration script (re-runnable, 58 replacements).
+## What's inside
 
-Local dependency note (dev): the `h264parse` plugin is extracted without sudo to
-`~/.hermes/cache/scratch/badpkgs/` (from the `gstreamer1.0-plugins-bad` package).
-For production: install that package, or bundle the plugin in `gui_t1/plugins/`.
+| Folder | Contents |
+|---|---|
+| `gui_t1/` | The T1 console ("ROV Mission Console", PySide6) — live 3-stream view, full MAVLink telemetry HUD, teleop, calibration / motor test / failsafe / parameter tools, OSM map, compressed capture. Folder overview: `gui_t1/README.md`; deep working notes (run, recipes, tests): `gui_t1/README_T1.md`. |
+| `onboard/` | `raw_agent.py` — onboard RAW recorder (production on the Pi via the BlueOS extension scaffold in `onboard/extension/`). |
+| `tests/` | Hardware-free test suite: `test_video.py`, `test_raw.py`, `test_console.py` (**17/17 PASS**, uses `fake_vehicle.py`), `probe_layout.py` (real-DPI layout check), `debug_misc*.py` (diagnostics). |
+| `install/` | `install_topside.sh` — topside installer. |
+| `migrate_pyqt5_to_pyside6.py` | One-shot binding migration script (58 replacements). |
+
+## Status (12 Oct 2026)
+
+Console **v2.2 + ArduSub/QGC tech-spec fixes** — all tests PASS without hardware
+(`test_console` 17/17). Key capabilities:
+
+- 3 camera streams at once (front + stereo L/R) from the BlueOS camera manager;
+- MAVLink 2 telemetry: attitude + compass dials, depth/temp, battery, QGC-style
+  INSTRUMENTS (Cam Tilt / Lights / Pilot Gain / Tether), SYS_STATUS pre-arm bit, link
+  watchdog + auto-reconnect, per-session telemetry tlog;
+- teleop with dead-man (MANUAL_CONTROL 20 Hz; RC-override keep-alive for camera tilt &
+  lights; pilot gain via `JS_GAIN_DEFAULT`);
+- vehicle ops à la QGC: arm/disarm (+ soft-gate against the pre-dive checklist), mode
+  change incl. SURFACE, gyro/baro/level calibration, 6-position accelerometer wizard,
+  compass calibration (QGC sequence), ArduSub-compliant motor test, failsafe & battery
+  panel (`ARMING_SKIPCHK` era), parameter browser;
+- OSM map à la rovgui + NED plot with a dead-reckoning position estimate (true position:
+  Stage 2 / VIO), capture markers; four layout presets (Pilot Focus / Mapping / Setup /
+  Capture);
+- capture: compressed recording + snapshots on the topside; RAW via the onboard agent;
+- AUTONOMOUS / VIO = *coming soon* (Stage 2, AUV mode).
+
+## Quick start
+
+    cd gui_t1
+    bash demo_local.sh                 # full display demo, no hardware
+    bash run_console_real.sh           # against a real ROV (MAVLink 14550, streams 5600+)
+
+## Notes
+
+- Python venv lives in `gui_t1/.venv` (PySide6 6.12 + system site packages for
+  GStreamer / pymavlink).
+- `.mkv` recording needs the `h264parse` plugin (`gstreamer1.0-plugins-bad`); a
+  sudo-free bundle can live in `gui_t1/plugins/` and is loaded automatically.
+- `libxcb-cursor0` is required for X11 (bundled sudo-free in `gui_t1/tools/xcb/`).
+- The `-SBC-Installer` repo is parked (Stage 2; the Stage-1 raw-extension path covers
+  the robot side).
+- All documents in this project are written in English.
