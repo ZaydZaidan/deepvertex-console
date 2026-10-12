@@ -1,40 +1,18 @@
-# ---------- Python ----------
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
+
+# Lingkungan virtual (besar) — buat ulang: install/install_topside.sh
 .venv/
 venv/
-.pytest_cache/
 
-# ---------- ROS 2 build ----------
-build/
-install/
-log/
+# Plugin GStreamer hasil bundel (diambil installer; jangan di-commit)
+plugins/
 
-# ---------- Log & data (jangan masuk repo) ----------
+# Artefak uji / rekaman
+*.mkv
+*.h264
+*.yuv
 *.log
-logs/
-*.bag
-*.db3
-*.mcap
-runs/
-output/
-
-# ---------- Secrets (WAJIB) ----------
-.env
-*.key
-*.pem
-secrets/
-license_private/
-
-# ---------- Artefak rilis ----------
-dist/
-*.tar
-*.tar.gz
-*.deb
-
-# ---------- OS / IDE ----------
 .DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*~

@@ -1,18 +1,17 @@
-# Third-Party Notices — DRAFT (perbarui saat packaging)
+# Third-Party Notices — DeepVertex Underwater Drone Software (T1)
 
-Repo/artefak ini memakai komponen pihak ketiga berikut. Sebelum distribusi,
-sertakan teks lisensi lengkap untuk setiap komponen yang benar-benar dikirim.
+Repo SOURCE (privat) untuk sistem Tahap 1. Komponen pihak ketiga yang dipakai:
 
 | Komponen | Lisensi | Catatan kepatuhan |
 |---|---|---|
-| VINS-Fusion (HKUST-Aerial-Robotics) | GPLv3 | Dikirim sebagai komponen terpisah (container/proses sendiri). Sertakan teks GPLv3 + penawaran source (upstream + modifikasi kita bila ada). |
-| ROS 2 (rclpy/rclcpp dll) | Apache-2.0 | Sertakan teks lisensi. |
-| PySide6 (Qt for Python) | LGPLv3 | Dynamic linking, tanpa modifikasi; sertakan lisensi. |
-| PyQt5 | GPLv3 (DIHINDARI) | Jangan masuk artefak distribusi kecuali sudah sesuai rencana (migrasi ke PySide6). |
-| OpenCV | Apache-2.0 | |
-| Ceres Solver | BSD-3-Clause | |
-| Eigen | MPL-2.0 | |
-| GStreamer | LGPL | Dipakai dinamis. |
+| PySide6 (Qt for Python) | LGPLv3 | Dynamic linking (import), tanpa modifikasi; sertakan lisensi saat distribusi. |
+| Qt 6 | LGPLv3 | Idem; tanpa modifikasi. |
+| GStreamer (core/base/good/libav/ugly) | LGPL | Dipakai dinamis; tanpa modifikasi. |
+| Plugin `h264parse` (gstreamer1.0-plugins-bad) | LGPL | Dibundel OPSIONAL oleh installer (tanpa sudo) utk rekaman `.mkv`; tanpa modifikasi. |
 | pymavlink | LGPLv3 | Import dinamis. |
+| numpy | BSD-3-Clause | |
+| Font DeepVertex Sans | turunan Plus Jakarta Sans (OFL) | Lihat `gui_t1/fonts/OFL.txt`. |
 
-Stonefish (simulator) TIDAK didistribusikan.
+Tidak ada komponen GPL yang dikirim di T1 (VINS-Fusion/Ceres = Tahap 2, dengan skema
+komplians terpisah bila dipakai lagi). PyQt5 (GPL) TIDAK dipakai — sudah dimigrasi
+ke PySide6.

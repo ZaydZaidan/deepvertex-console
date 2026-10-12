@@ -1,0 +1,16 @@
+# BlueOS extension — DeepVertex Raw Capture (scaffold; metadata diverifikasi saat Langkah C)
+version: "3.7"
+
+services:
+  deepvertex-raw-agent:
+    build: .
+    image: deepvertex/raw-agent:0.1.0
+    container_name: deepvertex-raw-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data:/data
+    # SESUAIKAN daftar device kamera stereo di Pi (cek: ls /dev/video*)
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video2:/dev/video2
