@@ -150,6 +150,25 @@ def main():
     print("[12] nilai sub: nvf=%s CamTilt readout=%r" % (ok_nvf, ro))
     lulus &= bool(ok_nvf and ro not in ("", "\u2014"))
 
+    tlog = os.path.join(w.sesi, "mavlink.tlog")
+    ok_tlog = tunggu(lambda: os.path.exists(tlog) and os.path.getsize(tlog) > 400, 8)
+    print("[13] tlog telemetri: %s (%d B)" % (ok_tlog,
+          os.path.getsize(tlog) if os.path.exists(tlog) else 0))
+    lulus &= bool(ok_tlog)
+
+    w._gain_step(0.05)
+    ok_gain = tunggu(lambda: any(n == "JS_GAIN_DEFAULT" for n, _v in
+                                 baca_stats().get("param_set", [])), 8)
+    print("[14] gain JS_GAIN_DEFAULT sampai kendaraan:", ok_gain)
+    lulus &= bool(ok_gain)
+
+    n0 = baca_stats().get("rc", 0)
+    w.sl_tilt.setValue(1800)
+    jalan(4.0)
+    ok_keep = tunggu(lambda: baca_stats().get("rc", 0) >= n0 + 2, 6)
+    print("[15] RC override tilt dipertahankan (keep-alive):", ok_keep)
+    lulus &= bool(ok_keep)
+
     hasil = {}
     w.rawpanel.client.sig_result.connect(lambda tag, d: hasil.__setitem__(tag, d))
     w.rawpanel.client.status()

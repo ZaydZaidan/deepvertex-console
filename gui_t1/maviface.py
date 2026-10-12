@@ -15,6 +15,10 @@ import os
 import threading
 import time
 
+# WAJIB: pymavlink default = MAVLink v1 -> rc_channels_override hanya 8 kanal
+# (lights kanal 9 dst. tidak bisa dikirim). QGC/Cockpit memakai MAVLink 2.
+os.environ.setdefault("MAVLINK20", "1")
+
 from PySide6 import QtCore
 
 try:
@@ -78,6 +82,8 @@ class MavBridge(QtCore.QObject):
         self.param_count = 0
         self._params_done = False
         self._ack_wait = []        # (command, tag) menunggu COMMAND_ACK
+        self.tlog_path = None      # bila diisi: rekam bytestream MAVLink (tlog, gaya QGC)
+        self._tlog_fh = None
 
     # ------------------------------------------------------------------ #
     def start(self):
@@ -203,8 +209,13 @@ class MavBridge(QtCore.QObject):
                     self.mav.mav.manual_control_send(self.mav.target_system, x, y, z, r, b)
                 elif kind == "rc":
                     ch = [int(val.get(i, 0)) for i in range(1, 19)]
-                    self.mav.mav.rc_channels_override_send(
-                        self.mav.target_system, self.mav.target_component, *ch)
+                    try:
+                        self.mav.mav.rc_channels_override_send(
+                            self.mav.target_system, self.mav.target_component, *ch)
+                    except TypeError:
+                        # dialek v1 hanya 8 kanal (tanpa ini: lights ch9+ bisu)
+                        self.mav.mav.rc_channels_override_send(
+                            self.mav.target_system, self.mav.target_component, *ch[:8])
             except Exception as e:
                 self.sig_status.emit("fast cmd failed: %r" % e)
 
@@ -258,6 +269,25 @@ class MavBridge(QtCore.QObject):
                                                   dialect="ardupilotmega")
             self.mav.mav.srcSystem = 250
             self.mav.mav.srcComponent = 190
+            if getattr(self, "tlog_path", None):
+                try:
+                    # logfile_raw pymavlink TIDAK terisi untuk udpin (terukur) -> tap recv()
+                    self._tlog_fh = open(self.tlog_path, "ab", buffering=0)
+                    _orig_recv = self.mav.recv
+
+                    def _tap_recv(n=None, _o=_orig_recv, _f=self._tlog_fh):
+                        s = _o(n)
+                        if s:
+                            try:
+                                _f.write(s)
+                            except Exception:                  # noqa: BLE001
+                                pass
+                        return s
+
+                    self.mav.recv = _tap_recv
+                    self.sig_status.emit("tlog aktif: %s" % self.tlog_path)
+                except Exception as exc:                       # noqa: BLE001
+                    self.sig_status.emit("tlog tidak aktif: %r" % exc)
         except Exception as exc:
             self.sig_status.emit(f"failed to open {url}: {exc}")
             return False
@@ -292,9 +322,16 @@ class MavBridge(QtCore.QObject):
         self._request_rates()
         t_req = t_hb = t_cmd = time.monotonic()
         t_att = t_veh = 0.0
+        t_last = time.monotonic()                # watchdog: pesan terakhir diterima
 
         while not self._stop.is_set():
             now = time.monotonic()
+            if now - t_last > 5.0:
+                # link mati TANPA exception (mis. tether dicabut) -> beri tahu + sambung ulang
+                self.state["link"] = False
+                self.sig_status.emit("MAVLink link HILANG — mencoba menyambung ulang …")
+                self._close()
+                return False
             self._drain_fast()                       # manual control / RC override
             if now - t_cmd > 0.2:                    # antrian perintah GUI
                 self._drain_cmds()
@@ -312,6 +349,7 @@ class MavBridge(QtCore.QObject):
             if msg is None:
                 continue
             self.state["msgs"] += 1
+            t_last = time.monotonic()
             t = msg.get_type()
             now = time.monotonic()
 
@@ -435,6 +473,12 @@ class MavBridge(QtCore.QObject):
         return True
 
     def _close(self):
+        try:
+            if self._tlog_fh is not None:
+                self._tlog_fh.close()
+                self._tlog_fh = None
+        except Exception:                                  # noqa: BLE001
+            pass
         try:
             if self.mav is not None:
                 self.mav.close()

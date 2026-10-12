@@ -112,6 +112,10 @@ class RovConsole(QtWidgets.QMainWindow):
 
         # ---------------- MAVLink (dibuat sebelum panel: panel2 mengikat sinyalnya)
         self.bridge = MavBridge(args.mavlink)
+        _tlog = getattr(args, "tlog", "auto")
+        if _tlog != "off":
+            self.bridge.tlog_path = (os.path.join(self.sesi, "mavlink.tlog")
+                                     if _tlog == "auto" else _tlog)
         self.bridge.sig_vehicle.connect(self._vehicle)
         self.bridge.sig_attitude.connect(self._attitude)
         self.bridge.sig_text.connect(self._text)
@@ -134,6 +138,10 @@ class RovConsole(QtWidgets.QMainWindow):
             self.players[nama] = p
 
         self.gamepad = Gamepad(self.bridge)
+        self._rc_keep = {}          # kanal RC override yang harus dipertahankan (tanpa pad)
+        self._rc_timer = QtCore.QTimer(self)
+        self._rc_timer.timeout.connect(self._rc_tick)
+        self._rc_timer.start(1500)
         self.gamepad.sig_status.connect(self._catat)
         self.gamepad.sig_live.connect(self._teleop_update)
 
@@ -506,6 +514,25 @@ class RovConsole(QtWidgets.QMainWindow):
         row2.addWidget(lab2)
         row2.addWidget(self.sl_tilt, 1)
         p.body_layout.addLayout(row2)
+        row3 = QtWidgets.QHBoxLayout()
+        row3.setSpacing(6)
+        lab3 = QtWidgets.QLabel("GAIN")
+        lab3.setObjectName("MicroLabel")
+        self.lbl_gain = QtWidgets.QLabel("pilot gain: — (JS_GAIN_DEFAULT)")
+        self.lbl_gain.setObjectName("Faint")
+        b_gm = QtWidgets.QPushButton("GAIN −")
+        b_gm.setObjectName("BtnTiny")
+        b_gm.setToolTip("kurangi pilot gain (JS_GAIN_DEFAULT) 0.05")
+        b_gm.clicked.connect(lambda: self._gain_step(-0.05))
+        b_gp = QtWidgets.QPushButton("GAIN +")
+        b_gp.setObjectName("BtnTiny")
+        b_gp.setToolTip("tambah pilot gain (JS_GAIN_DEFAULT) 0.05")
+        b_gp.clicked.connect(lambda: self._gain_step(0.05))
+        row3.addWidget(lab3)
+        row3.addWidget(b_gm)
+        row3.addWidget(b_gp)
+        row3.addWidget(self.lbl_gain, 1)
+        p.body_layout.addLayout(row3)
         P["vehicle"] = p
 
         # ---- setup (kalibrasi)
@@ -595,6 +622,9 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
         self.lbl_disk.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_disk)
+        self.lbl_cap_last = QtWidgets.QLabel("terakhir: —")
+        self.lbl_cap_last.setObjectName("Faint")
+        p.body_layout.addWidget(self.lbl_cap_last)
         P["capture"] = p
         td = QtCore.QTimer(self)
         td.timeout.connect(self._update_disk)
@@ -804,6 +834,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.gamepad.set_lights(val)
         else:
             pwm = int(1100 + (val / 100.0) * 800)
+            self._rc_keep[9] = pwm
             self.bridge.rc_override({9: pwm})
 
     def _set_tilt(self, val):
@@ -811,6 +842,7 @@ class RovConsole(QtWidgets.QMainWindow):
         if getattr(self.gamepad, "aktif", False):
             self.gamepad.tilt = self._tilt
         else:
+            self._rc_keep[8] = self._tilt
             self.bridge.rc_override({8: self._tilt})
 
     def _toggle_rec(self, nama, on):
@@ -836,6 +868,12 @@ class RovConsole(QtWidgets.QMainWindow):
     def _rec_selesai(self, aktif, path):
         if not aktif and path:
             self._catat("rekaman tersimpan: " + path)
+            try:
+                mb = os.path.getsize(path) / 1e6
+                self.lbl_cap_last.setText("terakhir: %s · %.1f MB" %
+                                          (os.path.basename(path), mb))
+            except OSError:
+                pass
 
     def _update_disk(self):
         import shutil
@@ -887,6 +925,9 @@ class RovConsole(QtWidgets.QMainWindow):
             self.ro_tether.set_value(nvf.get("TetherTrn"), "{:.0f}")
             self.ro_water.set_value(s.get("temp"), "{:.2f}")
             self.ro_range.set_value(s.get("rangefinder"), "{:.2f}")
+            _g = self.bridge.params.get("JS_GAIN_DEFAULT")
+            if _g is not None:
+                self.lbl_gain.setText("pilot gain: %.2f (JS_GAIN_DEFAULT)" % float(_g))
             self.ro_volt.set_value(s.get("volt"), "{:.2f}")
             self.ro_curr.set_value(s.get("curr"), "{:.2f}")
             self.ro_batt.set_value(s.get("remaining"), "{:.0f}")
@@ -907,6 +948,25 @@ class RovConsole(QtWidgets.QMainWindow):
             pass
 
     # ================================================================ tutup
+    def _rc_tick(self):
+        """Pertahankan RC override tilt/lights saat TANPA gamepad — override
+        ArduSub timeout ~3 dtk, jadi nilai slider harus dikirim ulang."""
+        if not self._rc_keep or getattr(self.gamepad, "aktif", False):
+            return
+        try:
+            self.bridge.rc_override(dict(self._rc_keep))
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _gain_step(self, delta):
+        """Ubah pilot gain via parameter JS_GAIN_DEFAULT (tanpa perlu BTN mapping)."""
+        kini = self.bridge.params.get("JS_GAIN_DEFAULT")
+        kini = 0.5 if kini is None else float(kini)
+        baru = max(0.1, min(1.0, round(kini + delta, 2)))
+        self.bridge.queue_param_set("JS_GAIN_DEFAULT", baru)
+        self._catat("pilot gain → %.2f (JS_GAIN_DEFAULT)" % baru)
+        self.lbl_gain.setText("pilot gain: %.2f (JS_GAIN_DEFAULT)" % baru)
+
     def _pilih_peta(self, ke):
         self.stack_peta.setCurrentIndex(int(ke))
         self.b_peta.setChecked(ke == 0)
@@ -1004,7 +1064,9 @@ def main():
     ap.add_argument("--raw-agent", default="http://127.0.0.1:8765")
     ap.add_argument("--outdir", default=os.path.expanduser("~/DeepVertex-ROV-Captures"))
     ap.add_argument("--preset", default="pilot-focus",
-                    choices=("pilot-focus", "setup", "capture"))
+                    choices=("pilot-focus", "mapping", "setup", "capture"))
+    ap.add_argument("--tlog", default="auto",
+                    help="'off' nonaktif; jalur berkas tlog; 'auto' = <sesi>/mavlink.tlog")
     ap.add_argument("--no-pad", action="store_true", help="jangan aktifkan teleop gamepad")
     ap.add_argument("--shot", default=None, help="simpan screenshot jendela ke PATH (uji tampilan)")
     ap.add_argument("--shot-after", type=float, default=6.0, help="detik sebelum screenshot")

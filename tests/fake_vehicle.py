@@ -9,14 +9,19 @@ COMMAND_LONG (ACK ACCEPTED). Hitung MANUAL_CONTROL masuk.
 import argparse
 import json
 import math
+import os
 import time
+
+# MAVLink 2 (v20) — samakan dengan konsol (ekstensi pesan & 18 kanal RC)
+os.environ.setdefault("MAVLINK20", "1")
 
 from pymavlink import mavutil
 
 PARAMS = [("FS_GCS_ENABLE", 0), ("FS_GCS_TIMEOUT", 5), ("FS_PILOT_INPUT", 0),
           ("FS_PILOT_TIMEOUT", 3), ("FS_LEAK_ENABLE", 2), ("BATT_LOW_VOLT", 13.2),
           ("BATT_CRIT_VOLT", 12.5), ("BATT_LOW_MAH", 0), ("BATT_CRIT_MAH", 0),
-          ("BATT_FS_LOW_ACT", 0), ("BATT_FS_CRT_ACT", 0), ("ARMING_CHECK", 1)]
+          ("BATT_FS_LOW_ACT", 0), ("BATT_FS_CRT_ACT", 0), ("ARMING_CHECK", 1),
+          ("JS_GAIN_DEFAULT", 0.5)]
 
 
 def main():
@@ -27,7 +32,7 @@ def main():
     a = ap.parse_args()
     m = mavutil.mavlink_connection(a.endpoint, source_system=1, source_component=1,
                                    dialect="ardupilotmega")
-    stats = {"manual": 0, "param_list_req": 0, "param_set": [], "cmd": []}
+    stats = {"manual": 0, "param_list_req": 0, "param_set": [], "cmd": [], "rc": 0}
     t0 = time.time()
     t_stats = 0.0
     i = 0
@@ -86,6 +91,8 @@ def main():
                 m.mav.command_ack_send(int(msg.command), 0)      # ACCEPTED
             elif tp == "MANUAL_CONTROL":
                 stats["manual"] += 1
+            elif tp == "RC_CHANNELS_OVERRIDE":
+                stats["rc"] += 1
 
         if a.stats and t - t_stats > 1.0:
             t_stats = t
