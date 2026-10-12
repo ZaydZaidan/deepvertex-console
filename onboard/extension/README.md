@@ -1,37 +1,37 @@
-# DeepVertex Raw Capture — BlueOS Extension (scaffold Langkah C)
+# DeepVertex Raw Capture — BlueOS Extension (Step C scaffold)
 
-Membungkus `raw_agent.py` (perekam RAW onboard) sebagai extension BlueOS, supaya
-pemasangan di Pi rapi (dapat dimatikan/dihapus tanpa jejak).
+Wraps `raw_agent.py` (the onboard RAW recorder) as a BlueOS extension, so the
+installation on the Pi is tidy (can be stopped/removed without a trace).
 
-> **Status: scaffold.** Format metadata/manifest diverifikasi terhadap dokumen
-> "Extensions" BlueOS resmi SAAT TANGAN (Langkah C / begitu Pi 4 ada). Nomor
-> device kamera & mounting path juga dikonfirmasi di Pi.
+> **Status: scaffold.** The metadata/manifest format is verified against the official
+> BlueOS "Extensions" document ON HAND (Step C / once the Pi 4 arrives). The camera
+> device numbers & mounting path are also confirmed on the Pi.
 
-## Isi
+## Contents
 
-| Berkas | Fungsi |
+| File | Function |
 |---|---|
-| `raw_agent.py` | perekam — **salin dulu**: `cp ../raw_agent.py .` (satu sumber kebenaran tetap di `../`) |
-| `Dockerfile` | image minimal: python3 + GStreamer (v4l2src, multifilesink) |
-| `docker-compose.yml` | service + akses jaringan host + device kamera + volume data |
+| `raw_agent.py` | recorder — **copy first**: `cp ../raw_agent.py .` (a single source of truth stays in `../`) |
+| `Dockerfile` | minimal image: python3 + GStreamer (v4l2src, multifilesink) |
+| `docker-compose.yml` | service + host network access + camera device + data volume |
 
-## Cara pasang di Pi (Langkah C — perdana)
+## How to install on the Pi (Step C — first time)
 
-1. Salin FOLDER ini ke BlueOS (File Browser ke `/root/extensions/deepvertex-raw/`,
-   atau `scp` lewat tether).
-2. Pastikan `raw_agent.py` sudah disalin ke folder ini (`cp ../raw_agent.py .`), lalu build & jalankan dari Terminal BlueOS:
+1. Copy this FOLDER to BlueOS (File Browser to `/root/extensions/deepvertex-raw/`,
+   or `scp` over the tether).
+2. Make sure `raw_agent.py` has been copied into this folder (`cp ../raw_agent.py .`), then build & run from the BlueOS Terminal:
    `cd /root/extensions/deepvertex-raw && docker compose up -d --build`
-   (atau daftarkan lewat tombol "+" di Extensions Manager bila format manifest sudah
-   disesuaikan dengan versi BlueOS yang terpasang).
-3. Cek: `curl http://127.0.0.1:8765/status` di Pi.
-4. Dari laptop: `./run_console_real.sh --raw-agent http://192.168.2.2:8765`
-   (192.168.2.2 = default IP BlueOS).
+   (or register it via the "+" button in Extensions Manager if the manifest format has
+   been adapted to the installed BlueOS version).
+3. Check: `curl http://127.0.0.1:8765/status` on the Pi.
+4. From the laptop: `./run_console_real.sh --raw-agent http://192.168.2.2:8765`
+   (192.168.2.2 = default BlueOS IP).
 
-## Yang WAJIB diverifikasi di Pi (jangan diasumsikan)
+## What MUST be verified on the Pi (do not assume)
 
-- Nomor device stereo: `ls /dev/video*` → perbarui `--device-left/--device-right`
-  (di docker-compose atau CMD).
-- Path penyimpanan: volume `/data` → pastikan cukup ruang & cepat (SD vs SSD).
-- Format caps YUYV & resolusi B0495: `v4l2-ctl --list-formats-ext` (uji deteksi).
-- `io-mode` v4l2src (dmabuf vs mmap) & beban CPU saat 2 kamera simultan.
-- Auth token: set `--token` (jangan biarkan terbuka di jaringan).
+- Stereo device numbers: `ls /dev/video*` → update `--device-left/--device-right`
+  (in docker-compose or CMD).
+- Storage path: the `/data` volume → ensure enough room & fast (SD vs SSD).
+- YUYV caps format & B0495 resolution: `v4l2-ctl --list-formats-ext` (detection test).
+- v4l2src `io-mode` (dmabuf vs mmap) & CPU load with 2 cameras simultaneous.
+- Auth token: set `--token` (do not leave it open on the network).

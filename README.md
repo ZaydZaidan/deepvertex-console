@@ -1,24 +1,24 @@
-# work/ — area kerja TAHAP 1 (Project Coral Mapping UAV)
+# work/ — STAGE 1 workspace (Project Coral Mapping UAV)
 
-Pusat kerja Langkah B (semua tanpa hardware dulu). Sumber asli di `~/ros2_ws/...`
-TIDAK disentuh; semua eksperimen & kode T1 hidup di sini.
+Working hub for Step B (all without hardware first). The original sources in
+`~/ros2_ws/...` are NOT touched; all T1 experiments & code live here.
 
-Repo GitHub (privat): `DeepVertex-Underwater-Drone-GUI-Installer` — kode T1 ber-versi di sini.
-Repo ini WAJIB tetap privat (closed-source); artefak distribusi ke klien (binary-only +
-lisensi) disiapkan terpisah saat packaging; `-SBC-Installer` di-park.
-Cara push: rsync `work/` → klon `repos/DeepVertex-Underwater-Drone-GUI-Installer` → commit/push.
+GitHub repo (private): `DeepVertex-Underwater-Drone-GUI-Installer` — versioned T1 code lives here.
+This repo MUST stay private (closed-source); the distribution artifacts for the client (binary-only +
+license) are prepared separately during packaging; `-SBC-Installer` is parked.
+How to push: rsync `work/` → clone of `repos/DeepVertex-Underwater-Drone-GUI-Installer` → commit/push.
 
-- `gui_t1/` — **konsol nyata T1** (salinan kerja GUI sim → migrasi PySide6 SELESAI
-  + modul baru: `video.py`, `rawcap.py`, `rov_console_real.py`).
-  Cara jalan & resep penting: `gui_t1/README_T1.md`.
-- `onboard/` — **raw_agent.py**: perekam RAW onboard (produksi di Pi/BlueOS;
-  uji lokal: `--test`). Protokol HTTP-nya dipakai `gui_t1/rawcap.py`.
-- `tests/` — uji tanpa hardware:
-  - `test_video.py` (display/rekam/snapshot vs stream dummy),
-  - `test_raw.py` (agen + transfer/verifikasi/hapus),
-  - `test_console.py` (konsol offscreen penuh + `fake_vehicle.py` MAVLink palsu).
-- `migrate_pyqt5_to_pyside6.py` — skrip migrasi binding (re-runnable, 58 penggantian).
+- `gui_t1/` — **the real T1 console** (working copy of the sim GUI → PySide6 migration DONE
+  + new modules: `video.py`, `rawcap.py`, `rov_console_real.py`).
+  How to run & key recipes: `gui_t1/README_T1.md`.
+- `onboard/` — **raw_agent.py**: onboard RAW recorder (production on Pi/BlueOS;
+  local test: `--test`). Its HTTP protocol is used by `gui_t1/rawcap.py`.
+- `tests/` — hardware-free tests:
+  - `test_video.py` (display/record/snapshot vs dummy stream),
+  - `test_raw.py` (agent + transfer/verify/delete),
+  - `test_console.py` (full offscreen console + `fake_vehicle.py` fake MAVLink).
+- `migrate_pyqt5_to_pyside6.py` — binding migration script (re-runnable, 58 replacements).
 
-Catatan dependensi lokal (dev): plugin `h264parse` diekstrak tanpa sudo ke
-`~/.hermes/cache/scratch/badpkgs/` (dari paket `gstreamer1.0-plugins-bad`).
-Untuk produksi: pasang paket tersebut, atau bundel pluginnya di `gui_t1/plugins/`.
+Local dependency note (dev): the `h264parse` plugin is extracted without sudo to
+`~/.hermes/cache/scratch/badpkgs/` (from the `gstreamer1.0-plugins-bad` package).
+For production: install that package, or bundle the plugin in `gui_t1/plugins/`.

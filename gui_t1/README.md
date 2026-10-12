@@ -1,79 +1,79 @@
 # ROV Mission Console
 
-Dashboard lokal (PyQt5) untuk misi pemetaan koral BlueROV2: memantau simulator
-Stonefish, stereo VIO (VINS-Fusion), lintasan VIO vs ground truth, dan telemetri
-ArduSub/Pixhawk. **GUI juga membuka seluruh stack-nya sendiri.**
+Local dashboard (PyQt5) for BlueROV2 coral mapping missions: monitors the Stonefish
+simulator, stereo VIO (VINS-Fusion), VIO trajectory vs ground truth, and
+ArduSub/Pixhawk telemetry. **The GUI also launches its entire stack itself.**
 
 ```
-bash "/home/zayd/Project BRIN VIO/gui/run_dashboard.sh"     # atau: rovgui
+bash "/home/zayd/Project BRIN VIO/gui/run_dashboard.sh"     # or: rovgui
 ```
 
-Kode ada di `gui/` repo `stonefish_bluerov2`; jalur lokal
-`/home/zayd/Project BRIN VIO/gui` adalah symlink ke sana, jadi `rovgui` tetap jalan.
+The code lives in `gui/` in the `stonefish_bluerov2` repo; the local path
+`/home/zayd/Project BRIN VIO/gui` is a symlink to it, so `rovgui` still works.
 
-## Apa yang dilakukan GUI saat dibuka
+## What the GUI does when opened
 
-1. membersihkan sisa proses uji lama (sim, relay, SITL, VINS, lawnmower);
-2. start **simulator + relay** (`ros2 launch stonefish_bluerov2 bluerov2_sim_spec.launch.py`)
-   → menunggu `/bluerov2/odometry` mengalir (>5 Hz);
-3. start **ArduSub SITL** (`scripts/start_ardusub.sh`, TCP 5760 + telemetri 5762)
-   → menunggu paket MAVLink;
-4. start **VINS-Fusion** (`ros2 launch vins_fusion_ros2 vins_bluerov2.launch.py`);
-5. tombol **START AUTONOMOUS** menyala begitu langkah 2+3 siap; menekannya menjalankan
-   controller lawnmower (`ros2 run stonefish_bluerov2 bluerov2_lawnmower.py`).
+1. cleans up leftover test processes (sim, relay, SITL, VINS, lawnmower);
+2. starts the **simulator + relay** (`ros2 launch stonefish_bluerov2 bluerov2_sim_spec.launch.py`)
+   → waits for `/bluerov2/odometry` to stream (>5 Hz);
+3. starts **ArduSub SITL** (`scripts/start_ardusub.sh`, TCP 5760 + telemetry 5762)
+   → waits for MAVLink packets;
+4. starts **VINS-Fusion** (`ros2 launch vins_fusion_ros2 vins_bluerov2.launch.py`);
+5. the **START AUTONOMOUS** button lights up once steps 2+3 are ready; pressing it runs
+   the lawnmower controller (`ros2 run stonefish_bluerov2 bluerov2_lawnmower.py`).
 
-Menutup GUI = menghentikan misi dan seluruh stack (`--keep-stack` untuk membiarkan stack hidup).
+Closing the GUI = stopping the mission and the entire stack (`--keep-stack` to let the stack keep running).
 
-## Kontrol proses
+## Process control
 
-| Elemen | Fungsi |
+| Element | Function |
 |---|---|
-| `START ALL` | simpul start seluruh komponen berurutan |
-| `STOP ALL` | hentikan misi lalu semua komponen (SIGINT ke group proses, SIGKILL bila perlu) |
-| `▶ / ■` per komponen | start/stop satu komponen (dengan cek dependensi) |
-| `START AUTONOMOUS` | toggle misi: nyala = lawnmower jalan, mati = lawnmower dihentikan + RC dinetralkan |
-| `START MAPPING MANUAL` | toggle sesi pemetaan MANUAL (2 Okt 2026): pilot mengemudi dengan gamepad (deadman), sementara **capture relay + logger + node guide** jalan. Guide menggambar **jalur rencana (putus-putus) + kotak area** di peta. STOP = teleop dinetralkan + run ditutup seperti misi autonomous (analisis + SFM). |
-| `START MANUAL PILOT` | pilot saja (mode MANUAL lama): **tidak ada** capture, **tidak ada** guide |
+| `START ALL` | start-all node starts every component in sequence |
+| `STOP ALL` | stop the mission then all components (SIGINT to process group, SIGKILL if needed) |
+| `▶ / ■` per component | start/stop a single component (with dependency check) |
+| `START AUTONOMOUS` | mission toggle: on = lawnmower running, off = lawnmower stopped + RC neutralized |
+| `START MAPPING MANUAL` | toggle a MANUAL mapping session (Oct 2, 2026): the pilot drives with a gamepad (deadman), while **capture relay + logger + guide node** run. The guide draws the **planned path (dashed) + area box** on the map. STOP = teleop neutralized + run closed like an autonomous mission (analysis + SFM). |
+| `START MANUAL PILOT` | pilot only (old MANUAL mode): **no** capture, **no** guide |
 
-## Auto-PID (menu Tuning)
+## Auto-PID (Tuning menu)
 
-Menu **Tuning ▸ Auto-PID** (Ctrl+T) menyetel parameter ArduSub ASLI lewat MAVLink
-(`rov_pid_autotune.py`): loop depth (`PSC_D_*`), heading/roll/pitch (`ATC_*`), berbasis uji
-**gangguan** (pulsa gaya lalu ukur respon), bukan langkah RC.
+The **Tuning ▸ Auto-PID** menu (Ctrl+T) tunes the REAL ArduSub parameters over MAVLink
+(`rov_pid_autotune.py`): depth loop (`PSC_D_*`), heading/roll/pitch (`ATC_*`), based on
+**disturbance** tests (force pulse then measure the response), not RC steps.
 
-- **Dialog opsi**: APPLY (simpan kandidat terbaik), ARM otomatis, iterasi, amplitudo, durasi
-  langkah, metode awal (auto/SIMC/ZN/...), metode uji (gangguan/tangga), kedalaman minimum uji,
-  **REAL ROV**, dan **MAVLink host**.
-- **REAL ROV (4 Okt 2026)**: centang REAL ROV untuk robot asli — syarat sim+SITL DILEWATI,
-  gangguan otomatis memakai pulsa RC (pola 8-thruster hanya ada di SITL), dan host MAVLink
-  diarahkan ke link robot (mis. `udp:192.168.2.1:14550` / `serial:/dev/ttyACM0:115200`).
-  Snapshot parameter otomatis; **Ctrl+C = parameter dikembalikan**. Snapshot bisa dipulihkan
-  juga via menu Tuning ▸ Restore parameters.
-- **Jendela respon+galat** (`pid_view.py`) terbuka OTOMATIS saat mode tuning: tiap iterasi
-  digambar sebagai jejak tersendiri + galat. Manual: `/usr/bin/python3 gui/pid_view.py`.
-- Verifikasi offscreen: `scripts/tools/uji_gui_tuning.py` (source ROS dulu).
+- **Options dialog**: APPLY (save the best candidate), auto ARM, iterations, amplitude, step
+  duration, initial method (auto/SIMC/ZN/...), test method (disturbance/step), minimum test depth,
+  **REAL ROV**, and **MAVLink host**.
+- **REAL ROV (Oct 4, 2026)**: check REAL ROV for the real robot — the sim+SITL requirement is SKIPPED,
+  automatic disturbance uses RC pulses (the 8-thruster pattern only exists in SITL), and the MAVLink
+  host is pointed at the robot link (e.g. `udp:192.168.2.1:14550` / `serial:/dev/ttyACM0:115200`).
+  Parameter snapshot is automatic; **Ctrl+C = parameters restored**. The snapshot can also be restored
+  via the Tuning ▸ Restore parameters menu.
+- **Response+error window** (`pid_view.py`) opens AUTOMATICALLY in tuning mode: each iteration
+  is drawn as its own trace + error. Manual: `/usr/bin/python3 gui/pid_view.py`.
+- Offscreen verification: `scripts/tools/uji_gui_tuning.py` (source ROS first).
 
-## Panel
+## Panels
 
-- **Stack · proses** — status + uptime tiap komponen, tombol start/stop.
-- **Stonefish · simulator view** — **panel sengaja dikosongkan** (23 Sep 2026): mode
-  `mirror` dihapus, pemilik sistem menonton jendela Stonefish secara langsung.
-  Mode `reparent` (embed sungguhan) hanya bila diminta eksplisit dan berisiko.
-- **VIO left / right** — feed 720p; **capture** (opsional) 1920×1200 RGB untuk SfM.
-- **Trajectory** — lintasan VIO vs ground truth + RMSE, panjang jalur, rasio skala.
-  Di tab **MAP**, selain jejak GT (hitam) & VIO (merah) ada **garis petunjuk (guide)**
-  dari node misi: jalur DIRENCANAKAN putus-putus + panah arah gerak + kotak batas area,
-  lengkap dengan penanda `NEXT` (waypoint terdekat). Guide muncul **seketika saat tombol
-  misi ditekan** — jalur autonomous sudah diketahui sebelum robot bergerak (§2 Okt 2026).
+- **Stack · processes** — status + uptime for each component, start/stop buttons.
+- **Stonefish · simulator view** — **panel intentionally left empty** (Sep 23, 2026): the
+  `mirror` mode was removed, the system owner watches the Stonefish window directly.
+  `reparent` mode (real embed) only when explicitly requested and risky.
+- **VIO left / right** — 720p feed; **capture** (optional) 1920×1200 RGB for SfM.
+- **Trajectory** — VIO trajectory vs ground truth + RMSE, path length, scale ratio.
+  In the **MAP** tab, besides the GT trace (black) & VIO (red) there is a **guide line**
+  from the mission node: the PLANNED path dashed + movement-direction arrows + area boundary box,
+  complete with a `NEXT` marker (nearest waypoint). The guide appears **the moment the mission
+  button is pressed** — the autonomous path is known before the robot moves (§Oct 2, 2026).
 - **Flight / Gyro / Power** — mode, armed, attitude, depth, altitude AGL, heading,
-  throttle, gyro, akselerasi, baterai.
+  throttle, gyro, acceleration, battery.
 - **VIO·sim status**, **ArduSub messages**, **Log stack**.
 
-## Opsi
+## Options
 
 ```
 --embed auto|reparent|off          default auto = panel simulasi kosong (mirror dihapus)
---no-autostart                     jangan buka stack otomatis (start manual dari panel)
+--no-autostart                     do not auto-start the stack (start manually from the panel)
 --autostart-mission                begitu stack siap, langsung toggle START AUTONOMOUS
 --keep-stack                       jangan hentikan stack saat GUI ditutup
 --log-dir DIR                      folder log proses (default /tmp/rov_dashboard_logs)
@@ -82,32 +82,32 @@ Menu **Tuning ▸ Auto-PID** (Ctrl+T) menyetel parameter ArduSub ASLI lewat MAVL
 --size WxH, --shot FILE, --shot-after N, --no-ros, --no-mav
 ```
 
-## Peringatan penting
+## Important warnings
 
-1. **Jangan pakai `--embed reparent`** kecuali Anda tahu risikonya: reparent jendela
-   X11 pernah membuat jendela dashboard menutupi seluruh layar dan menghilangkan
-   terminal. Mode default tidak menyentuh jendela simulator sama sekali — panel
-   simulasi dikosongkan (mode `mirror` dihapus 23 Sep 2026).
-2. Tutup GUI lewat jendelanya (atau `q`/Ctrl-C di terminal peluncur) supaya stack
-   dihentikan dengan rapi.
-3. Peta tautan MAVLink (SERIAL0/TCP 5760 hanya menerima **satu** klien, dan SITL ArduSub
-   berhenti di `Waiting for connection ....` sampai klien itu datang):
-   - **5760** (SERIAL0) — dashboard (sekaligus membuka blokir boot SITL)
-   - **5762** (SERIAL2) — controller lawnmower (`mavlink_url:=tcp:127.0.0.1:5762`)
-   - **14550** (SERIAL1/UDP) — QGC (dashboard bisa memakai ini sebagai cadangan)
-   Runner Tahap B (tanpa GUI) tetap memakai default controller di 5760.
+1. **Do not use `--embed reparent`** unless you know the risk: reparenting an
+   X11 window once made the dashboard window cover the whole screen and lose the
+   terminal. The default mode does not touch the simulator window at all — the
+   simulator panel is left empty (`mirror` mode removed Sep 23, 2026).
+2. Close the GUI through its window (or `q`/Ctrl-C in the launcher terminal) so the stack
+   is stopped cleanly.
+3. MAVLink link map (SERIAL0/TCP 5760 accepts only **one** client, and ArduSub SITL
+   stops at `Waiting for connection ....` until that client arrives):
+   - **5760** (SERIAL0) — dashboard (also unblocks the SITL boot)
+   - **5762** (SERIAL2) — lawnmower controller (`mavlink_url:=tcp:127.0.0.1:5762`)
+   - **14550** (SERIAL1/UDP) — QGC (the dashboard can use this as a fallback)
+   The Stage B runner (without GUI) still uses the controller default at 5760.
 
-## Berkas
+## Files
 
-| Berkas | Isi |
+| File | Contents |
 |---|---|
-| `rov_dashboard.py` | jendela utama, tata letak panel, timer |
-| `stackui.py` | panel STACK, tombol START AUTONOMOUS, autostart berurutan |
-| `procman.py` | manajer proses (group SIGINT/SIGKILL, log, cleanup sisa proses) |
-| `widgets.py` | widget QPainter kustom (panel, tile kamera, plot) |
-| `theme.py` | palet gelap netral + aksen amber |
-| `rosiface.py` | ROS 2: citra VIO/capture, odometry, ground truth |
-| `maviface.py` | MAVLink via pymavlink (telemetri + netralkan RC) |
-| `xembed.py` | pencarian jendela simulator, cek WM, detach |
-| `pid_view.py` | jendela realtime **respon + galat** Auto-PID (terbuka otomatis saat mode tuning; juga untuk robot asli) |
-| `run_dashboard.sh` | peluncur (sumber ROS 2 + profil DDS 16 MB) |
+| `rov_dashboard.py` | main window, panel layout, timers |
+| `stackui.py` | STACK panel, START AUTONOMOUS button, sequential autostart |
+| `procman.py` | process manager (SIGINT/SIGKILL group, logs, leftover-process cleanup) |
+| `widgets.py` | custom QPainter widgets (panels, camera tiles, plots) |
+| `theme.py` | neutral dark palette + amber accent |
+| `rosiface.py` | ROS 2: VIO/capture images, odometry, ground truth |
+| `maviface.py` | MAVLink via pymavlink (telemetry + RC neutralization) |
+| `xembed.py` | simulator window search, WM check, detach |
+| `pid_view.py` | realtime Auto-PID **response + error** window (opens automatically in tuning mode; also for the real robot) |
+| `run_dashboard.sh` | launcher (sources ROS 2 + DDS profile 16 MB) |
