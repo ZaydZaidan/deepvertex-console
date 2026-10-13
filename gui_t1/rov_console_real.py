@@ -57,10 +57,11 @@ class RovConsole(QtWidgets.QMainWindow):
         "pilot-focus": {
             "lebar_kiri": 350,
             "left": ["flight", "instruments", "power", "vehicle", "preflight"],
-            "mid": ["cam_front", "notif"],
+            # kamera TANPA stretch: panel mengunci pas rasio frame (gambar penuh)
+            "mid": [("cam_front", 0)],
             "mid_row": ["cam_left", "cam_right"],
             "row_di": 1,
-            "right": ["teleop", "capture", "raw", "soon"],
+            "right": ["notif", "teleop", "capture", "raw", "soon"],
         },
         "mapping": {
             "lebar_kiri": 350,
@@ -77,10 +78,10 @@ class RovConsole(QtWidgets.QMainWindow):
         "capture": {
             "lebar_kiri": 350,
             "left": ["flight", "power", "preflight"],
-            "mid": ["cam_front", "notif"],
+            "mid": [("cam_front", 0)],
             "mid_row": ["cam_left", "cam_right"],
             "row_di": 1,
-            "right": ["capture", "raw", "teleop"],
+            "right": ["notif", "capture", "raw", "teleop"],
         },
     }
 
@@ -364,6 +365,12 @@ class RovConsole(QtWidgets.QMainWindow):
             self.vis[key] = self.P[key]
         if row_keys and row_di >= len(mid):
             self._lay_mid.addWidget(self._baris_bawah(row_keys))
+        # tanpa panel ber-stretch di kolom tengah (mode kamera rasio-penuh):
+        # sisa ruang ke bawah supaya panel mengunci (hug) kontennya
+        if not any((item[1] if isinstance(item, tuple) else None) or
+                   (isinstance(item, str) and item in ("cam_front", "params"))
+                   for item in mid):
+            self._lay_mid.addStretch(1)
 
     def _baris_bawah(self, keys):
         if self._baris_row is None:
@@ -385,6 +392,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def _panel_kamera(self, key, judul, tinggi):
         p = W.Panel(judul, "H.264 · BlueOS", domain="field")
         tile = W.CameraTile(key.replace("cam_", ""), judul=False)
+        tile.mode_gambar = "contain"     # T1 nyata: frame kamera ditampilkan UTUH
         tile.tinggi_maks = tinggi
         tile.set_status("menunggu stream …")
         p.body_layout.addWidget(tile, 1)
@@ -394,9 +402,9 @@ class RovConsole(QtWidgets.QMainWindow):
     def _build_panels(self):
         P = self.P
         # ---- kamera
-        P["cam_front"] = self._panel_kamera("cam_front", "CAM · FRONT (PILOT)", 300)
-        P["cam_left"] = self._panel_kamera("cam_left", "CAM · STEREO L", 220)
-        P["cam_right"] = self._panel_kamera("cam_right", "CAM · STEREO R", 220)
+        P["cam_front"] = self._panel_kamera("cam_front", "CAM · FRONT (PILOT)", None)
+        P["cam_left"] = self._panel_kamera("cam_left", "CAM · STEREO L", None)
+        P["cam_right"] = self._panel_kamera("cam_right", "CAM · STEREO R", None)
 
         # ---- flight
         p = W.Panel("FLIGHT · ATTITUDE & DEPTH", "roll/pitch · heading", domain="field")
@@ -496,14 +504,22 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addLayout(rowb)
         row2 = QtWidgets.QHBoxLayout()
         row2.setSpacing(4)
-        lab = QtWidgets.QLabel("LIGHTS")
+        lab = QtWidgets.QLabel("LIGHTS 0%")
         lab.setObjectName("MicroLabel")
+        lab.setFixedWidth(80)
+        self.lab_lights = lab
         self.sl_lights = QtWidgets.QSlider(Qt.Horizontal)
         self.sl_lights.setRange(0, 100)
         self.sl_lights.setToolTip("intensitas lampu (kanal RC9 — VERIFY kolam)")
         self.sl_lights.valueChanged.connect(self._set_lights)
-        lab2 = QtWidgets.QLabel("TILT")
+        lab2 = QtWidgets.QLabel("TILT 50%")
         lab2.setObjectName("MicroLabel")
+        lab2.setFixedWidth(68)
+        self.lab_tilt = lab2
+        b_tc = QtWidgets.QPushButton("50%")
+        b_tc.setObjectName("BtnTiny")
+        b_tc.setToolTip("kembalikan tilt ke 50% (tengah = berhenti; RC8 itu komando laju)")
+        b_tc.clicked.connect(lambda: self.sl_tilt.setValue(1500))
         self.sl_tilt = QtWidgets.QSlider(Qt.Horizontal)
         self.sl_tilt.setRange(1100, 1900)
         self.sl_tilt.setValue(1500)
@@ -513,6 +529,7 @@ class RovConsole(QtWidgets.QMainWindow):
         row2.addWidget(self.sl_lights, 1)
         row2.addWidget(lab2)
         row2.addWidget(self.sl_tilt, 1)
+        row2.addWidget(b_tc)
         p.body_layout.addLayout(row2)
         row3 = QtWidgets.QHBoxLayout()
         row3.setSpacing(6)
@@ -533,6 +550,20 @@ class RovConsole(QtWidgets.QMainWindow):
         row3.addWidget(b_gp)
         row3.addWidget(self.lbl_gain, 1)
         p.body_layout.addLayout(row3)
+        row4 = QtWidgets.QHBoxLayout()
+        row4.setSpacing(6)
+        lab4 = QtWidgets.QLabel("MAX SPEED")
+        lab4.setObjectName("MicroLabel")
+        self.cb_cap = QtWidgets.QComboBox()
+        for teks, val in (("25%", 0.25), ("50%", 0.5), ("75%", 0.75), ("100%", 1.0)):
+            self.cb_cap.addItem(teks, val)
+        self.cb_cap.setCurrentIndex(3)
+        self.cb_cap.setToolTip("batas kecepatan perintah pilot (skala stick → MANUAL_CONTROL).\n"
+                               "100% = penuh. Setel dari GUI; tidak menulis param kendaraan.")
+        self.cb_cap.currentIndexChanged.connect(self._set_cap)
+        row4.addWidget(lab4)
+        row4.addWidget(self.cb_cap, 1)
+        p.body_layout.addLayout(row4)
         P["vehicle"] = p
 
         # ---- setup (kalibrasi)
@@ -845,6 +876,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._catat("perintah mode %s (%d) dikirim" % (nama, angka))
 
     def _set_lights(self, val):
+        self.lab_lights.setText("LIGHTS %d%%" % int(val))
         if getattr(self.gamepad, "aktif", False):
             self.gamepad.set_lights(val)
         else:
@@ -854,6 +886,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def _set_tilt(self, val):
         self._tilt = int(val)
+        self.lab_tilt.setText("TILT %d%%" % int(round((self._tilt - 1100) / 8.0)))
         if getattr(self.gamepad, "aktif", False):
             self.gamepad.tilt = self._tilt
         else:
@@ -905,6 +938,17 @@ class RovConsole(QtWidgets.QMainWindow):
                 vals[6] if len(vals) > 6 else 0, vals[7] if len(vals) > 7 else 0)
         for kode, v in zip(("fwd", "lat", "depth", "yaw", "dpx", "dpy"), peta):
             self._teleop_bars[kode].setValue(int(max(-1.0, min(1.0, v)) * 100))
+        t_live = live.get("tilt")
+        try:
+            if t_live is not None:
+                t_live = int(t_live)
+                self.lab_tilt.setText("TILT %d%%" % int(round((t_live - 1100) / 8.0)))
+                if not self.sl_tilt.isSliderDown():
+                    self.sl_tilt.blockSignals(True)
+                    self.sl_tilt.setValue(t_live)
+                    self.sl_tilt.blockSignals(False)
+        except Exception:                                  # noqa: BLE001
+            pass
         btns = [i for i, b in enumerate(live.get("buttons") or []) if b]
         self.lbl_pad.setText("pad: %s | deadman %s | tombol %s | tilt %d µs" % (
             live.get("nama") or "—", "DITEKAN" if live.get("deadman") else "LEPAS",
@@ -972,6 +1016,20 @@ class RovConsole(QtWidgets.QMainWindow):
             self.bridge.rc_override(dict(self._rc_keep))
         except Exception:                                  # noqa: BLE001
             pass
+
+    def _set_cap(self, _idx):
+        """MAX SPEED: skala perintah pilot di sisi GUI (gamepad.cap)."""
+        val = self.cb_cap.currentData()
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            val = 1.0
+        try:
+            self.gamepad.cap = val
+        except Exception:                                  # noqa: BLE001
+            pass
+        self._catat("MAX SPEED %.0f%% — perintah pilot diskalakan ke %.0f%%"
+                    % (val * 100, val * 100))
 
     def _gain_step(self, delta):
         """Ubah pilot gain via parameter JS_GAIN_DEFAULT (tanpa perlu BTN mapping)."""

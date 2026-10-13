@@ -328,6 +328,8 @@ class CameraTile(QtWidgets.QWidget):
         self._rate = None
         self._stamp = None
         self._aspect = 4.0 / 3.0      # rasio frame terakhir (default 4:3)
+        self.mode_gambar = "cover"    # 'cover' = isi kotak lalu POTONG (sim);
+                                      # 'contain' = tampilkan UTUH (konsol T1 nyata)
         self._off = None              # alasan kamera mati (None = hidup)
         self._off_title = "CAMERA OFF"  # judul besar saat mati ("CAMERA OFF" / "NO FRAMES")
         # preview dimatikan (kamera TETAP mengalir untuk VINS): frame jangan digambar.
@@ -402,6 +404,12 @@ class CameraTile(QtWidgets.QWidget):
     # ---------------------------------------------------------------- ukuran
     def hasHeightForWidth(self):
         return True
+
+    def sizeHint(self):
+        """Tinggi natural = lebar / rasio frame -> panel mengunci pas rasio kamera
+        (tanpa bilah samping, tanpa potong)."""
+        w = max(240, self.width())
+        return QtCore.QSize(w, self.heightForWidth(w))
 
     def heightForWidth(self, w):
         """Tinggi ideal = lebar / rasio gambar (+ header). Panel jadi pas, tidak vertikal."""
@@ -525,7 +533,11 @@ class CameraTile(QtWidgets.QWidget):
             # TERBESAR lalu potong kelebihannya. Sebelumnya letterbox (skala terkecil)
             # sehingga muncul kolom/bar hitam di sisi gambar (temuan pemilik 28 Sep).
             iw, ih = self._img.width(), self._img.height()
-            s = max(area.width() / max(1, iw), area.height() / max(1, ih))
+            if self.mode_gambar == "contain":
+                # UTUH: skala terkecil -> seluruh frame terlihat (bar di sisi bila perlu)
+                s = min(area.width() / max(1, iw), area.height() / max(1, ih))
+            else:
+                s = max(area.width() / max(1, iw), area.height() / max(1, ih))
             w, h = iw * s, ih * s
             x = area.x() + (area.width() - w) / 2
             y = area.y() + (area.height() - h) / 2

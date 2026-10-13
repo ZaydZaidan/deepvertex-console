@@ -42,9 +42,7 @@ WANTED = [
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 5, "SCALED_PRESSURE2"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 5, "VFR_HUD"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "EKF_STATUS_REPORT"),
-    ("MAV_CMD_SET_MESSAGE_INTERVAL", 5, "STATUSTEXT"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "HEARTBEAT"),
-    ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "NAMED_VALUE_FLOAT"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "SERVO_OUTPUT_RAW"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 2, "MAG_CAL_PROGRESS"),
     ("MAV_CMD_SET_MESSAGE_INTERVAL", 1, "MAG_CAL_REPORT"),
@@ -481,7 +479,11 @@ class MavBridge(QtCore.QObject):
             elif t == "SERVO_OUTPUT_RAW":
                 d = self.state["servo"]
                 for i in range(1, 17):
-                    v = getattr(msg, "servo%d_output" % i, None)
+                    # nama field beda antar build pymavlink: servoN_raw (terukur di
+                    # mesin ini) vs servoN_output (build lain)
+                    v = getattr(msg, "servo%d_raw" % i, None)
+                    if v is None:
+                        v = getattr(msg, "servo%d_output" % i, None)
                     if v:
                         d[i] = int(v)
 

@@ -36,7 +36,9 @@ CFG_DEFAULT = {
     "invert_fwd": False, "invert_lat": True, "invert_depth": True, "invert_yaw": False,
     "invert_tilt": True,
     "deadman_buttons": [4, 5],
-    "btn_center_cam": 0, "btn_arm_toggle": 9, "btn_mode_cycle": 8, "btn_depth_hold": 6,
+    "btn_center_cam": 0, "btn_arm_toggle": -1, "btn_mode_cycle": 8, "btn_depth_hold": 6,
+    # btn_arm_toggle = -1: ARM lewat PAD DIMATIKAN sampai uji kolam (tombol ARM di GUI
+    # memakai konfirmasi checklist). Aktifkan lagi (9 = Options) saat uji kolam dimulai.
     "mode_base": 19, "mode_hold": 2, "mode_cycle": [19, 2, 0],
     "mode_repeat_s": 1.5,
     "deadzone": 0.05, "rate_hz": 20.0,
@@ -67,6 +69,7 @@ class Gamepad(QtCore.QObject):
         self.axes = {}
         self.buttons = {}
         self.tilt = int(self.cfg["tilt_center"])
+        self.cap = 1.0                      # MAX SPEED (konsol): skala perintah pilot
         self.last_out = (0, 0, 500, 0)      # perintah manual terakhir (utk peta estimasi)
         self.lights = 0.0               # 0..100
         self._mode_idx = 0
@@ -234,6 +237,13 @@ class Gamepad(QtCore.QObject):
             r = int(yaw * 1000 * c["scale_yaw"])
             # z: ArduSub 0..1000, netral 500. dep>0 = naik (setelah invert) -> VERIFY kolam
             z = int(500 + dep * 500 * c["scale_depth"])
+            # MAX SPEED (konsol): skala seluruh perintah pilot (0.25/0.5/0.75/1.0)
+            _cap = float(getattr(self, "cap", 1.0))
+            if _cap < 1.0:
+                x = int(x * _cap)
+                y = int(y * _cap)
+                r = int(r * _cap)
+                z = int(500 + (z - 500) * _cap)
             self.last_out = (x, y, z, r)
             self.bridge.send_manual_control(x, y, z, r, 0)
         else:
