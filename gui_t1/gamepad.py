@@ -103,7 +103,7 @@ class Gamepad(QtCore.QObject):
     # ------------------------------------------------------------------ hidup
     def cari_device(self):
         if evdev is None:
-            return None, "modul evdev tidak terpasang"
+            return None, "evdev module is not installed"
         kandidat = []
         for path in evdev.list_devices():
             try:
@@ -128,7 +128,7 @@ class Gamepad(QtCore.QObject):
                 d.close()
         kandidat.sort(key=lambda t: -t[0])
         if not kandidat:
-            return None, "tidak ada device gamepad"
+            return None, "no gamepad device found"
         dev = kandidat[0][1]
         for _s, d in kandidat[1:]:
             d.close()
@@ -150,7 +150,7 @@ class Gamepad(QtCore.QObject):
         self._thread.start()
         self._timer.start(int(1000 / max(2.0, self.cfg["rate_hz"])))
         self.aktif = True
-        self.sig_status.emit("gamepad terhubung: %s (%s)" % (dev.name, dev.path))
+        self.sig_status.emit("gamepad connected: %s (%s)" % (dev.name, dev.path))
 
     def terapkan_cfg(self, ganti):
         """Terapkan bagian config (preset pad). Key tak dikenal diabaikan."""

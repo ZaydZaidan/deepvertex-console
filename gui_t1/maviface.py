@@ -309,7 +309,7 @@ class MavBridge(QtCore.QObject):
                     self.mav.recv = _tap_recv
                     self.sig_status.emit("tlog aktif: %s" % self.tlog_path)
                 except Exception as exc:                       # noqa: BLE001
-                    self.sig_status.emit("tlog tidak aktif: %r" % exc)
+                    self.sig_status.emit("tlog not active: %r" % exc)
         except Exception as exc:
             self.sig_status.emit(f"failed to open {url}: {exc}")
             return False
@@ -351,7 +351,7 @@ class MavBridge(QtCore.QObject):
             if now - t_last > 5.0:
                 # link mati TANPA exception (mis. tether dicabut) -> beri tahu + sambung ulang
                 self.state["link"] = False
-                self.sig_status.emit("MAVLink link HILANG — mencoba menyambung ulang …")
+                self.sig_status.emit("MAVLink link LOST — reconnecting …")
                 self._close()
                 return False
             self._drain_fast()                       # manual control / RC override

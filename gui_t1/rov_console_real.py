@@ -192,7 +192,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._timer_sb.start(1000)
 
         with open(os.path.join(self.sesi, "session.json"), "w", encoding="utf-8") as f:
-            json.dump({"mulai": time.strftime("%Y-%m-%d %H:%M:%S"),
+            json.dump({"start": time.strftime("%Y-%m-%d %H:%M:%S"),
                        "mavlink": args.mavlink,
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
@@ -257,7 +257,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.chip_ekf = W.Chip("ekf")        # kesehatan EKF
         # audit UI 13 Okt: chip MODE/ARM/PAD tidak lagi ditempel di baris chip —
         # informasinya sudah dibawa BANNER BESAR (hindari duplikasi; sisa: LINK/REC/FS/EKF)
-        for c, teks in ((self.chip_link, "menunggu"), (self.chip_mode, "—"),
+        for c, teks in ((self.chip_link, "wait"), (self.chip_mode, "—"),
                         (self.chip_arm, "—"), (self.chip_pad, "off"), (self.chip_rec, "—"),
                         (self.chip_fs, "—"), (self.chip_ekf, "—")):
             self._chip(c, "ink_faint", teks)
@@ -324,7 +324,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_alert.setVisible(False)
 
     def _safety_check(self, s):
-        """Monitor keselamatan berjalan (leak latch · baterai · failsafe · link)."""
+        """Running safety monitor (leak latch · battery · failsafe · link)."""
         try:
             txt = (s.get("last_text") or "").lower()
             if ("leak" in txt or "bocor" in txt) and s.get("last_text_sev", 6) <= 4:
@@ -418,7 +418,7 @@ class RovConsole(QtWidgets.QMainWindow):
             l.setObjectName("MicroLabel")
             theme.set_peran(l, "dim")
             return l
-        self.sb_msg = buat("siap — menunggu stream & telemetri …")
+        self.sb_msg = buat("ready — waiting for stream & telemetry …")
         self.sb_link = buat("MAVLink: —")
         self.sb_batt = buat("BATT: —")
         self.sb_raw = buat("RAW: —")
@@ -428,7 +428,7 @@ class RovConsole(QtWidgets.QMainWindow):
         for w in (self.sb_link, self.sb_batt, self.sb_raw, self.sb_pad):
             self.sb.lay.addWidget(w)
             self.sb.tambah_pemisah()
-        self.sb_sesi = buat("sesi: " + os.path.basename(self.sesi))
+        self.sb_sesi = buat("session: " + os.path.basename(self.sesi))
         self.sb.lay.addWidget(self.sb_sesi)
         self.sb.tambah_pemisah()
         self.sb_jam = buat("--:--:--")
@@ -436,7 +436,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def _perbarui_statusbar(self):
         s = self.bridge.state
-        self.sb_link.setText("MAVLink: %s" % ("terhubung" if s.get("link") else "menunggu"))
+        self.sb_link.setText("MAVLink: %s" % ("ok" if s.get("link") else "waiting"))
         v = s.get("volt")
         rem = s.get("remaining")
         self.sb_batt.setText("BATT: %s%s" % ("%.2f V" % v if v else "—",
@@ -665,14 +665,14 @@ class RovConsole(QtWidgets.QMainWindow):
         b_go.clicked.connect(lambda: self._buka_mode_nama(self.cb_mode.currentIndex()))
         b_arm = QtWidgets.QPushButton("ARM")
         b_arm.setObjectName("BtnTiny")
-        b_arm.setToolTip("ARM — uji kolam dulu, pastikan propeller aman")
+        b_arm.setToolTip("ARM — pool test first, make sure the props are safe")
         b_arm.clicked.connect(lambda: self._arm(True))
         b_dis = QtWidgets.QPushButton("DISARM")
         b_dis.setObjectName("BtnTiny")
         b_dis.clicked.connect(lambda: self._arm(False))
         b_surf = QtWidgets.QPushButton("SURFACE")
         b_surf.setObjectName("BtnTiny")
-        b_surf.setToolTip("mode SURFACE — bawa ROV ke permukaan (aksi darurat)")
+        b_surf.setToolTip("SURFACE mode — bring the ROV to the surface (emergency)")
         b_surf.clicked.connect(lambda: self._buka_mode_nama(3))
         _fm = QtGui.QFontMetrics(self.font())
         for _b in (b_go, b_arm, b_dis, b_surf):
@@ -702,18 +702,18 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lab_tilt = lab2
         b_tc = QtWidgets.QPushButton("RESET")
         b_tc.setObjectName("BtnTiny")
-        b_tc.setToolTip("kembalikan kamera tilt ke posisi 50% — otomatis (baca balik CamTilt)")
+        b_tc.setToolTip("return camera tilt to 50% — automatic (reads back CamTilt)")
         b_tc.clicked.connect(self._reset_tilt)
         self.sl_tilt = QtWidgets.QSlider(Qt.Horizontal)
         self.sl_tilt.setRange(1100, 1900)
         self.sl_tilt.setValue(1500)
-        self.sl_tilt.setToolTip("tilt kamera depan (kanal RC8 — VERIFY kolam)")
+        self.sl_tilt.setToolTip("front camera tilt (RC8 channel — VERIFY in pool)")
         self.sl_tilt.valueChanged.connect(self._set_tilt)
         self.sp_lights = QtWidgets.QSpinBox()
         self.sp_lights.setRange(0, 100)
         self.sp_lights.setSuffix("%")
         self.sp_lights.setFixedWidth(theme.px(64))
-        self.sp_lights.setToolTip("ketik 0-100 lalu Enter (sama dengan slider)")
+        self.sp_lights.setToolTip("type 0-100 then Enter (same as the slider)")
         self.sp_lights.valueChanged.connect(self._spin_lights)
         row2.addWidget(lab)
         row2.addWidget(self.sl_lights, 1)
@@ -728,8 +728,8 @@ class RovConsole(QtWidgets.QMainWindow):
         self.sp_tilt.setSuffix("%")
         self.sp_tilt.setFixedWidth(theme.px(64))
         self.sp_tilt.setValue(50)
-        self.sp_tilt.setToolTip("ketik 0-100 lalu Enter. 50 = berhenti; "
-                                ">50 tilt turun, <50 tilt naik (RC8 = komando laju)")
+        self.sp_tilt.setToolTip("type 0-100 then Enter. 50 = stop; "
+                                ">50 tilts down, <50 tilts up (RC8 = rate command)")
         self.sp_tilt.valueChanged.connect(self._spin_tilt)
         row3x.addWidget(self.sp_tilt)
         row3x.addWidget(b_tc)
@@ -737,7 +737,7 @@ class RovConsole(QtWidgets.QMainWindow):
         row3 = QtWidgets.QHBoxLayout()
         row3.setSpacing(6)
         self.lbl_gain = QtWidgets.QLabel("gain: —")
-        self.lbl_gain.setToolTip("pilot gain (param JS_GAIN_DEFAULT) — 100% = penuh")
+        self.lbl_gain.setToolTip("pilot gain (param JS_GAIN_DEFAULT) — 100% = full")
         self.lbl_gain.setObjectName("Faint")
         b_gm = QtWidgets.QPushButton("GAIN −")
         b_gm.setObjectName("BtnTiny")
@@ -760,7 +760,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.cb_cap.addItem(teks, val)
         self.cb_cap.setCurrentIndex(3)
         self.cb_cap.setToolTip("batas kecepatan perintah pilot (skala stick → MANUAL_CONTROL).\n"
-                               "100% = penuh. Setel dari GUI; tidak menulis param kendaraan.")
+                               "100% = full. Set from the GUI; does not write a vehicle param.")
         self.cb_cap.currentIndexChanged.connect(self._set_cap)
         row4.addWidget(lab4)
         row4.addWidget(self.cb_cap, 1)
@@ -768,7 +768,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["vehicle"] = p
 
         # ---- setup (kalibrasi)
-        p = W.Panel("SETUP · KALIBRASI", "ala QGC/BlueOS Vehicle Setup", domain="mission")
+        p = W.Panel("SETUP · CALIBRATION", "QGC/BlueOS style vehicle setup", domain="mission")
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(4)
         tombol = (("GYRO", lambda: self._cal("gyro")),
@@ -784,7 +784,7 @@ class RovConsole(QtWidgets.QMainWindow):
             grid.addWidget(b, i // 2, i % 2)
         p.body_layout.addLayout(grid)
         info = QtWidgets.QLabel("Urutan disarankan: gyro → level → accel → compass → baro "
-                                "(baro setiap awal penyelaman). Baca instruksi tiap dialog.")
+                                "(baro each dive start). Read the instructions in each dialog.")
         info.setObjectName("MicroLabel")
         info.setWordWrap(True)
         p.body_layout.addWidget(info)
@@ -796,19 +796,19 @@ class RovConsole(QtWidgets.QMainWindow):
         b.setObjectName("BtnTiny")
         b.clicked.connect(self._motor_dialog)
         p.body_layout.addWidget(b)
-        b2 = QtWidgets.QPushButton("MODE MOTOR DETECT (arah putaran, di air)")
+        b2 = QtWidgets.QPushButton("MOTOR DETECT MODE (spin direction, in water)")
         b2.setObjectName("BtnTiny")
         b2.clicked.connect(lambda: self.bridge.queue_mode(VO.MODE_MOTOR_DETECT))
         p.body_layout.addWidget(b2)
-        ket = QtWidgets.QLabel("Uji darat: LEPAS propeller. Uji air: mode MOTOR DETECT "
-                               "menjalankan rutin otomatis (ROV mengapung bebas).")
+        ket = QtWidgets.QLabel("Bench test: PROPS OFF. In water: MOTOR DETECT "
+                               "runs the routine automatically (ROV floats freely).")
         ket.setObjectName("MicroLabel")
         ket.setWordWrap(True)
         p.body_layout.addWidget(ket)
         P["motors"] = p
 
         # ---- failsafe
-        p = W.Panel("FAILSAFE & BATERAI", "param FS_/BATT_ (gaya QGC Safety)", domain="mission")
+        p = W.Panel("FAILSAFE & BATTERY", "FS_/BATT_ params (QGC Safety style)", domain="mission")
         p.body_layout.addWidget(VO.FailsafePanel(self.bridge))
         b_fs = QtWidgets.QPushButton("APPLY RECOMMENDED (4S 10000 mAh)")
         b_fs.setObjectName("BtnTiny")
@@ -882,7 +882,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.btn_rec[nama] = b1
             self.btn_snap[nama] = b2
         p.body_layout.addLayout(grid)
-        self.lbl_sesi = QtWidgets.QLabel("sesi: " + os.path.basename(self.sesi))
+        self.lbl_sesi = QtWidgets.QLabel("session: " + os.path.basename(self.sesi))
         self.lbl_sesi.setObjectName("Faint")
         self.lbl_sesi.setWordWrap(True)
         p.body_layout.addWidget(self.lbl_sesi)
@@ -908,10 +908,9 @@ class RovConsole(QtWidgets.QMainWindow):
             lab = QtWidgets.QLabel(nama)
             lab.setObjectName("MicroLabel")
             lab.setFixedWidth(theme.px(44))
-            bar = QtWidgets.QProgressBar()
-            bar.setRange(-100, 100)
-            bar.setTextVisible(False)
-            bar.setFixedHeight(theme.px(8))
+            # bar berpusat NOL (audit 13 Okt): QProgressBar mengisi dari kiri —
+            # stick netral tampak "50% terisi" dan pilot salah baca nilainya.
+            bar = W.BarTengah(tinggi=8)
             baris_bar.addWidget(lab)
             baris_bar.addWidget(bar, 1)
             p.body_layout.addLayout(baris_bar)
@@ -935,7 +934,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["raw"] = p
 
         # ---- peta misi: peta OSM (ala rovgui asli) + plot NED + estimasi
-        p = W.Panel("PETA MISI", "OSM · estimate (T2)", domain="mission")
+        p = W.Panel("MISSION MAP", "OSM · estimate (T2)", domain="mission")
         self.peta = PetaPanel()
         # default T1: perairan Kepulauan Seribu (dekat dermaga Pulau Pramuka).
         # Operator mengganti titik anchor kapan saja lewat "TARUH ANCHOR" (klik peta).
@@ -958,28 +957,28 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addWidget(self.stack_peta, 1)
         rowp = QtWidgets.QHBoxLayout()
         rowp.setSpacing(4)
-        self.b_peta = QtWidgets.QPushButton("PETA")
+        self.b_peta = QtWidgets.QPushButton("MAP")
         self.b_peta.setObjectName("BtnTiny")
         self.b_peta.setCheckable(True)
         self.b_peta.setChecked(True)
-        self.b_peta.setToolTip("peta OSM ala rovgui (geser: tahan-klik · zoom: roda)")
+        self.b_peta.setToolTip("OSM map (drag: hold-click · zoom: wheel)")
         self.b_ned = QtWidgets.QPushButton("NED")
         self.b_ned.setObjectName("BtnTiny")
         self.b_ned.setCheckable(True)
-        self.b_ned.setToolTip("plot NED: area survei + lajur rencana + jejak")
+        self.b_ned.setToolTip("NED plot: survey area + planned lanes + track")
         self.b_peta.clicked.connect(lambda: self._pilih_peta(0))
         self.b_ned.clicked.connect(lambda: self._pilih_peta(1))
         b_anc = QtWidgets.QPushButton("PLACE ANCHOR")
         b_anc.setObjectName("BtnTiny")
-        b_anc.setToolTip("klik: peta masuk mode pin - klik satu titik di peta = anchor (0,0) lokal")
+        b_anc.setToolTip("pin mode: click a point on the map = local anchor (0,0)")
         b_anc.clicked.connect(self._siapkan_anchor)
         b_iku = QtWidgets.QPushButton("FOLLOW ROV")
         b_iku.setObjectName("BtnTiny")
-        b_iku.setToolTip("pandangan peta kembali mengikuti posisi estimasi ROV")
+        b_iku.setToolTip("map view follows the estimated ROV position again")
         b_iku.clicked.connect(lambda: self.peta.pusatkan_ke_robot())
         b_res = QtWidgets.QPushButton("RESET EST.")
         b_res.setObjectName("BtnTiny")
-        b_res.setToolTip("nol-kan posisi estimasi & jejak (mulai dari sini)")
+        b_res.setToolTip("zero the estimated position & track (start from here)")
         b_res.clicked.connect(self._reset_estimasi)
         self.lbl_pose = QtWidgets.QLabel("N 0.0  E 0.0")
         self.lbl_pose.setObjectName("MicroLabel")
@@ -1024,8 +1023,8 @@ class RovConsole(QtWidgets.QMainWindow):
         label_map = (("cam_front", "Front camera (pilot)"), ("cam_left", "Stereo L"),
                      ("cam_right", "Stereo R"), ("flight", "Flight telemetry"),
                      ("power", "Power & battery"), ("vehicle", "Vehicle (pilot)"),
-                     ("preflight", "Pre-flight check"), ("setup", "Setup · kalibrasi"),
-                     ("motors", "Motor test"), ("failsafe", "Failsafe & baterai"),
+                     ("preflight", "Pre-flight check"), ("setup", "Setup · calibration"),
+                     ("motors", "Motor test"), ("failsafe", "Failsafe & battery"),
                      ("params", "Parameters"), ("teleop", "Teleop (gamepad)"),
                      ("capture", "Capture"), ("raw", "RAW onboard"),
                      ("notif", "Notifications"), ("soon", "Autonomous (coming soon)"))
@@ -1054,9 +1053,9 @@ class RovConsole(QtWidgets.QMainWindow):
         # ukuran teks — keterbacaan di kapal / matahari terik (12 Okt 2026)
         self.grup_teks = QtGui.QActionGroup(self)
         self.grup_teks.setExclusive(True)
-        for teks_a, nilai_a in (("Ukuran teks: Normal (100%)", 1.0),
-                                ("Ukuran teks: Besar (120%)", 1.2),
-                                ("Ukuran teks: Ekstra (140%)", 1.4)):
+        for teks_a, nilai_a in (("Text size: Normal (100%)", 1.0),
+                                ("Text size: Large (120%)", 1.2),
+                                ("Text size: Extra (140%)", 1.4)):
             a = QtGui.QAction(teks_a, self, checkable=True)
             a.setChecked(abs(theme.SKALA - nilai_a) < 0.01)
             a.triggered.connect(lambda _=False, v=nilai_a: self._ganti_skala(v))
@@ -1070,7 +1069,7 @@ class RovConsole(QtWidgets.QMainWindow):
             veh.addAction("Mode %s" % nama, lambda _=False, n=num: self.bridge.queue_mode(n))
         veh.addSeparator()
         veh.addAction("Motor test…", self._motor_dialog)
-        kal = veh.addMenu("Kalibrasi")
+        kal = veh.addMenu("Calibration")
         kal.addAction("Gyroscope", lambda: self._cal("gyro"))
         kal.addAction("Accelerometer (6 posisi)…", self._cal_accel)
         kal.addAction("Compass (onboard)", lambda: self._cal("mag"))
@@ -1090,7 +1089,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def _pill(self, lb, dot, label, value, warna_value, bg="raise_", border="line_hi",
               semua_terang=False):
-        """Pill status: titik + LABEL kecil + NILAI — satu bahasa dengan chip."""
+        """Status pill: dot + small LABEL + VALUE — same visual language as chips."""
         try:
             c_dot = theme.warna(dot) if isinstance(dot, str) else dot
             c_lab = theme.warna("on_accent") if semua_terang else theme.warna("ink_faint")
@@ -1130,7 +1129,7 @@ class RovConsole(QtWidgets.QMainWindow):
             pass
 
     def _gaya_pad(self, konek):
-        """Pill status GAMEPAD — pilot harus tahu pad tersambung atau tidak."""
+        """GAMEPAD status pill — the pilot must always see if the pad is connected."""
         try:
             if getattr(self, "_pad_kini", None) == bool(konek):
                 return
@@ -1147,7 +1146,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._set_mark_merek()
 
     def _ganti_skala(self, x):
-        """Ganti ukuran teks GLOBAL (QSS + widget gambar sendiri) secara hidup."""
+        """Change the GLOBAL text scale live (QSS + self-painted widgets)."""
         theme.set_skala(x)
         theme.apply(theme.aktif(), QtWidgets.QApplication.instance())
         self.lab_lights.setFixedWidth(theme.px(80))
@@ -1158,7 +1157,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._catat("ukuran teks -> %.0f%%" % (x * 100))
 
     def _menu_screenshot(self):
-        p, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Simpan screenshot",
+        p, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save screenshot",
                                                      "console.png", "PNG (*.png)")
         if p and self.grab().save(p):
             self._catat("screenshot: %s" % p)
@@ -1175,8 +1174,8 @@ class RovConsole(QtWidgets.QMainWindow):
             "Konsol Misi ROV — TAHAP 1 (mode ROV)\n"
             "BlueROV2 via BlueOS · MAVLink (pymavlink) · GStreamer · PySide6\n"
             "Basis tampilan: konsol sim DeepVertex (satu bahasa desain).\n"
-            "Fungsi: teleop gamepad, kalibrasi, motor test, failsafe, parameter, "
-            "preflight, capture compressed + RAW onboard.")
+            "Features: gamepad teleop, calibration, motor test, failsafe, parameters, "
+            "preflight, compressed + RAW onboard capture.")
 
     # ================================================================ aksi
     def _cal(self, jenis):
@@ -1198,14 +1197,14 @@ class RovConsole(QtWidgets.QMainWindow):
                     r = QtWidgets.QMessageBox.question(
                         self, "Pre-dive checklist",
                         "Checklist pre-dive %d/%d tercentang.\n"
-                        "Lanjut ARM? (ala 'Enforce Preflight' QGC)" % (total - belum, total))
+                        "Continue ARM? (QGC 'Enforce Preflight' style)" % (total - belum, total))
                     if r != QtWidgets.QMessageBox.Yes:
-                        self._catat("ARM dibatalkan — checklist pre-dive belum lengkap")
+                        self._catat("ARM cancelled — pre-dive checklist is not complete")
                         return
             except Exception:                              # noqa: BLE001
                 pass
         self.bridge.queue_arm(bool(on))
-        self._catat("perintah %s dikirim (uji kolam dulu)" % ("ARM" if on else "DISARM"))
+        self._catat("command %s sent (pool test first)" % ("ARM" if on else "DISARM"))
 
     def _buka_mode_nama(self, idx):
         nama, angka = MODE_LIST[idx] if 0 <= idx < len(MODE_LIST) else MODE_LIST[0]
@@ -1213,7 +1212,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._catat("perintah mode %s (%d) dikirim" % (nama, angka))
 
     def _spin_lights(self, v):
-        """Ketik persen -> gerakkan slider (satu jalur logika dengan slider)."""
+        """Typing a percent moves the slider (same code path as the slider)."""
         try:
             if self.sl_lights.value() != int(v):
                 self.sl_lights.setValue(int(v))
@@ -1221,7 +1220,7 @@ class RovConsole(QtWidgets.QMainWindow):
             pass
 
     def _spin_tilt(self, v):
-        """Ketik persen (0-100) -> PWM 1100-1900; 50% = 1500 (berhenti)."""
+        """Type percent (0-100) -> PWM 1100-1900; 50% = 1500 (stop)."""
         try:
             pwm = int(1100 + max(0, min(100, int(v))) * 8)
             if self.sl_tilt.value() != pwm:
@@ -1246,7 +1245,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.bridge.rc_override({9: pwm})
 
     def _kirim_tilt_pwm(self, pwm):
-        """Kirim perintah LAJU ch8 langsung (dipakai routine RESET/tengah)."""
+        """Send a direct RATE command on ch8 (used by the RESET/center routine)."""
         pwm = int(max(1100, min(1900, pwm)))
         if getattr(self.gamepad, "aktif", False):
             self.gamepad.tilt = pwm
@@ -1268,7 +1267,7 @@ class RovConsole(QtWidgets.QMainWindow):
                 self._center_timer = QtCore.QTimer(self)
                 self._center_timer.timeout.connect(self._tick_center)
             self._center_timer.start(150)
-            self._catat("RESET tilt: menyapu kembali ke 50% …")
+            self._catat("RESET tilt: sweeping back to 50% …")
         except Exception:                                  # noqa: BLE001
             pass
 
@@ -1302,7 +1301,7 @@ class RovConsole(QtWidgets.QMainWindow):
                         self.sp_tilt.blockSignals(False)
                 except Exception:                          # noqa: BLE001
                     pass
-                self._catat("tilt kembali ke 50%% (terbaca %.0f%%)" % (x * 100))
+                self._catat("tilt back to 50%% (readback %.0f%%)" % (x * 100))
                 return
             self._kirim_tilt_pwm(1700 if x > 0.5 else 1300)
         except Exception:                                  # noqa: BLE001
@@ -1350,7 +1349,7 @@ class RovConsole(QtWidgets.QMainWindow):
         ok = self.players[nama].snapshot(path)
         if ok:
             self.plot_misi.add_marker("snap")
-        self._catat("snapshot %s → %s" % (nama, path if ok else "GAGAL (belum ada frame)"))
+        self._catat("snapshot %s → %s" % (nama, path if ok else "FAILED (no frame yet)"))
 
     def _rec_selesai(self, aktif, path):
         if not aktif and path:
@@ -1405,15 +1404,15 @@ class RovConsole(QtWidgets.QMainWindow):
         self.last = dict(s)
         try:
             self._chip(self.chip_link, "ok" if s.get("link") else "warn",
-                       "terhubung" if s.get("link") else "menunggu")
+                       "ok" if s.get("link") else "wait")
             self._chip(self.chip_mode, "ink_faint", str(s.get("mode") or "—"))
             self._chip(self.chip_arm, "warn" if s.get("armed") else "ok",
-                       "ARMED" if s.get("armed") else "disarm")
+                       "ARMED" if s.get("armed") else "DISARMED")
             self._gaya_banner(s.get("mode"), s.get("armed"))
             txt_fs = (s.get("last_text") or "").lower()
             if "failsafe" in txt_fs or "e-stop" in txt_fs or "estop" in txt_fs:
                 self._chip(self.chip_fs,
-                           "err" if s.get("last_text_sev", 6) <= 3 else "warn", "AKTIF")
+                           "err" if s.get("last_text_sev", 6) <= 3 else "warn", "ACTIVE")
             else:
                 self._chip(self.chip_fs, "ok", "—")
             ekf = s.get("ekf_ok")
@@ -1443,7 +1442,7 @@ class RovConsole(QtWidgets.QMainWindow):
                                 % (camt * 100))
                     self._reset_tilt()
                 else:
-                    self._catat("camera tilt saat start: %.0f%% (sudah ~50%%)"
+                    self._catat("camera tilt at start: %.0f%% (near 50%%)"
                                 % (camt * 100))
             self._safety_check(s)
             l1 = nvf.get("Lights1")
@@ -1493,7 +1492,7 @@ class RovConsole(QtWidgets.QMainWindow):
     )
 
     def _apply_failsafe_defaults(self):
-        """Default failsafe+ baterai utk BlueROV2 + Tattu 4S 10000 mAh (bisa diubah)."""
+        """Failsafe + battery defaults for BlueROV2 + Tattu 4S 10000 mAh (editable)."""
         for nm, val in self._FS_REKOMENDASI:
             self.bridge.queue_param_set(nm, val)
         self._catat("failsafe defaults applied (BlueROV2 + 4S 10000 mAh) — "
@@ -1506,7 +1505,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("gamepad mapping error: %r" % exc)
 
     def _buat_panel_guide(self):
-        """Panduan SETUP untuk pemula (permintaan pemilik 13 Okt): langkah bernomor."""
+        """Beginner SETUP guide (owner request 13 Oct): numbered steps."""
         p = W.Panel("SETUP GUIDE (NEW ROV)", "steps 1-7 · ~10 min", domain="motion")
         langkah = (
             (1, "Accelerometer", "ROV flat on the desk — follow the 6 positions.",
@@ -1591,7 +1590,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def _siapkan_anchor(self):
         self.peta.siapkan_pin()
-        self._catat("peta mode PIN: klik satu titik di peta = anchor (0,0) lokal")
+        self._catat("map PIN mode: click a point on the map = local anchor (0,0)")
 
     def _anchor_dipilih(self, lat, lon):
         a = dict(self.peta.anchor)
@@ -1599,13 +1598,13 @@ class RovConsole(QtWidgets.QMainWindow):
         a["lon"] = float(lon)
         a["sumber"] = "pin operator"
         self.peta.set_anchor(a)
-        self._catat("anchor peta diset: %.6f, %.6f" % (lat, lon))
+        self._catat("map anchor set: %.6f, %.6f" % (lat, lon))
 
     def _reset_estimasi(self):
         self.plot_misi.ancor()
         self.peta.bersihkan()
         self.peta.set_pose(0.0, 0.0, 0.0)
-        self._catat("estimasi & jejak direset ke (0,0) di titik anchor")
+        self._catat("estimate & track reset to (0,0) at the anchor")
 
     def _peta_tick(self):
         now = time.monotonic()
@@ -1659,7 +1658,7 @@ class RovConsole(QtWidgets.QMainWindow):
         try:
             with open(os.path.join(self.sesi, "session_end.json"), "w",
                       encoding="utf-8") as f:
-                json.dump({"selesai": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+                json.dump({"end": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
         except OSError:
             pass
         super().closeEvent(ev)
@@ -1679,7 +1678,7 @@ def _terapkan_tema(app, nama=None, skala=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Konsol Misi ROV — Tahap 1 (mode ROV)")
+    ap = argparse.ArgumentParser(description="ROV Mission Console — Phase 1 (ROV mode)")
     ap.add_argument("--mavlink", default="udpin:0.0.0.0:14550",
                     help="endpoint MAVLink (mis. udpin:0.0.0.0:14550 / udp:192.168.2.2:14550)")
     ap.add_argument("--front-port", type=int, default=5600)
@@ -1690,14 +1689,14 @@ def main():
     ap.add_argument("--preset", default="pilot-focus",
                     choices=("pilot-focus", "mapping", "setup", "capture"))
     ap.add_argument("--tlog", default="auto",
-                    help="'off' nonaktif; jalur berkas tlog; 'auto' = <sesi>/mavlink.tlog")
+                    help="'off' disabled; path to a tlog file; 'auto' = <session>/mavlink.tlog")
     ap.add_argument("--tema", default="abyss", choices=tuple(theme.tampil()),
-                    help="palet warna (ink = hitam ala rovgui) — bisa ganti live di View > Appearance")
+                    help="color palette (ink = dark) — switchable live in View > Appearance")
     ap.add_argument("--teks", type=float, default=1.2, metavar="SKALA",
                     help="skala ukuran teks (1.0/1.2/1.4) utk keterbacaan di lapangan")
-    ap.add_argument("--no-pad", action="store_true", help="jangan aktifkan teleop gamepad")
-    ap.add_argument("--shot", default=None, help="simpan screenshot jendela ke PATH (uji tampilan)")
-    ap.add_argument("--shot-after", type=float, default=6.0, help="detik sebelum screenshot")
+    ap.add_argument("--no-pad", action="store_true", help="do not enable gamepad teleop")
+    ap.add_argument("--shot", default=None, help="save a window screenshot to PATH (UI testing)")
+    ap.add_argument("--shot-after", type=float, default=6.0, help="seconds before the screenshot")
     args = ap.parse_args()
     args.port_front = args.front_port
     args.port_stereo_L = args.left_port

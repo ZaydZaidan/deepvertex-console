@@ -120,7 +120,7 @@ class RawPanel(QtWidgets.QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
 
-        self.lbl = QtWidgets.QLabel("RAW · belum terhubung ke agen")
+        self.lbl = QtWidgets.QLabel("RAW · not connected to the agent")
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         lay.addWidget(self.lbl)
@@ -132,9 +132,9 @@ class RawPanel(QtWidgets.QWidget):
         row.setSpacing(4)
         self.btn = {}
         for key, txt, tip, cam in (
-                ("L", "RAW L", "mulai rekam RAW stereo KIRI", "left"),
-                ("R", "RAW R", "mulai rekam RAW stereo KANAN", "right"),
-                ("both", "L+R", "mulai rekam RAW dua kamera", "both")):
+                ("L", "RAW L", "start RAW recording — stereo LEFT", "left"),
+                ("R", "RAW R", "start RAW recording — stereo RIGHT", "right"),
+                ("both", "L+R", "start RAW recording — both cameras", "both")):
             b = QtWidgets.QPushButton(txt)
             b.setObjectName("BtnTiny")
             b.setToolTip(tip)
@@ -143,7 +143,7 @@ class RawPanel(QtWidgets.QWidget):
             self.btn[key] = b
         b = QtWidgets.QPushButton("STOP")
         b.setObjectName("BtnTiny")
-        b.setToolTip("hentikan rekam RAW (kedua kamera)")
+        b.setToolTip("stop RAW recording (both cameras)")
         b.clicked.connect(lambda: self.client.stop("both"))
         row.addWidget(b)
         self.sp_chunk = QtWidgets.QSpinBox()
@@ -162,7 +162,7 @@ class RawPanel(QtWidgets.QWidget):
 
         row2 = QtWidgets.QHBoxLayout()
         row2.setSpacing(4)
-        b = QtWidgets.QPushButton("MUAT ULANG")
+        b = QtWidgets.QPushButton("REFRESH")
         b.setObjectName("BtnTiny")
         b.clicked.connect(self.client.files)
         row2.addWidget(b)
@@ -171,9 +171,9 @@ class RawPanel(QtWidgets.QWidget):
         b.setToolTip("unduh file terpilih ke laptop + verifikasi sha256")
         b.clicked.connect(self._transfer)
         row2.addWidget(b)
-        b = QtWidgets.QPushButton("HAPUS ✓")
+        b = QtWidgets.QPushButton("DELETE ✓")
         b.setObjectName("BtnTiny")
-        b.setToolTip("hapus di Pi SEMUA file yang sudah terverifikasi di laptop")
+        b.setToolTip("delete on the Pi ALL files already verified on the laptop")
         b.clicked.connect(self._hapus)
         row2.addWidget(b)
         row2.addStretch(1)
@@ -197,14 +197,14 @@ class RawPanel(QtWidgets.QWidget):
     def _transfer(self):
         items = self.list.selectedItems()
         if not items:
-            self.prog.setText("pilih file dulu di daftar")
+            self.prog.setText("select a file in the list first")
             return
         for it in items:
             self.client.transfer(it.data(QtCore.Qt.ItemDataRole.UserRole), self.outdir)
 
     def _hapus(self):
         if not self.verified:
-            self.prog.setText("belum ada file terverifikasi untuk dihapus")
+            self.prog.setText("no verified files to delete yet")
             return
         names = list(self.verified.keys())
         self.prog.setText(f"menghapus {len(names)} file terverifikasi di Pi …")
@@ -219,7 +219,7 @@ class RawPanel(QtWidgets.QWidget):
                 caps = d.get("captures") or {}
                 aktif = ", ".join(k for k, v in caps.items() if isinstance(v, dict) and v.get("aktif"))
                 self.lbl.setText(f"RAW · agen OK ({'test' if d.get('test') else 'device'}) — "
-                                 f"capture aktif: {aktif or 'tidak ada'}")
+                                 f"active capture: {aktif or 'none'}")
                 self.lbl_disk.setText(f"disk Pi bebas: {d.get('disk_free_mb', '?')} MB "
                                       f"(ambang {d.get('min_free_mb', '?')} MB) — dir {d.get('dir', '?')}")
             else:
@@ -236,9 +236,9 @@ class RawPanel(QtWidgets.QWidget):
                         it.setText(it.text() + "  ✓ terverifikasi")
                     self.list.addItem(it)
             else:
-                self.prog.setText(f"daftar file gagal: {d.get('error', '')[:90]}")
+                self.prog.setText(f"listing files failed: {d.get('error', '')[:90]}")
         elif tag in ("start", "stop"):
-            self.prog.setText(f"{tag}: {'ok' if d.get('ok') else d.get('error', 'gagal')}")
+            self.prog.setText(f"{tag}: {'ok' if d.get('ok') else d.get('error', 'failed')}")
             self.client.status()
             self.client.files()
         elif tag == "transfer":
@@ -247,13 +247,13 @@ class RawPanel(QtWidgets.QWidget):
                 self.prog.setText(f"✓ {os.path.basename(d['rel'])} terverifikasi → {d['path']}")
                 self.client.files()
             elif d.get("ok"):
-                self.prog.setText(f"✗ {d.get('rel', '')}: sha TIDAK cocok — jangan dihapus di Pi!")
+                self.prog.setText(f"✗ {d.get('rel', '')}: sha MISMATCH — do not delete on the Pi!")
             else:
-                self.prog.setText(f"✗ transfer gagal: {d.get('error', '')[:90]}")
+                self.prog.setText(f"✗ transfer failed: {d.get('error', '')[:90]}")
         elif tag == "delete":
             if d.get("ok"):
-                self.prog.setText("hapus selesai — " + str(d.get("hasil", ""))[:120])
+                self.prog.setText("delete finished — " + str(d.get("hasil", ""))[:120])
                 self.verified.clear()
                 self.client.files()
             else:
-                self.prog.setText(f"hapus gagal: {d.get('error', '')[:90]}")
+                self.prog.setText(f"delete failed: {d.get('error', '')[:90]}")

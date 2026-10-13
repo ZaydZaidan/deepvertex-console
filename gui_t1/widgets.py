@@ -987,3 +987,53 @@ class TrajectoryPlot(QtWidgets.QWidget):
             p.drawText(QRectF(x, area.bottom() + 16, w, 12), Qt.AlignLeft | Qt.AlignVCenter, txt)
             x += w
         p.end()
+
+
+class BarTengah(QtWidgets.QWidget):
+    """Bar teleop berpusat-NOL (audit 13 Okt).
+
+    Akar masalah: QProgressBar(range -100..100) selalu mengisi dari KIRI —
+    nilai 0 (stick netral) tampil 50% terisi sehingga pilot salah baca.
+    Widget ini menggambar: track + garis tengah + isian dari titik tengah.
+    API: setValue(-100..100), value().
+    """
+
+    def __init__(self, tinggi=8, parent=None):
+        super().__init__(parent)
+        self._v = 0
+        self.setFixedHeight(theme.px(tinggi))
+        self.setMinimumWidth(60)
+
+    def setValue(self, v):
+        try:
+            v = int(max(-100, min(100, int(v))))
+        except (TypeError, ValueError):
+            v = 0
+        if v != self._v:
+            self._v = v
+            self.update()
+
+    def value(self):
+        return self._v
+
+    def paintEvent(self, _ev):                          # noqa: N802 (Qt)
+        p = QtGui.QPainter(self)
+        try:
+            p.setRenderHint(QtGui.QPainter.Antialiasing)
+            wd, ht = self.width(), self.height()
+            r = ht / 2.0
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QColor(255, 255, 255, 22))
+            p.drawRoundedRect(0, 0, wd, ht, r, r)
+            mid = wd / 2.0
+            p.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 46), 1))
+            p.drawLine(int(mid), 0, int(mid), ht)
+            if self._v != 0:
+                p.setPen(QtCore.Qt.NoPen)
+                p.setBrush(theme.warna("accent"))
+                x1 = mid + (mid * (self._v / 100.0))
+                kiri = int(min(mid, x1))
+                lebar = max(1, int(abs(x1 - mid)))
+                p.drawRoundedRect(kiri, 0, lebar, ht, r, r)
+        finally:
+            p.end()

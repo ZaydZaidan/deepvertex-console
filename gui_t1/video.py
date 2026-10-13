@@ -100,7 +100,7 @@ class StreamPlayer(QtCore.QObject):
             self._bus_timer = QtCore.QTimer(self)
             self._bus_timer.timeout.connect(self._poll_bus)
             self._bus_timer.start(250)
-        self.sig_status.emit(f"{self.nama}: mulai (port {self.port})")
+        self.sig_status.emit(f"{self.nama}: started (port {self.port})")
 
     def stop(self):
         if self._rec_proc is not None:
@@ -113,7 +113,7 @@ class StreamPlayer(QtCore.QObject):
         if self._bus_timer is not None:
             self._bus_timer.stop()
             self._bus_timer = None
-        self.sig_status.emit(f"{self.nama}: berhenti")
+        self.sig_status.emit(f"{self.nama}: stopped")
 
     def restart(self, tunda_ms=1500):
         self.stop()
@@ -201,7 +201,7 @@ class StreamPlayer(QtCore.QObject):
         self._rec_container = container
         # beri waktu perekam bind + parse, baru buka keran relai
         QtCore.QTimer.singleShot(500, self._buka_relai)
-        self.sig_status.emit(f"{self.nama}: mulai merekam → {os.path.basename(path)}")
+        self.sig_status.emit(f"{self.nama}: recording started → {os.path.basename(path)}")
         return True
 
     def _buka_relai(self):
@@ -225,7 +225,7 @@ class StreamPlayer(QtCore.QObject):
                 err = (self._rec_proc.stderr.read() or "").strip()[-200:]
             except Exception:                     # noqa: BLE001
                 pass
-            self.sig_error.emit(f"{self.nama}: perekam berhenti tak terduga (rc={rc}) {err}")
+            self.sig_error.emit(f"{self.nama}: recorder stopped unexpectedly (rc={rc}) {err}")
             self._bersihkan_perekam()
 
     def stop_record(self):
@@ -254,7 +254,7 @@ class StreamPlayer(QtCore.QObject):
         ok = ukuran > 1000
         self.sig_recording.emit(False, path if ok else "")
         self.sig_status.emit(
-            f"{self.nama}: rekaman {'tersimpan' if ok else 'GAGAL'} "
+            f"{self.nama}: recording {'saved' if ok else 'FAILED'} "
             f"({container}, {ukuran / 1e6:.1f} MB) → {path}")
 
     def _bersihkan_perekam(self):
