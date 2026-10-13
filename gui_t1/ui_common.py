@@ -1,9 +1,9 @@
-"""ui_common.py — komponen UI bersama untuk konsol T1 (Rate UI, Segmen, kosongkan).
+"""ui_common.py — komponen UI bersama untuk konsol (Rate UI, Segmen, kosongkan).
 
 Segmen / FlowLayout / FlowBox / StatusBar DISALIN dari konsol sim (sudah migrasi
-PySide6) supaya konsol T1 memakai KOMPONEN & GAYA YANG SAMA — satu bahasa desain,
+PySide6) supaya konsol memakai KOMPONEN & GAYA YANG SAMA — satu bahasa desain,
 tanpa mengimpor seluruh aplikasi sim. Kalau gaya di salah satu sisi berubah,
-ubah KEDUANYA (sinkron) — komponen ini diuji lewat uji tampilan konsol T1.
+ubah KEDUANYA (sinkron) — komponen ini diuji lewat uji tampilan konsol.
 """
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
@@ -15,7 +15,7 @@ class Segmen(QtWidgets.QWidget):
     dipilih = QtCore.Signal(str)
 
     def __init__(self, opsi, parent=None):
-        """opsi = [(kunci, label, tooltip), ...]"""
+        """opsi = [(kunci, label, tooltip),...]"""
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)

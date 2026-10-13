@@ -4,7 +4,7 @@
 Prasyarat: agen sudah jalan, mis.:
   /usr/bin/python3 onboard/raw_agent.py --test --dir <scratch>/rawtest \
       --chunk-mb 4 --port 8791 --width 640 --height 360 --fps 25
-Jalankan:  .venv/bin/python ../tests/test_raw.py
+Jalankan:.venv/bin/python../tests/test_raw.py
 """
 import os
 import sys

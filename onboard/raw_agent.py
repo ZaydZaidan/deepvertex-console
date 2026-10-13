@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DeepVertex raw capture agent — perekam RAW onboard (Delivery T1, opsi B).
+"""DeepVertex raw capture agent — perekam RAW onboard (Delivery, opsi B).
 
 Berjalan di robot (Raspberry Pi 4 / BlueOS). Merekam frame RAW (YUYV) dari
 kamera UVC ke file chunk di disk lokal, dikendalikan lewat HTTP dari GUI topside.
@@ -9,7 +9,7 @@ Ketergantungan: python3 stdlib + binary `gst-launch-1.0` (sudah ada di BlueOS).
 Protokol HTTP (JSON):
   GET  /status                -> status service, disk, capture aktif
   POST /capture/start         -> {"cam": "left"|"right"|"front"|"both", "chunk_mb": 1024}
-  POST /capture/stop          -> {"cam": ...}
+  POST /capture/stop          -> {"cam":...}
   GET  /files                 -> daftar chunk (path relatif, ukuran, mtime)
   GET  /sha256/<path>         -> sha256 file (dihitung streaming, di-cache)
   GET  /download/<path>       -> unduh file (streaming)
@@ -336,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
 # --------------------------------------------------------------------------- #
 def main():
     global ARGS
-    ap = argparse.ArgumentParser(description="DeepVertex raw capture agent (T1)")
+    ap = argparse.ArgumentParser(description="DeepVertex raw capture agent ")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--dir", default=os.path.expanduser("~/raw_captures"),
                     help="directory for the RAW chunk files")

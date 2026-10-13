@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Uji konsol T1 offscreen (v2): 3 stream dummy + MAVLink palsu (PARAM/ACK) +
+"""Uji konsol offscreen (v2): 3 stream dummy + MAVLink palsu (PARAM/ACK) +
 agen RAW (--test) + teleop simulasi. Semua fitur inti diuji tanpa hardware.
 
-Prasyarat: agen RAW jalan di :8791 (lihat tests/test_raw.py docstring).
-Jalankan dari folder gui_t1:  .venv/bin/python ../tests/test_console.py
+Prasyarat: agen RAW jalan di:8791 (lihat tests/test_raw.py docstring).
+Jalankan dari folder gui_t1:.venv/bin/python../tests/test_console.py
 """
 import glob
 import json

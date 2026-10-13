@@ -6,7 +6,7 @@ Email **security@deepvertex.id** (or contact the maintainer directly) with steps
 reproduce. Please do not open public issues for security matters. We acknowledge
 within 3 business days.
 
-## Scope & threat model (Phase 1)
+## Scope & threat model (ROV mode)
 
 The console is a **field tool** operating on a private tether network:
 

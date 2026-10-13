@@ -19,7 +19,7 @@ Nilai hex & rasio kontrasnya diambil dari rancangan terukur
 (`ROVGUI_REDESIGN/palet_dvx.py` + `MOCKUP_FINAL.html`); JANGAN diubah tanpa mengukur
 ulang — skrip pengukurnya ada di berekas uji kontras (`Progress/tools/uji_kontras_gui.py`).
 
-Kompatibilitas: nama token LAMA (BG, PANEL, ACCENT, TEXT_DIM, ...) tetap bisa dipakai
+Kompatibilitas: nama token LAMA (BG, PANEL, ACCENT, TEXT_DIM,...) tetap bisa dipakai
 (`theme.TEXT_DIM`) dan SELALU mengembalikan nilai palet AKTIF (module __getattr__),
 sehingga kode lama tidak perlu diubah sekaligus dan tetap ikut berganti tema.
 """
@@ -190,7 +190,7 @@ def nilai(nama=None):
 
 
 def domain(nama_domain):
-    """Warna penanda domain ('digital', 'mission', ...)."""
+    """Warna penanda domain ('digital', 'mission',...)."""
     return warna(DOMAIN.get(nama_domain, "neutral"))
 
 
@@ -562,15 +562,9 @@ def qss(nama=None):
         _ca = t.get("accent_text") or t.get("accent", "#00E5FF")
         _sk = max(1.0, float(SKALA))
         _uk = (int(13 * _sk), int(9 * _sk))
-        out = (out.replace("__PANAH_UP__", _ikon_panah("up", _cd, _uk))
-                  .replace("__PANAH_DOWN__", _ikon_panah("down", _cd, _uk))
-                  .replace("__PANAH_UP_A__", _ikon_panah("up", _ca, _uk))
-                  .replace("__PANAH_DOWN_A__", _ikon_panah("down", _ca, _uk)))
+        out = (out.replace("__PANAH_UP__", _ikon_panah("up", _cd, _uk)).replace("__PANAH_DOWN__", _ikon_panah("down", _cd, _uk)).replace("__PANAH_UP_A__", _ikon_panah("up", _ca, _uk)).replace("__PANAH_DOWN_A__", _ikon_panah("down", _ca, _uk)))
     except Exception:                                   # noqa: BLE001
-        out = (out.replace('url("__PANAH_UP__")', "none")
-                  .replace('url("__PANAH_DOWN__")', "none")
-                  .replace('url("__PANAH_UP_A__")', "none")
-                  .replace('url("__PANAH_DOWN_A__")', "none"))
+        out = (out.replace('url("__PANAH_UP__")', "none").replace('url("__PANAH_DOWN__")', "none").replace('url("__PANAH_UP_A__")', "none").replace('url("__PANAH_DOWN_A__")', "none"))
     return out
 
 

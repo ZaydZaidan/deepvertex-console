@@ -1,4 +1,4 @@
-"""Video H.264 via GStreamer untuk konsol nyata T1 — display, relai, rekam, snapshot.
+"""Video H.264 via GStreamer untuk konsol nyata  — display, relai, rekam, snapshot.
 
 Resep yang sudah TERUJI (12 Okt 2026, GStreamer 1.24.2):
   Display (in-proses):  udpsrc port=P caps=<RTP H264> ! rtpjitterbuffer latency=200
@@ -172,7 +172,7 @@ class StreamPlayer(QtCore.QObject):
 
     # ------------------------------------------------------------------ rekam
     def rekam_bisa(self):
-        """(bisa, container) — mkv bila h264parse ada; kalau tidak, .h264 elementer."""
+        """(bisa, container) — mkv bila h264parse ada; kalau tidak,.h264 elementer."""
         if h264parse_tersedia():
             return True, "mkv"
         return True, "h264"

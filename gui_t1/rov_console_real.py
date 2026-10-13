@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Konsol Misi ROV — TAHAP 1 (mode ROV, BlueROV2 via BlueOS) — konsol lengkap.
+"""ROV mission console — ROV MODE (mode ROV, BlueROV2 via BlueOS) — konsol lengkap.
 
 TAMPILAN: layout 3 kolom; komponen bersama ada di ui_common.py (Segmen/FlowBox/
 StatusBar di ui_common.py), rel kiri & kanan yang scroll, kolom tengah + baris
@@ -10,7 +10,7 @@ FUNGSI (gaya QGC): teleop gamepad (MANUAL_CONTROL + deadman), ARM/DISARM/mode,
 compass/level/baro), MOTOR TEST, FAILSAFE+BATERAI, browser PARAMETER,
 PRE-FLIGHT CHECK (status hidup + checklist pre-dive resmi Blue Robotics).
 
-Jalankan: ./run_console_real.sh [opsi]   (lihat --help)
+Jalankan:./run_console_real.sh [opsi]   (lihat --help)
 """
 import argparse
 import json
@@ -54,7 +54,7 @@ def _slug(nama):
     for ch in (nama or "").strip().lower():
         if ch.isalnum() or ch in "-_":
             out.append(ch)
-        elif ch in " .":
+        elif ch in ".":
             out.append("_")
     s = "".join(out)
     while "__" in s:
@@ -66,7 +66,7 @@ def _buat_dir_sesi(root, nama=""):
     """Struktur sesi (audit 13 Okt — alur file jelas & siap delivery):
 
     <root>/<YYYYMMDD_HHMMSS>_<nama-sesi>/
-        compressed/   video .mkv + snapshot .png (jalur stream BlueOS)
+        compressed/   video.mkv + snapshot.png (jalur stream BlueOS)
         raw/          chunk RAW hasil transfer dari Pi (arsip utuh, per kamera)
         mavlink.tlog  /  session_start.json / session_end.json
     """
@@ -629,7 +629,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def _panel_kamera(self, key, judul, tinggi):
         p = W.Panel(judul, "H.264 · BlueOS", domain="field")
         tile = W.CameraTile(key.replace("cam_", ""), judul=False)
-        tile.mode_gambar = "contain"     # T1 nyata: frame kamera ditampilkan UTUH
+        tile.mode_gambar = "contain"     #  nyata: frame kamera ditampilkan UTUH
         tile.tinggi_maks = tinggi
         tile.set_status("waiting for stream …")
         p.body_layout.addWidget(tile)      # hug: tinggi = rasio frame (tanpa stretch)
@@ -715,7 +715,7 @@ class RovConsole(QtWidgets.QMainWindow):
         row.setSpacing(6)
         self.cb_mode = QtWidgets.QComboBox()
         self.cb_mode.addItems([n for n, _m in MODE_LIST])
-        self.cb_mode.setToolTip("mode ArduSub aktif T1 (otonom/posisi = coming soon)")
+        self.cb_mode.setToolTip("mode ArduSub aktif  (otonom/posisi = coming soon)")
         b_go = QtWidgets.QPushButton("SET")
         b_go.setObjectName("BtnTiny")
         b_go.clicked.connect(lambda: self._buka_mode_nama(self.cb_mode.currentIndex()))
@@ -932,7 +932,7 @@ class RovConsole(QtWidgets.QMainWindow):
                 QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             cb.setMinimumContentsLength(10)
             cb.setToolTip("REC mode for this camera:\n"
-                          "COMPRESSED = .mkv video through the BlueOS stream (small)\n"
+                          "COMPRESSED =.mkv video through the BlueOS stream (small)\n"
                           "RAW = uncompressed frames via the onboard agent (big; "
                           "files live on the Pi until you transfer them\n"
                           "in the RAW CAPTURE panel → this session's raw/ folder)")
@@ -973,7 +973,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_save.setWordWrap(True)
         self.lbl_save.setToolTip(
             "Everything for this dive goes into\n%s\n"
-            "  compressed/ ← .mkv + .png from the live streams\n"
+            "  compressed/ ←.mkv +.png from the live streams\n"
             "  raw/        ← uncompressed chunks transferred from the Pi" % self.sesi)
         p.body_layout.addWidget(self.lbl_save)
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
@@ -1033,10 +1033,10 @@ class RovConsole(QtWidgets.QMainWindow):
         # ---- peta misi: peta OSM (ala rovgui asli) + plot NED + estimasi
         p = W.Panel("MISSION MAP", "OSM · estimate (T2)", domain="mission")
         self.peta = PetaPanel()
-        # default T1: perairan Kepulauan Seribu (dekat dermaga Pulau Pramuka).
+        # default: perairan Kepulauan Seribu (dekat dermaga Pulau Pramuka).
         # Operator mengganti titik anchor kapan saja lewat "TARUH ANCHOR" (klik peta).
         self.peta.set_anchor({"lat": -5.7463, "lon": 106.6135, "heading_deg": 0.0,
-                              "sumber": "default T1 (Kepulauan Seribu)"})
+                              "sumber": "default  (Kepulauan Seribu)"})
         self.peta.setMinimumHeight(220)
         self.peta.pin_dipilih.connect(self._anchor_dipilih)
         self.plot_misi = PlotMisi()
@@ -1104,7 +1104,7 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addWidget(W.Placeholder(
             "COMING SOON",
             "Autonomous, VIO, dan pemetaan berjalan pada Tahap 2 (mode AUV, Jetson Orin Nano). "
-            "Phase 1 is ROV mode only: manual pilot + capture."))
+            "ROV mode is ROV mode only: manual pilot + capture."))
         P["soon"] = p
 
     # ================================================================ menu
@@ -1268,7 +1268,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def _menu_about(self):
         QtWidgets.QMessageBox.about(
             self, "DeepVertex ROV Console",
-            "Marine Technology \u2014 ROV console (Phase 1, ROV mode)\n"
+            "Marine Technology \u2014 ROV console (ROV mode, ROV mode)\n"
             "BlueROV2 via BlueOS · MAVLink (pymavlink) · GStreamer · PySide6\n"
             "Basis tampilan: konsol sim DeepVertex (satu bahasa desain).\n"
             "Features: gamepad teleop, calibration, motor test, failsafe, parameters, "
@@ -1523,7 +1523,7 @@ class RovConsole(QtWidgets.QMainWindow):
             try:
                 self.lbl_save.setToolTip(
                     "Everything for this dive goes into\n%s\n"
-                    "  compressed/ ← .mkv + .png from the live streams\n"
+                    "  compressed/ ←.mkv +.png from the live streams\n"
                     "  raw/        ← uncompressed chunks transferred from the Pi"
                     % baru)
             except Exception:                          # noqa: BLE001
@@ -1939,7 +1939,7 @@ def _terapkan_tema(app, nama=None, skala=None):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="DeepVertex Marine Technology \u2014 ROV console (Phase 1, ROV mode)")
+        description="DeepVertex Marine Technology \u2014 ROV console (ROV mode, ROV mode)")
     ap.add_argument("--mavlink", default="udpin:0.0.0.0:14550",
                     help="endpoint MAVLink (mis. udpin:0.0.0.0:14550 / udp:192.168.2.2:14550)")
     ap.add_argument("--front-port", type=int, default=5600)

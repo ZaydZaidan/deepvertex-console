@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Installer topside T1 (Ubuntu 24.04) — venv + cek GStreamer + bundel plugin mkv (opsional).
+# Installer topside  (Ubuntu 24.04) — venv + cek GStreamer + bundel plugin mkv (opsional).
 # Aman dijalankan ulang (idempotent).
 set -uo pipefail
-DIR="$(cd "$(dirname "$0")/.." && pwd)"        # .../work
+DIR="$(cd "$(dirname "$0")/.." && pwd)"        #.../work
 GUI="$DIR/gui_t1"
 
 echo "== 1) venv + PySide6 =="
@@ -19,9 +19,9 @@ for e in rtph264depay rtpjitterbuffer avdec_h264 matroskamux multifilesink fakes
 done
 [ "$miss" = 1 ] && echo "   → pasang: sudo apt install gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav"
 
-echo "== 3) h264parse (rekaman .mkv) =="
+echo "== 3) h264parse (rekaman.mkv) =="
 if gst-inspect-1.0 h264parse >/dev/null 2>&1; then
-  echo "   h264parse OK — rekaman .mkv tersedia"
+  echo "   h264parse OK — rekaman.mkv tersedia"
 else
   echo "   h264parse TIDAK ADA — mencoba ambil plugin tanpa sudo …"
   tmp="$(mktemp -d)"
@@ -34,7 +34,7 @@ else
     cp "$tmp/x/usr/lib/x86_64-linux-gnu/"*.so* "$GUI/plugins/lib/" 2>/dev/null || true
     echo "   plugin dibundel ke $GUI/plugins/ (run_console_real.sh memakai otomatis)"
   else
-    echo "   GAGAL ambil paket — rekaman akan fallback ke .h264."
+    echo "   GAGAL ambil paket — rekaman akan fallback ke.h264."
     echo "   atau pasang manual: sudo apt install gstreamer1.0-plugins-bad"
   fi
   rm -rf "$tmp"
@@ -62,5 +62,5 @@ fi
 
 echo "== 4) uji cepat (opsional, tanpa hardware) =="
 echo "   jalankan: $GUI/run_console_real.sh   (konsol)"
-echo "   uji     : cd $GUI && .venv/bin/python ../tests/test_video.py"
+echo "   uji: cd $GUI &&.venv/bin/python../tests/test_video.py"
 echo "SELESAI."

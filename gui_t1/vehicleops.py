@@ -1,4 +1,4 @@
-"""vehicleops.py — operasi kendaraan T1 (gaya QGC): kalibrasi, motor test, failsafe,
+"""vehicleops.py — operasi kendaraan  (gaya QGC): kalibrasi, motor test, failsafe,
 browser parameter, dan panel PRE-FLIGHT CHECK.
 
 Sumber perintah: dokumentasi ArduPilot/ArduSub + prosedur Blue Robotics
@@ -893,8 +893,8 @@ class PreflightPanel(QtWidgets.QWidget):
         hea = s.get("sys_healthy")
 
         def _st(mask, mandatory=True):
-            if pres is None or hea is None:
-                return ("ink_faint", "—")
+            if pres is None or hea is None or int(pres) == 0:
+                return ("ink_faint", "—")     # no data yet — do not blame a sensor
             if not (int(pres) & mask):
                 return ("err", "NOT FOUND") if mandatory else ("ink_faint", "n/a")
             if int(hea) & mask:
@@ -927,6 +927,11 @@ class PreflightPanel(QtWidgets.QWidget):
             self._set_sensor(key, warna, teks)
 
         # ringkasan
+        try:
+            self.chip_bar.sesuaikan()
+            self.chip_bar_s.sesuaikan()
+        except Exception:                                  # noqa: BLE001
+            pass
         kurang = [k for k, c in self.cb.items() if not c.isChecked()]
         siap = (s.get("link") and v is not None and v >= 12.5 and "leak" not in txt)
         if siap and not kurang:

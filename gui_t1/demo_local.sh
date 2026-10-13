@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Demo TAMPILAN konsol T1 tanpa hardware:
+# Demo TAMPILAN konsol tanpa hardware:
 #   3 stream dummy (port 5600-5602) + kendaraan MAVLink palsu + agen RAW uji → konsol.
 # Tutup jendela konsol = semua helper dimatikan otomatis.
 #
@@ -26,7 +26,7 @@ echo "[demo] kendaraan MAVLink palsu …"
 spawn /usr/bin/python3 "$ROOT/tests/fake_vehicle.py" --secs 7200
 
 if curl -s --max-time 1 http://127.0.0.1:8765/status >/dev/null 2>&1; then
-  echo "[demo] agen RAW sudah jalan di :8765 — dilewati"
+  echo "[demo] agen RAW sudah jalan di:8765 — dilewati"
 else
   echo "[demo] agen RAW uji (port 8765, data di /tmp/dv_raw_demo) …"
   spawn /usr/bin/python3 "$ROOT/onboard/raw_agent.py" --test --dir /tmp/dv_raw_demo \

@@ -3,7 +3,7 @@
 Prinsip: HANYA penyedia yang benar-benar mengembalikan citra yang didaftarkan.
 Hasil uji nyata (`scripts/tools/uji_penyedia.py`, satu ubin per penyedia, 26 Sep 2026):
 
-  hidup : OSM Standard · OSM Humanitarian (HOT) · OpenTopoMap · Wikimedia ·
+  hidup: OSM Standard · OSM Humanitarian (HOT) · OpenTopoMap · Wikimedia ·
           Esri World Imagery · World Topo · World Street · Dark Gray · Ocean
   dibuang: Google (4 jenis, host tidak dapat diresolusi — 0/4),
            OSM Cycle Map & Transport (host lama sudah tidak ada),
@@ -23,12 +23,12 @@ CACHE = os.path.expanduser("~/.cache/rovgui_peta")
 # User-Agent yang sama dengan panel peta (ketentuan penyedia: identitas jelas + atribusi).
 UA = "RovGuiVIO/1.0 (riset VIO BlueROV2; kontak zaydzihnizaidan@gmail.com)"
 
-PENYEDIA_DAFTAR = {'OSM : Standard': {'url': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+PENYEDIA_DAFTAR = {'OSM: Standard': {'url': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     'attr': '© OpenStreetMap contributors',
                     'sub': '',
                     'z_maks': 19,
                     'grup': 'OSM'},
- 'OSM : Humanitarian (HOT)': {'url': 'https://tile-{s}.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+ 'OSM: Humanitarian (HOT)': {'url': 'https://tile-{s}.openstreetmap.fr/hot/{z}/{x}/{y}.png',
                               'attr': '© OpenStreetMap contributors · HOT',
                               'sub': 'hot',
                               'z_maks': 19,
@@ -48,22 +48,22 @@ PENYEDIA_DAFTAR = {'OSM : Standard': {'url': 'https://tile.openstreetmap.org/{z}
                                   'sub': 'satelit',
                                   'z_maks': 18,
                                   'grup': 'Esri'},
- 'Esri : World Topo': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+ 'Esri: World Topo': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
                        'attr': 'Esri World Topo',
                        'sub': 'esri_topo',
                        'z_maks': 19,
                        'grup': 'Esri'},
- 'Esri : World Street': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+ 'Esri: World Street': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
                          'attr': 'Esri World Street',
                          'sub': 'esri_street',
                          'z_maks': 19,
                          'grup': 'Esri'},
- 'Esri : Dark Gray Canvas': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+ 'Esri: Dark Gray Canvas': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
                              'attr': 'Esri Dark Gray Canvas',
                              'sub': 'esri_gelap',
                              'z_maks': 16,
                              'grup': 'Esri'},
- 'Esri : Ocean Basemap': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+ 'Esri: Ocean Basemap': {'url': 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
                           'attr': 'Esri Ocean Basemap',
                           'sub': 'esri_laut',
                           'z_maks': 13,
@@ -71,10 +71,10 @@ PENYEDIA_DAFTAR = {'OSM : Standard': {'url': 'https://tile.openstreetmap.org/{z}
 
 # PENYEDIA BAWAAN: dipilih dari hasil ukur `scripts/tools/ukur_penyedia.py` (latensi rata-rata,
 # 3 ubin per penyedia, lokasi Jakarta/Seribu):
-#   1. OSM : Standard        0,08 s  <-- TERCEPAT + tajam saat zoom dalam (bukan foto diperbesar)
+#   1. OSM: Standard        0,08 s  <-- TERCEPAT + tajam saat zoom dalam (bukan foto diperbesar)
 #   2. Satelit (Esri)        0,20 s     citra foto; di zoom dalam tampak pecah/kabur
 #   3. Esri Ocean            0,27 s
-#   ... OpenTopoMap          2,66 s     paling lambat
+#... OpenTopoMap          2,66 s     paling lambat
 #
 # KEPUTUSAN PEMILIK 27 Sep 2026: HOT TIDAK lagi jadi bawaan. Dua alasan terukur:
 #   (a) HOT paling lambat dari jaringan ini (1,7-1,8 s/ubin) dan ubinnya sering nyaris kosong
@@ -82,7 +82,7 @@ PENYEDIA_DAFTAR = {'OSM : Standard': {'url': 'https://tile.openstreetmap.org/{z}
 #   (b) tampilannya dinilai ulang secara visual pada ubin area Kepulauan Seribu
 #       (`scripts/tools/banding_penyedia.py`): OSM Standard punya garis pantai tegas + label
 #       terbaca + tidak ramai = paling dekat dengan tampilan "bersih" QGroundControl.
-BAWAAN = "OSM : Standard"
+BAWAAN = "OSM: Standard"
 
 URUTAN_GRUP = ["OSM", "Esri"]
 

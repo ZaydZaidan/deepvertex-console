@@ -1,4 +1,4 @@
-"""gamepad.py — teleop gamepad T1 (gaya QGC): MANUAL_CONTROL 20 Hz + deadman wajib.
+"""gamepad.py — teleop gamepad  (gaya QGC): MANUAL_CONTROL 20 Hz + deadman wajib.
 
 Pemetaan default = SALINAN pemetaan yang sudah diverifikasi di sim (mission_params.yaml):
 pad DS4 "Wireless Controller" (hid-sony): sumbu 0=LX 1=LY 2=L2 3=RX 4=RY 5=R2 6=dpadX

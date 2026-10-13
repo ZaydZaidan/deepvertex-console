@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Dump firmware version + ALL parameters from the real ROV (read-only).
 
-Run (console BEST stopped first — avoids the UDP socket race):
-    .venv/bin/python ../tests/real_rov_paramdump.py [--filter BATT] [--all]
+Run (console BEST stopped first — avoids the UDP socket race):.venv/bin/python../tests/real_rov_paramdump.py [--filter BATT] [--all]
 """
 import argparse
 import os

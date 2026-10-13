@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrasi PyQt5 -> PySide6 untuk work/gui_t1 (Delivery T1, Langkah B).
+"""Migrasi PyQt5 -> PySide6 untuk work/gui_t1 (Delivery, Langkah B).
 
 Aturan (mekanis, re-runnable):
   - from PyQt5 / import PyQt5        -> PySide6

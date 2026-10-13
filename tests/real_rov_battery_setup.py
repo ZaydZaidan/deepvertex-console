@@ -3,7 +3,7 @@
 
 Reads current BATT_* params, sets capacity + failsafe thresholds (voltage & mAh),
 reads back and waits for SYS_STATUS.battery_remaining to become valid.
-Run: .venv/bin/python ../tests/real_rov_battery_setup.py
+Run:.venv/bin/python../tests/real_rov_battery_setup.py
 """
 import os
 import time

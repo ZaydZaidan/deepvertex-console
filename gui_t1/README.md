@@ -1,9 +1,9 @@
-# gui_t1 — T1 ROV Mission Console (+ simulator GUI originals)
+# gui_t1 —  ROV Mission Console (+ simulator GUI originals)
 
 This folder is the working root of the **Stage 1 (ROV mode) console** for the real
 BlueROV2 (BlueOS), plus the original simulator GUI files it was derived from.
 
-## T1 console (primary)
+## console (primary)
 
 `rov_console_real.py` — the console for the real ROV. Design & widgets mirror the
 current simulator GUI (ROV Mission Console incl. the 28 Sep 2026 redesign); the binding
@@ -28,13 +28,13 @@ Capabilities (Oct 12, 2026 — console v2.2 + ArduSub/QGC tech-spec fixes):
 - AUTONOMOUS / VIO = *coming soon* (Stage 2, AUV mode).
 
 Run instructions, dependencies, test suite and the "do not change without re-testing"
-recipes are in **`README_T1.md`** (working notes).
+recipes are in **`README_WORKING_NOTES.md`** (working notes).
 
-### T1 console files
+### console files
 
 | File | Contents |
 |---|---|
-| `rov_console_real.py` | T1 console: main window, panels, wiring, capture/RAW/UAV presets |
+| `rov_console_real.py` | console: main window, panels, wiring, capture/RAW/UAV presets |
 | `video.py` | GStreamer display / relay / recording / snapshot |
 | `rawcap.py` | RAW agent HTTP client + panel |
 | `vehicleops.py` | calibration, motor test, failsafe, parameter browser, pre-flight |
@@ -45,12 +45,12 @@ recipes are in **`README_T1.md`** (working notes).
 | `peta_panel.py`, `peta_geo.py`, `peta_penyedia.py` | OSM map widget (à la rovgui) + geo/tile helpers |
 | `demo_local.sh`, `run_console_real.sh` | display demo / real-ROV launchers |
 | `fonts/`, `ikon/`, `plugins/`, `tools/` | theme assets; bundled GStreamer plugin; bundled libxcb-cursor (sudo-free) |
-| `README_T1.md` | working notes: run, dependencies, tests, key recipes |
+| `README_WORKING_NOTES.md` | working notes: run, dependencies, tests, key recipes |
 
 ## Simulator GUI originals (design base)
 
 Files kept from the simulator console; they are the visual/behavioural reference for the
-T1 console. The full sim stack (Stonefish + ArduSub SITL + VINS-Fusion) is NOT part of
+console. The full sim stack (Stonefish + ArduSub SITL + VINS-Fusion) is NOT part of
 this repo, so they are not runnable standalone from here.
 
 | File | Contents |
@@ -60,8 +60,8 @@ this repo, so they are not runnable standalone from here.
 | `rosiface.py` | ROS 2 interface (sim only) |
 | `xembed.py` | simulator window embedding utilities (sim only) |
 | `pid_view.py` | Auto-PID response + error window (sim + real robot) |
-| `dem3d_plot.py`, `dem3d_viewer.py`, `estimasi_misi.py` | sim extras (not part of T1) |
-| `run_dashboard.sh` | sim GUI launcher (sources ROS 2; not used by T1) |
+| `dem3d_plot.py`, `dem3d_viewer.py`, `estimasi_misi.py` | sim extras (not part of ) |
+| `run_dashboard.sh` | sim GUI launcher (sources ROS 2; not used by ) |
 
 Warnings carried over from the sim GUI: never use `--embed reparent` (X11 reparenting
 can cover the whole screen), and close the GUI through its window so the stack stops

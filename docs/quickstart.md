@@ -6,7 +6,7 @@ is on the bench or in the water with the tether connected.
 ## 1. Start the console
 
 ```bash
-deepvertexrov          # or ./gui_t1/run_console_real.sh
+deepvertexrov          # or./gui_t1/run_console_real.sh
 ```
 
 - The **Session name** dialog appears — type the dive name (e.g. `Coral Survey A`).

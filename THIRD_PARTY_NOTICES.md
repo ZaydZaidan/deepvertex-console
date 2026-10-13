@@ -1,4 +1,4 @@
-# Third-Party Notices — DeepVertex Underwater Drone Software (Phase 1)
+# Third-Party Notices — DeepVertex Underwater Drone Software (ROV mode)
 
 This source repository is private. The shipped application dynamically links the
 following third-party components:
@@ -13,6 +13,10 @@ following third-party components:
 | numpy | BSD-3-Clause | |
 | DeepVertex Sans font | derived from Plus Jakarta Sans (OFL) | See `gui_t1/fonts/OFL.txt`. |
 
-No GPL components are shipped in Phase 1 (VINS-Fusion / Ceres are Phase-2 items with
+No GPL components are shipped in ROV mode (VINS-Fusion / Ceres are autonomy items with
 a separate compliance plan if reintroduced). PyQt5 (GPL) is **not** used — the code
 was migrated to PySide6.
+
+This repository's own source is licensed under the PolyForm Strict License
+1.0.0 (see LICENSE). The components listed above remain under their own
+licenses; the product license does not change those terms.

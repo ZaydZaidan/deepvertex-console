@@ -54,7 +54,7 @@ class Panel(QtWidgets.QFrame):
         head.setObjectName("PanelHead")
         # TINGGI ALAMI (bukan dipatok): kalau judul/hint tidak muat, kepala panel
         # membungkus ke baris berikutnya — bukan memotong teks (aturan keras pemilik).
-        head.setMinimumHeight(24)     # mockup: .phead min-height 25px
+        head.setMinimumHeight(24)     # mockup:.phead min-height 25px
         h = QtWidgets.QHBoxLayout(head)
         h.setContentsMargins(theme.px(12), theme.px(6), theme.px(12), theme.px(6))
         h.setSpacing(6)
@@ -67,7 +67,7 @@ class Panel(QtWidgets.QFrame):
         self.hint.setWordWrap(True)
         self.hint.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         # JANGAN biarkan hint panjang melar/terpotong: label tidak boleh memaksa lebar
-        # panel (pelajaran 23 Sep: hint "TAHAN L1/LB ..." membuat kotak kanan berantakan).
+        # panel (pelajaran 23 Sep: hint "TAHAN L1/LB..." membuat kotak kanan berantakan).
         self.hint.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
         self.hint.setToolTip(hint)
         h.addWidget(self.mark)
@@ -198,7 +198,7 @@ class Meter(QtWidgets.QWidget):
         p.setFont(f)
         p.drawText(QRectF(0, 0, self.label_w - 4, h), Qt.AlignLeft | Qt.AlignVCenter, self.label.upper())
 
-        # track 4 px seperti rancangan (.meter .track height:4px) — bukan balok 8 px
+        # track 4 px seperti rancangan (.meter.track height:4px) — bukan balok 8 px
         p.setPen(QtGui.QColor(theme.HAIRLINE))
         p.setBrush(QtGui.QColor(theme.HAIRLINE))     # track 4 px (rancangan: warna --line)
         p.drawRect(QRectF(bar_x, cy - 2, bar_w, 4))
@@ -331,9 +331,9 @@ class CameraTile(QtWidgets.QWidget):
         self._buf = None
         self._rate = None
         self._stamp = None
-        self._aspect = 4.0 / 3.0      # rasio frame terakhir (default 4:3)
+        self._aspect = 16.0 / 9.0     # rasio frame terakhir (default 16:9 ala stream)
         self.mode_gambar = "cover"    # 'cover' = isi kotak lalu POTONG (sim);
-                                      # 'contain' = tampilkan UTUH (konsol T1 nyata)
+                                      # 'contain' = tampilkan UTUH (konsol nyata)
         self._off = None              # alasan kamera mati (None = hidup)
         self._off_title = "CAMERA OFF"  # judul besar saat mati ("CAMERA OFF" / "NO FRAMES")
         # preview dimatikan (kamera TETAP mengalir untuk VINS): frame jangan digambar.
@@ -474,7 +474,7 @@ class CameraTile(QtWidgets.QWidget):
             return                    # preview dimatikan: buang frame (jangan hapus status)
         if array.ndim == 3:
             if array.shape[2] == 4:
-                array = array[:, :, :3]
+                array = array[:,:,:3]
             c = array.shape[2]
             h, w = array.shape[:2]
             arr = np.ascontiguousarray(array)

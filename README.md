@@ -4,7 +4,9 @@
 
 # DeepVertex Marine Technology Console
 
-**BlueROV2 mission console for coral-mapping surveys — Phase 1 (ROV mode).**
+**BlueROV2 mission console for coral-mapping surveys — ROV mode.**
+
+**BlueOS-compatible. Tested on the BlueROV2.**
 
 A QGroundControl-style topside application (PySide6) for the BlueRobotics BlueROV2:
 three live camera streams, full MAVLink telemetry, gamepad teleop with safety
@@ -12,10 +14,12 @@ interlocks, compressed **and** onboard-RAW capture with a clear per-dive file la
 pre-flight sensor health, failsafe management, and calibration tools — designed to be
 run by a dive crew, not by a software engineer.
 
-[![CI](https://github.com/DeepVertex/deepvertex-console/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepVertex/deepvertex-console/actions/workflows/ci.yml)
+[![CI](https://github.com/ZaydZaidan/deepvertex-console/actions/workflows/ci.yml/badge.svg)](https://github.com/ZaydZaidan/deepvertex-console/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-1.0.0-00b3d6)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2024.04-333)
-![License](https://img.shields.io/badge/license-Proprietary-e11d48)
+![License](https://img.shields.io/badge/license-PolyForm%20Strict-7048e8)
+![BlueOS](https://img.shields.io/badge/BlueOS-compatible-1f6feb)
+![Tested on](https://img.shields.io/badge/tested%20on-BlueROV2-00b3d6)
 ![Python](https://img.shields.io/badge/python-3.12-3776ab)
 
 </div>
@@ -79,11 +83,9 @@ console is built around that.
 ## Quick start
 
 ```bash
-# 1) Topside install (venv + PySide6 + GStreamer checks)
-./install/install_topside.sh
+# 1) Topside install (venv + PySide6 + GStreamer checks)./install/install_topside.sh
 
-# 2) Launch (defaults: ink theme, 120% text, RAW agent at the robot)
-./gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
+# 2) Launch (defaults: ink theme, 120% text, RAW agent at the robot)./gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
 
 # …or the launcher installed on the field laptop:
 deepvertexrov
@@ -107,7 +109,7 @@ Full documentation index: [docs/](#documentation).
 | [docs/architecture.md](docs/architecture.md) | Modules, threads, MAVLink layer, agent protocol, theming |
 | [docs/testing.md](docs/testing.md) | Test suite, probes, fake vehicle, agent test mode |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Field-proven fixes for the issues we actually hit |
-| [docs/roadmap.md](docs/roadmap.md) | Phase 2 (AUV + VIO), known limitations |
+| [docs/roadmap.md](docs/roadmap.md) | Autonomy + VIO (next), known limitations |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev environment, conventions, PR flow |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting & scope |
@@ -115,7 +117,7 @@ Full documentation index: [docs/](#documentation).
 ## Repository layout
 
 ```
-gui_t1/          The console (PySide6) — see gui_t1/README_T1.md for work notes
+gui_t1/          The console (PySide6) — see gui_t1/README_WORKING_NOTES.md for work notes
 onboard/         raw_agent.py + BlueOS extension scaffold (onboard RAW recorder)
 tests/           Hardware-free suite (30 checks), layout/scroll/pad probes,
                  fake_vehicle.py, tether link check, parameter dump tools
@@ -129,27 +131,34 @@ progress/        Engineering log for the delivery (chronological)
 The full suite runs without hardware (own fake autopilot + GStreamer test pipelines):
 
 ```bash
-cd gui_t1
-.venv/bin/python ../tests/test_console.py     # 30 checks — PASS
-.venv/bin/python ../tests/test_video.py
-.venv/bin/python ../tests/test_raw.py
-.venv/bin/python ../tests/probe_layout.py     # geometry/truncation scan, 4 layouts
-.venv/bin/python ../tests/probe_scroll.py     # no-clip + scroll reachability scan
-.venv/bin/python ../tests/probe_padmap.py     # gamepad page + live-highlight shots
+cd gui_t1.venv/bin/python../tests/test_console.py     # 30 checks — PASS.venv/bin/python../tests/test_video.py.venv/bin/python../tests/test_raw.py.venv/bin/python../tests/probe_layout.py     # geometry/truncation scan, 4 layouts.venv/bin/python../tests/probe_scroll.py     # no-clip + scroll reachability scan.venv/bin/python../tests/probe_padmap.py     # gamepad page + live-highlight shots
 ```
 
 CI runs the same suite headlessly on every push (see `.github/workflows/ci.yml`).
 
 ## Status & roadmap
 
-**Phase 1 (ROV mode) is feature-complete and field-tested** on the real BlueROV2 over
+**ROV mode is feature-complete and field-tested** on the real BlueROV2 over
 the tether — teleop, capture, RAW transfer, failsafe and calibration flows were all
-exercised on hardware. Phase 2 locks in autonomous operation (AUV mode + VIO) on the
+exercised on hardware. autonomy (next) locks in autonomous operation (AUV mode + VIO) on the
 Orin companion. Known limitations are listed in [docs/roadmap.md](docs/roadmap.md).
+
+## Links
+
+| | |
+|---|---|
+| Website | [deepvertex.tech](https://deepvertex.tech) |
+| Instagram | [@deepvertex](https://instagram.com/deepvertex) |
+| LinkedIn | [DeepVertex](https://www.linkedin.com/company/deepvertex) |
+| Business & licensing | hello@deepvertex.tech |
 
 ## License
 
-**Proprietary — all rights reserved.** This repository is private; access does not
-grant any right to use, copy, modify or distribute. See [LICENSE](LICENSE) and
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (PySide6/Qt/GStreamer under
-LGPL — dynamically linked, unmodified).
+**PolyForm Strict 1.0.0 — source-available.** You may read, run and use this
+software for any **noncommercial** purpose. You may **not** distribute it or make
+**changes / new works** based on it, and commercial use requires a **written
+license** — contact [hello@deepvertex.tech](mailto:hello@deepvertex.tech).
+DeepVertex names, logos and branding must never be removed or altered.
+See [LICENSE](LICENSE); third-party components keep their own licenses
+([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — PySide6/Qt/GStreamer under
+LGPL, dynamically linked, unmodified).

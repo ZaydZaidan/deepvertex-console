@@ -159,7 +159,7 @@ class PetaPanel(QtWidgets.QWidget):
         try:
             from peta_penyedia import BAWAAN as _BAWAAN
         except Exception:                                     # noqa: BLE001
-            _BAWAAN = "OSM : Standard"
+            _BAWAAN = "OSM: Standard"
         self.provider = _BAWAAN
         # grid meter di peta: default MATI (pemilik tidak suka tampilan bergaris)
         self.tampilkan_grid = False
@@ -176,7 +176,7 @@ class PetaPanel(QtWidgets.QWidget):
         self._kosong = set()        # ubin kosong (tak ada citra) -> jangan digambar
         # JEDA unduhan: saat misi autonomous berjalan, unduhan ubin DIPAUSE supaya tidak
         # berebut CPU/jaringan dengan VINS (permintaan pemilik: jangan sampai mengganggu VIO).
-        # Sumber ubin sendiri (server XYZ / folder lokal / berkas .mbtiles)
+        # Sumber ubin sendiri (server XYZ / folder lokal / berkas.mbtiles)
         self.url_server = "http://127.0.0.1:8080/{z}/{x}/{y}.png"
         self.dir_lokal = os.path.expanduser("~/peta_ubin")
         self.berkas_mbtiles = os.path.expanduser("~/peta.mbtiles")
@@ -437,7 +437,7 @@ class PetaPanel(QtWidgets.QWidget):
         return self._info().get("sumber", "http")
 
     def _ambil_mbtiles(self, z, x, y):
-        """Ambil satu ubin dari berkas .mbtiles (SQLite) -> simpan ke cache. Kembalikan bool."""
+        """Ambil satu ubin dari berkas.mbtiles (SQLite) -> simpan ke cache. Kembalikan bool."""
         import sqlite3
         b = getattr(self, "berkas_mbtiles", "")
         if not b or not os.path.exists(b):
@@ -457,7 +457,7 @@ class PetaPanel(QtWidgets.QWidget):
             return False
 
     def set_sumber(self, url_server=None, dir_lokal=None, berkas_mbtiles=None):
-        """Atur sumber ubin sendiri (server XYZ / folder lokal / .mbtiles) + simpan."""
+        """Atur sumber ubin sendiri (server XYZ / folder lokal /.mbtiles) + simpan."""
         if url_server:
             self.url_server = url_server
         if dir_lokal:

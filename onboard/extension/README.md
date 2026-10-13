@@ -11,7 +11,7 @@ installation on the Pi is tidy (can be stopped/removed without a trace).
 
 | File | Function |
 |---|---|
-| `raw_agent.py` | recorder — **copy first**: `cp ../raw_agent.py .` (a single source of truth stays in `../`) |
+| `raw_agent.py` | recorder — **copy first**: `cp../raw_agent.py.` (a single source of truth stays in `../`) |
 | `Dockerfile` | minimal image: python3 + GStreamer (v4l2src, multifilesink) |
 | `docker-compose.yml` | service + host network access + camera device + data volume |
 
@@ -19,7 +19,7 @@ installation on the Pi is tidy (can be stopped/removed without a trace).
 
 1. Copy this FOLDER to BlueOS (File Browser to `/root/extensions/deepvertex-raw/`,
    or `scp` over the tether).
-2. Make sure `raw_agent.py` has been copied into this folder (`cp ../raw_agent.py .`), then build & run from the BlueOS Terminal:
+2. Make sure `raw_agent.py` has been copied into this folder (`cp../raw_agent.py.`), then build & run from the BlueOS Terminal:
    `cd /root/extensions/deepvertex-raw && docker compose up -d --build`
    (or register it via the "+" button in Extensions Manager if the manifest format has
    been adapted to the installed BlueOS version).

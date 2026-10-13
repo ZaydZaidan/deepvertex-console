@@ -10,8 +10,7 @@ Two sides to install: the **topside** (the laptop that runs the console) and the
 ### One-shot installer (recommended)
 
 ```bash
-cd deepvertex-console
-./install/install_topside.sh
+cd deepvertex-console./install/install_topside.sh
 ```
 
 The script is idempotent and safe to re-run. It:
@@ -36,9 +35,8 @@ The script is idempotent and safe to re-run. It:
 
 ### Verify
 
-```bash
-./gui_t1/run_console_real.sh --help          # CLI reference
-cd gui_t1 && .venv/bin/python ../tests/test_console.py   # 30/30 PASS without hardware
+```bash./gui_t1/run_console_real.sh --help          # CLI reference
+cd gui_t1 &&.venv/bin/python../tests/test_console.py   # 30/30 PASS without hardware
 ```
 
 ## 2. Tether & network
@@ -57,7 +55,7 @@ nmcli con up "Wired connection 1"
 3. Verify:
 
 ```bash
-cd gui_t1 && .venv/bin/python ../tests/real_rov_linkcheck.py
+cd gui_t1 &&.venv/bin/python../tests/real_rov_linkcheck.py
 # expects: ping ~5 ms, BlueOS web 200, MAVLink heartbeat stream
 ```
 

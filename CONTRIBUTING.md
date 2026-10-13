@@ -5,10 +5,8 @@ approved contractors. By contributing you agree your work is owned by DeepVertex
 
 ## Dev environment
 
-```bash
-./install/install_topside.sh
-cd gui_t1
-.venv/bin/python ../tests/test_console.py     # must be PASS before any PR
+```bash./install/install_topside.sh
+cd gui_t1.venv/bin/python../tests/test_console.py     # must be PASS before any PR
 ```
 
 ## Ground rules

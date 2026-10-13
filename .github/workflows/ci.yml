@@ -39,10 +39,10 @@ jobs:
 
       - name: Console suite (headless)
         working-directory: gui_t1
-        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" python ../tests/test_console.py
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" python../tests/test_console.py
 
       - name: Video + RAW suites
         working-directory: gui_t1
         run: |
-          xvfb-run -a python ../tests/test_video.py
-          xvfb-run -a python ../tests/test_raw.py
+          xvfb-run -a python../tests/test_video.py
+          xvfb-run -a python../tests/test_raw.py

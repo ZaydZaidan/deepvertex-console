@@ -1,6 +1,6 @@
-"""peta_misi.py — panel PETA MISI T1: rencana survei + jejak estimasi (dead-reckoning).
+"""peta_misi.py — panel PETA MISI: rencana survei + jejak estimasi (dead-reckoning).
 
-Posisi presisi menyusul di T2 (VIO). Di T1 peta menggambar:
+Posisi presisi menyusul di T2 (VIO). Di  peta menggambar:
   - area survei (default 10x10 m) + lajur rencana (spacing 1.0 m) — mirror geometri sim
   - jejak ESTIMASI posisi (integrasi heading kompas + perintah manual pilot)
   - penanda peristiwa (snapshot / mulai rekam) + tombol ANCOR (posisi sekarang = 0,0)

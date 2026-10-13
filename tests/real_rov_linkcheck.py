@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real-ROV tether link check (READ-ONLY — never arms or moves anything).
 
-Usage:  .venv/bin/python ../tests/real_rov_linkcheck.py [--host 192.168.2.2] [--secs 8]
+Usage:.venv/bin/python../tests/real_rov_linkcheck.py [--host 192.168.2.2] [--secs 8]
 
 Checks:
   1. MAVLink: listens on udpin:0.0.0.0:14550 while sending GCS heartbeats;

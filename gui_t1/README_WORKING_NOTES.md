@@ -5,7 +5,7 @@ simulator GUI (ROV Mission Console, including the Sep 28, 2026 redesign); the bi
 now **PySide6**.
 
 Status (Oct 12, 2026): **console v2.2 + ArduSub/QGC tech-spec fixes** — all tests PASS
-without hardware (`test_console` 17/17). T1 features: 3 camera streams (front + stereo
+without hardware (`test_console` 17/17).  features: 3 camera streams (front + stereo
 L/R), MAVLink 2 telemetry (attitude/compass dials, depth, temperature, battery, QGC-style
 INSTRUMENTS, SYS_STATUS pre-arm bit), telemetry tlog per session, teleop with dead-man,
 vehicle ops (arm/mode/SURFACE, calibration, motor test, failsafe, parameter browser,
@@ -14,9 +14,7 @@ Stage 2/VIO), compressed capture + snapshot (topside), and **onboard RAW capture
 (option B — via the `../onboard/raw_agent.py` agent). AUTONOMOUS and VIO = *coming soon*
 (Stage 2, AUV mode).
 
-## Run
-
-    ./run_console_real.sh [--mavlink udpin:0.0.0.0:14550] [--outdir ~/DeepVertex-ROV-Captures]
+## Run./run_console_real.sh [--mavlink udpin:0.0.0.0:14550] [--outdir ~/DeepVertex-ROV-Captures]
 
 Desktop launcher & icon: `~/.local/share/applications/deepvertex-console.desktop` and a
 shortcut `~/Desktop/DeepVertex Marine Technology Console.desktop` (icon =
@@ -67,17 +65,9 @@ Closing the console window = all demo helpers are shut down too; demo RAW data i
 - pymavlink runs in **MAVLink 2** mode (`MAVLINK20=1` is set before import): required for
   18-channel RC override (lights ch9+) and modern message extensions.
 
-## Tests (no hardware)
+## Tests (no hardware)../tests/test_video.py      # display + record + snapshot against a dummy stream../tests/test_raw.py        # RAW agent: start/stop → transfer+sha256 → delete../tests/test_console.py    # full offscreen console + fake MAVLink + RAW agent (17/17)../tests/probe_layout.py    # real-DPI layout probe (run on a real display; 0 truncation)../tests/debug_misc*.py     # diagnostics (tlog / RC-override investigations)
 
-    ../tests/test_video.py      # display + record + snapshot against a dummy stream
-    ../tests/test_raw.py        # RAW agent: start/stop → transfer+sha256 → delete
-    ../tests/test_console.py    # full offscreen console + fake MAVLink + RAW agent (17/17)
-    ../tests/probe_layout.py    # real-DPI layout probe (run on a real display; 0 truncation)
-    ../tests/debug_misc*.py     # diagnostics (tlog / RC-override investigations)
-
-Prerequisite for test_raw/test_console: the RAW agent running on :8791, e.g.
-
-    .venv/bin/python ../onboard/raw_agent.py --test --port 8791 \
+Prerequisite for test_raw/test_console: the RAW agent running on:8791, e.g..venv/bin/python../onboard/raw_agent.py --test --port 8791 \
         --dir /tmp/dv_raw --chunk-mb 4 --width 640 --height 360 --fps 25
 
 (The agent's default port is 8765; tests expect `--port 8791`.)
@@ -123,7 +113,7 @@ Prerequisite for test_raw/test_console: the RAW agent running on :8791, e.g.
   named directly ("FAULT" / "NOT FOUND"); the PRE-ARM chip tooltip now carries the
   latest vehicle status text.
 - **Storage guard + time estimate**: while recording you see the estimated minutes
-  left until the SAFE LIMIT (topside for compressed .mkv, the Pi for RAW), plus a
+  left until the SAFE LIMIT (topside for compressed.mkv, the Pi for RAW), plus a
   snapshot-count estimate. Below the warn margin the ALERT strip turns amber; below
   the hard margin (default 1.5 GB topside) REC and SNAP are BLOCKED with a
   "transfer/clean up first" message — RAW start is blocked when the Pi hits its own

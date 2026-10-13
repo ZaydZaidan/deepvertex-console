@@ -1,7 +1,7 @@
 """Telemetri ArduSub/Pixhawk lewat MAVLink (pymavlink) untuk dashboard.
 
 Endpoint:
-  --mavlink auto (default)  : coba udpin:0.0.0.0:14550 lalu tcp:127.0.0.1:5760
+  --mavlink auto (default): coba udpin:0.0.0.0:14550 lalu tcp:127.0.0.1:5760
   --mavlink udpin:0.0.0.0:14551 (bila SITL dijalankan dengan --serial2 udpclient:…:14551)
 
 Catatan penting:
@@ -63,7 +63,7 @@ class MavBridge(QtCore.QObject):
     def __init__(self, url="auto", parent=None):
         super().__init__(parent)
         self.candidates = {
-            # 5760 DULUAN: SITL ArduSub berhenti di "Waiting for connection ...." sampai ada
+            # 5760 DULUAN: SITL ArduSub berhenti di "Waiting for connection...." sampai ada
             # klien di SERIAL0 — dashboard yang membuka blokir itu sekaligus memakai link-nya.
             # 14550 (SERIAL1/UDP) cadangan. 5762 sengaja TIDAK dipakai: itu milik controller.
             "auto": ["tcp:127.0.0.1:5760", "udpin:0.0.0.0:14550"],
@@ -123,7 +123,7 @@ class MavBridge(QtCore.QObject):
         with self._cmd_lock:
             self._cmdq.append(("arm", bool(on)))
 
-    # ---- perluasan T1: parameter, perintah umum, kalibrasi, manual control -------
+    # ---- perluasan: parameter, perintah umum, kalibrasi, manual control -------
     def queue_param_set(self, nama, nilai):
         with self._cmd_lock:
             self._cmdq.append(("param", (str(nama), float(nilai))))
@@ -185,7 +185,7 @@ class MavBridge(QtCore.QObject):
                     self._params_done = False
                     self.mav.mav.param_request_list_send(self.mav.target_system,
                                                          self.mav.target_component)
-                    self.sig_status.emit("meminta daftar parameter ...")
+                    self.sig_status.emit("meminta daftar parameter...")
                 elif kind == "cmdlong":
                     cmd, (p1, p2, p3, p4, p5, p6, p7), tag = val
                     self.mav.mav.command_long_send(self.mav.target_system,
@@ -266,7 +266,7 @@ class MavBridge(QtCore.QObject):
         """Coba seluruh kandidat; kalau semuanya gagal, ulangi lagi.
 
         WAJIB: SITL baru muncul setelah simulator siap, dan ArduSub sendiri berhenti di
-        'Waiting for connection ....' sampai ada klien di SERIAL0 (5760). Karena itu bridge
+        'Waiting for connection....' sampai ada klien di SERIAL0 (5760). Karena itu bridge
         tidak boleh menyerah sekali coba — ia mengulang sampai berhasil atau dihentikan.
         """
         while not self._stop.is_set():

@@ -1,12 +1,12 @@
 # Changelog
 
-All notable changes to the DeepVertex Marine Technology Console (Phase 1 · ROV mode).
+All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
-the application package (`MAJOR.MINOR.PATCH` — Phase 2 features will ship as 2.x).
+the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
 ## [1.0.0] — 2026-10-14
 
-First field-complete release of the Phase 1 console, verified against the real
+First field-complete release of the ROV mode console, verified against the real
 BlueROV2 over the Fathom-X tether.
 
 ### Added
