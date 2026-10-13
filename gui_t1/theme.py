@@ -170,7 +170,7 @@ def aktif(nama=None):
 
 
 def _dari_lingkungan():
-    """Palet awal: dari env (proses anak: pid_view/dem3d) atau bawaan."""
+    """Palet awal: dari env ROVGUI_THEME atau bawaan."""
     n = os.environ.get("ROVGUI_THEME", "").strip().lower()
     return n if n in PALET else BAWAAN
 
@@ -289,7 +289,7 @@ QWidget {
 }
 QMainWindow, QDialog { background: $field; }
 QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget { background: transparent; }
-QToolTip { background: $head; color: $ink; border: 1px solid $line_hi; padding: 3px 6px; }
+QToolTip { background: $head; color: $ink; border: 1px solid $line_hi; padding: 5px 9px; }
 #Header     { background: $panel; border-bottom: 1px solid $line; }
 #HeaderTitle{ font-size: 14px; font-weight: 700; letter-spacing: 2px; color: $ink; }
 #HeaderSub  { font-size: 10px; color: $ink_faint; letter-spacing: 0.5px; }
@@ -333,11 +333,15 @@ QLabel[peran="err"]   { color: $err; }
 QLabel[peran="brass"] { color: $brass; }
 
 QScrollArea { border: none; }
-QScrollBar:vertical { background: $field; width: 8px; margin: 0; }
-QScrollBar::handle:vertical { background: $line_hi; min-height: 24px; }
+QScrollBar:vertical { background: $field; width: 10px; margin: 0; }
+QScrollBar::handle:vertical { background: $line_hi; min-height: 30px;
+                              border-radius: 5px; margin: 1px; }
+QScrollBar::handle:vertical:hover { background: $accent; }
 QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
-QScrollBar:horizontal { background: $field; height: 8px; margin: 0; }
-QScrollBar::handle:horizontal { background: $line_hi; min-width: 24px; }
+QScrollBar:horizontal { background: $field; height: 10px; margin: 0; }
+QScrollBar::handle:horizontal { background: $line_hi; min-width: 30px;
+                                border-radius: 5px; margin: 1px; }
+QScrollBar::handle:horizontal:hover { background: $accent; }
 
 /* --- menu bar (desktop-application look, 23 Sep 2026) --- */
 QMenuBar {
@@ -346,7 +350,7 @@ QMenuBar {
     border-bottom: 1px solid $line;
     padding: 1px 4px;
 }
-QMenuBar::item { background: transparent; padding: 4px 10px; border-radius: 8px; }
+QMenuBar::item { background: transparent; padding: 6px 12px; border-radius: 8px; }
 QMenuBar::item:selected { background: $head; color: $ink; }
 QMenuBar::item:pressed { background: $line; }
 QMenu {
@@ -355,10 +359,10 @@ QMenu {
     border: 1px solid $line;
     padding: 4px;
 }
-QMenu::item { padding: 5px 22px 5px 14px; border-radius: 8px; }
+QMenu::item { padding: 7px 26px 7px 16px; border-radius: 8px; }
 QMenu::item:selected { background: $line_hi; }
 QMenu::item:disabled { color: $ink_faint; }
-QMenu::separator { height: 1px; background: $line; margin: 4px 6px; }
+QMenu::separator { height: 1px; background: $line; margin: 6px 8px; }
 
 /* --- buttons: one style for the whole GUI --- */
 QPushButton {
@@ -366,8 +370,8 @@ QPushButton {
     color: $ink;
     border: 1px solid $line_hi;
     border-radius: 8px;
-    padding: 3px 10px;
-    min-height: 22px;
+    padding: 5px 14px;
+    min-height: 24px;
     font-size: 10px;
     letter-spacing: 0.8px;
 }
@@ -389,14 +393,14 @@ QPushButton#BtnGhost:hover { border-color: $accent; color: $accent_text; }
 QPushButton#BtnBig {
     min-height: 30px; font-size: 12px; font-weight: 600; letter-spacing: 2px;
 }
-QPushButton#BtnTiny { min-height: 20px; padding: 0 8px; font-size: 10px; }
+QPushButton#BtnTiny { min-height: 22px; padding: 0 12px; font-size: 10px; }
 /* STACK-row buttons (2 Oct 2026): the component list must stay compact so the owner's
    right rail fits WITHOUT a scrollbar at 1620x978 (test R9_kanan_1620x978). The pilot's
    pan/tilt and log-fold buttons deliberately KEEP the larger BtnTiny size. */
-QPushButton#BtnRow { min-height: 16px; padding: 0 6px; font-size: 10px; }
+QPushButton#BtnRow { min-height: 16px; padding: 0 8px; font-size: 10px; }
 QPushButton#SegBtn {
     background: transparent; border: 1px solid $line; border-radius: 8px;
-    padding: 0 10px; min-height: 20px; font-size: 10px; font-weight: 600;
+    padding: 0 14px; min-height: 22px; font-size: 10px; font-weight: 600;
     letter-spacing: 0.8px; color: $ink_dim;
 }
 QPushButton#SegBtn:checked { background: $accent_tint; color: $accent_text;
@@ -407,26 +411,70 @@ QPushButton#SegBtn:pressed { background: $head; }
 /* --- number fields: must READ as editable --- */
 QDoubleSpinBox, QSpinBox, QLineEdit {
     background: $raise_; color: $ink; border: 1px solid $line_hi;
-    border-radius: 8px; padding: 0 8px; min-height: 20px; font-size: 12px; font-weight: 500;
+    border-radius: 8px; padding: 0 10px; min-height: 24px; font-size: 12px; font-weight: 500;
     selection-background-color: $accent; selection-color: $on_accent;
+}
+/* SPIN ARROWS (audit 13 Okt): tombol +/- harus JELAS — panah segitiga eksplisit,
+   area klik lebih besar, hover aksen. Berlaku GLOBAL ke semua spinbox. */
+QDoubleSpinBox, QSpinBox { padding-right: 26px; }
+QDoubleSpinBox::up-button, QSpinBox::up-button {
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 20px; background: $head; border-left: 1px solid $line_hi;
+    border-top-right-radius: 8px;
+}
+QDoubleSpinBox::down-button, QSpinBox::down-button {
+    subcontrol-origin: border; subcontrol-position: bottom right;
+    width: 20px; background: $head; border-left: 1px solid $line_hi;
+    border-bottom-right-radius: 8px;
+}
+QDoubleSpinBox::up-button:hover, QSpinBox::up-button:hover,
+QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover {
+    background: $line_hi;
+}
+QDoubleSpinBox::up-arrow, QSpinBox::up-arrow {
+    width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-bottom: 6px solid $ink_dim;
+}
+QDoubleSpinBox::down-arrow, QSpinBox::down-arrow {
+    width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid $ink_dim;
+}
+QDoubleSpinBox::up-arrow:hover, QSpinBox::up-arrow:hover {
+    border-bottom-color: $accent_text;
+}
+QDoubleSpinBox::down-arrow:hover, QSpinBox::down-arrow:hover {
+    border-top-color: $accent_text;
 }
 QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus { border-color: $accent; }
 QComboBox {
     background: $raise_; color: $ink; border: 1px solid $line_hi;
-    border-radius: 8px; padding: 0 8px 0 10px; min-height: 20px; font-size: 11px;
+    border-radius: 8px; padding: 0 12px 0 12px; min-height: 24px; font-size: 11px;
+}
+QComboBox::drop-down {
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 22px; background: $head; border-left: 1px solid $line_hi;
+    border-top-right-radius: 8px; border-bottom-right-radius: 8px;
+}
+QComboBox::drop-down:hover { background: $line_hi; }
+QComboBox::down-arrow {
+    width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid $ink_dim;
 }
 QComboBox:focus { border-color: $accent; }
 QComboBox QAbstractItemView { background: $panel; color: $ink;
                               border: 1px solid $line; selection-background-color: $line_hi; }
 QCheckBox { color: $ink; font-size: 11px; }
-QCheckBox::indicator { width: 12px; height: 12px; border: 1px solid $line_hi;
+QCheckBox::indicator { width: 14px; height: 14px; border: 1px solid $line_hi;
                        background: $raise_; border-radius: 4px; }
 QCheckBox::indicator:checked { background: $accent; border-color: $accent; }
 
 QTabWidget::pane { border: 1px solid $line; background: $panel; }
 QTabBar::tab {
     background: $head; color: $ink_dim; border: 1px solid $line;
-    padding: 3px 12px; font-size: 10px; letter-spacing: 1px;
+    padding: 5px 14px; font-size: 10px; letter-spacing: 1px;
 }
 QTabBar::tab:selected { background: $panel; color: $ink; border-bottom-color: $panel; }
 

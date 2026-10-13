@@ -315,7 +315,7 @@ class PadMapDialog(QtWidgets.QDialog):
 
         self.grid = QtWidgets.QGridLayout()
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(4)
+        self.grid.setSpacing(6)
         self.lbl = {}
         self.tipe = {}
         self.tandai = {}
@@ -366,7 +366,7 @@ class PadMapDialog(QtWidgets.QDialog):
         v.addWidget(self.lbl_status)
 
         row = QtWidgets.QHBoxLayout()
-        row.setSpacing(4)
+        row.setSpacing(6)
         lab_p = QtWidgets.QLabel("PRESET")
         lab_p.setObjectName("MicroLabel")
         self.cb_preset = QtWidgets.QComboBox()

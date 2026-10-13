@@ -43,18 +43,37 @@ def main():
             time.sleep(0.02)
 
     jalan(1.5)
-    w._apply_preset("setup")
-    jalan(0.8)
 
-    sa = w.findChildren(QtWidgets.QScrollArea)
-    info = []
-    for s in sa:
-        vb = s.verticalScrollBar()
-        info.append((vb.maximum(), s.objectName() or s.parent().__class__.__name__))
-    print("scrollareas:", info)
-    for s in sa:
-        s.verticalScrollBar().setValue(s.verticalScrollBar().maximum())
-    jalan(0.8)
+    for nm in ("pilot-focus", "mapping", "setup", "capture"):
+        w._apply_preset(nm)
+        jalan(0.7)
+        sa = w.findChildren(QtWidgets.QScrollArea)
+        print("== preset", nm)
+        for i, s in enumerate(sa):
+            vb = s.verticalScrollBar()
+            vp = s.viewport().width()
+            dalam = s.widget()
+            minw = dalam.minimumSizeHint().width() if dalam else 0
+            print("  scroll#%d max=%d vpW=%d innerMinW=%d klip-H=%s" %
+                  (i, vb.maximum(), vp, minw, minw > vp + 2))
+            if dalam is not None:
+                for ch in dalam.findChildren(
+                        QtWidgets.QWidget,
+                        options=QtCore.Qt.FindDirectChildrenOnly):
+                    cm = ch.minimumSizeHint().width()
+                    if cm > vp + 2 and ch.isVisible():
+                        ttl = ""
+                        try:
+                            lab = ch.findChild(QtWidgets.QLabel, "PanelTitle")
+                            ttl = lab.text() if lab is not None else ""
+                        except Exception:                  # noqa: BLE001
+                            pass
+                        print("     PELANGGAR: %s minW=%d>%d  %s" %
+                              (ch.__class__.__name__, cm, vp, ttl[:44]))
+            vb.setValue(vb.maximum())
+        jalan(0.5)
+    w._apply_preset("setup")
+    jalan(0.6)
 
     pf = w.P["failsafe"]
     btns = [b for b in pf.findChildren(QtWidgets.QPushButton)

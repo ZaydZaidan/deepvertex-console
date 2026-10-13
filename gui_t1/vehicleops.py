@@ -379,7 +379,7 @@ class ParamBrowser(QtWidgets.QWidget):
         self._terisi = set()
         v = QtWidgets.QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(4)
+        v.setSpacing(6)
         row = QtWidgets.QHBoxLayout()
         self.filter = QtWidgets.QLineEdit()
         self.filter.setPlaceholderText("filter (FS_ / BATT_ / RC)")
@@ -497,9 +497,9 @@ class FailsafePanel(QtWidgets.QWidget):
         self._awal = {}
         v = QtWidgets.QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(3)
+        v.setSpacing(5)
         grid = QtWidgets.QGridLayout()
-        grid.setSpacing(4)
+        grid.setSpacing(6)
         for i, (nama, label, jenis, opsi, tip) in enumerate(self.BARIS):
             lab = QtWidgets.QLabel(label)
             lab.setObjectName("MicroLabel")
@@ -626,7 +626,7 @@ class PreflightPanel(QtWidgets.QWidget):
         self.cb = {}
         v = QtWidgets.QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(4)
+        v.setSpacing(6)
 
         # ---- status hidup
         self.chip = {}

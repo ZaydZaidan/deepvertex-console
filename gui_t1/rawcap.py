@@ -14,6 +14,8 @@ import urllib.request
 
 from PySide6 import QtCore, QtWidgets
 
+import theme
+
 
 class RawClient(QtCore.QObject):
     sig_result = QtCore.Signal(str, object)      # tag, dict hasil
@@ -118,9 +120,10 @@ class RawPanel(QtWidgets.QWidget):
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(4)
+        lay.setSpacing(6)
 
-        self.lbl = QtWidgets.QLabel("RAW · not connected to the agent")
+        self.lbl = QtWidgets.QLabel("RAW · not connected to the agent "
+                                    "(uncompressed capture)")
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         lay.addWidget(self.lbl)
@@ -128,32 +131,48 @@ class RawPanel(QtWidgets.QWidget):
         self.lbl_disk.setObjectName("Faint")
         lay.addWidget(self.lbl_disk)
 
+        # Baris 1: pilih kamera RAW. Baris 2: STOP + ukuran chunk.
+        # (audit 13 Okt: satu baris panjang = minW 602 px > viewport rel 442 = TERKLIP;
+        #  dipecah dua baris supaya panel muat utuh di rel kanan.)
         row = QtWidgets.QHBoxLayout()
-        row.setSpacing(4)
+        row.setSpacing(6)
         self.btn = {}
         for key, txt, tip, cam in (
-                ("L", "RAW L", "start RAW recording — stereo LEFT", "left"),
-                ("R", "RAW R", "start RAW recording — stereo RIGHT", "right"),
-                ("both", "L+R", "start RAW recording — both cameras", "both")):
+                ("L", "RAW L", "start RAW recording — stereo LEFT (B0495C)", "left"),
+                ("R", "RAW R", "start RAW recording — stereo RIGHT (B0495C)", "right"),
+                ("both", "L+R", "start RAW recording — both stereo cameras", "both"),
+                ("front", "RAW F", "start RAW recording — FRONT camera "
+                 "(uncompressed, ≤640×480 over USB2)", "front")):
             b = QtWidgets.QPushButton(txt)
             b.setObjectName("BtnTiny")
             b.setToolTip(tip)
             b.clicked.connect(lambda _, k=key: self.client.start(k, self.sp_chunk.value()))
             row.addWidget(b)
             self.btn[key] = b
+        row.addStretch(1)
+        lay.addLayout(row)
+
+        row1b = QtWidgets.QHBoxLayout()
+        row1b.setSpacing(6)
         b = QtWidgets.QPushButton("STOP")
         b.setObjectName("BtnTiny")
-        b.setToolTip("stop RAW recording (both cameras)")
+        b.setToolTip("stop ALL RAW recording (every camera)")
         b.clicked.connect(lambda: self.client.stop("both"))
-        row.addWidget(b)
+        row1b.addWidget(b)
+        b = QtWidgets.QPushButton("STOP F")
+        b.setObjectName("BtnTiny")
+        b.setToolTip("stop RAW recording on the FRONT camera")
+        b.clicked.connect(lambda: self.client.stop("front"))
+        row1b.addWidget(b)
         self.sp_chunk = QtWidgets.QSpinBox()
         self.sp_chunk.setRange(64, 8192)
         self.sp_chunk.setValue(1024)
         self.sp_chunk.setSuffix(" MB/chunk")
-        self.sp_chunk.setToolTip("ukuran potongan file RAW di Pi")
-        row.addWidget(self.sp_chunk)
-        row.addStretch(1)
-        lay.addLayout(row)
+        self.sp_chunk.setFixedWidth(theme.px(118))
+        self.sp_chunk.setToolTip("chunk size for the RAW files written on the Pi")
+        row1b.addWidget(self.sp_chunk)
+        row1b.addStretch(1)
+        lay.addLayout(row1b)
 
         self.list = QtWidgets.QListWidget()
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
@@ -161,14 +180,15 @@ class RawPanel(QtWidgets.QWidget):
         lay.addWidget(self.list, 1)
 
         row2 = QtWidgets.QHBoxLayout()
-        row2.setSpacing(4)
+        row2.setSpacing(6)
         b = QtWidgets.QPushButton("REFRESH")
         b.setObjectName("BtnTiny")
         b.clicked.connect(self.client.files)
         row2.addWidget(b)
         b = QtWidgets.QPushButton("TRANSFER ►")
         b.setObjectName("BtnTiny")
-        b.setToolTip("unduh file terpilih ke laptop + verifikasi sha256")
+        b.setToolTip("download the selected chunks into this session's raw/ folder "
+                     "+ sha256 verify")
         b.clicked.connect(self._transfer)
         row2.addWidget(b)
         b = QtWidgets.QPushButton("DELETE ✓")
@@ -207,7 +227,7 @@ class RawPanel(QtWidgets.QWidget):
             self.prog.setText("no verified files to delete yet")
             return
         names = list(self.verified.keys())
-        self.prog.setText(f"menghapus {len(names)} file terverifikasi di Pi …")
+        self.prog.setText(f"deleting {len(names)} verified files on the Pi …")
         self.client.delete(names)
 
     # ------------------------------------------------------------------ hasil
@@ -218,10 +238,12 @@ class RawPanel(QtWidgets.QWidget):
             if d.get("ok"):
                 caps = d.get("captures") or {}
                 aktif = ", ".join(k for k, v in caps.items() if isinstance(v, dict) and v.get("aktif"))
-                self.lbl.setText(f"RAW · agen OK ({'test' if d.get('test') else 'device'}) — "
+                self.lbl.setText(f"RAW agent OK ({'test' if d.get('test') else 'device'}) — "
                                  f"active capture: {aktif or 'none'}")
-                self.lbl_disk.setText(f"disk Pi bebas: {d.get('disk_free_mb', '?')} MB "
-                                      f"(ambang {d.get('min_free_mb', '?')} MB) — dir {d.get('dir', '?')}")
+                self.lbl_disk.setText(f"Pi free: {d.get('disk_free_mb', '?')} MB "
+                                      f"(min {d.get('min_free_mb', '?')} MB) — Pi dir "
+                                      f"{d.get('dir', '?')}  →  transfer pulls into this "
+                                      f"session's raw/")
             else:
                 self.lbl.setText("RAW agent unreachable")
                 self.lbl.setToolTip(str(d.get("error", "")))
@@ -233,7 +255,7 @@ class RawPanel(QtWidgets.QWidget):
                     it = QtWidgets.QListWidgetItem(f"{rel}   ({size / 1e6:.1f} MB)")
                     it.setData(QtCore.Qt.ItemDataRole.UserRole, rel)
                     if rel in self.verified:
-                        it.setText(it.text() + "  ✓ terverifikasi")
+                        it.setText(it.text() + "  ✓ verified")
                     self.list.addItem(it)
             else:
                 self.prog.setText(f"listing files failed: {d.get('error', '')[:90]}")

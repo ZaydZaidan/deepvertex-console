@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Konsol Misi ROV — TAHAP 1 (mode ROV, BlueROV2 via BlueOS) — konsol lengkap.
 
-TAMPILAN: kembar konsol sim (rov_dashboard.py) — komponen sama (Segmen/FlowBox/
+TAMPILAN: layout 3 kolom; komponen bersama ada di ui_common.py (Segmen/FlowBox/
 StatusBar di ui_common.py), rel kiri & kanan yang scroll, kolom tengah + baris
 bawah, menu bar, chip status. Preset: Pilot Focus / Setup & Preflight / Capture.
 
@@ -35,18 +35,26 @@ from rawcap import RawPanel
 from video import StreamPlayer, h264parse_tersedia
 
 STREAM_DEF = (
-    ("front", "CAM · FRONT (PILOT)", 5600),
-    ("stereo L", "CAM · STEREO L", 5601),
-    ("stereo R", "CAM · STEREO R", 5602),
+    ("front", "CAM · FRONT (Low-Light USB)", 5600),
+    ("stereo L", "CAM · STEREO L (B0495C)", 5601),
+    ("stereo R", "CAM · STEREO R (B0495C)", 5602),
 )
 MODE_LIST = (("MANUAL", VO.MODE_MANUAL), ("STABILIZE", VO.MODE_STABILIZE),
              ("ALT_HOLD (depth hold)", VO.MODE_ALT_HOLD), ("SURFACE", VO.MODE_SURFACE))
 
 
 def _buat_dir_sesi(root):
+    """Struktur sesi (audit 13 Okt — alur file jelas & siap delivery):
+
+    <root>/<YYYYMMDD_HHMMSS>_dive/
+        compressed/   video .mkv + snapshot .png (jalur stream BlueOS)
+        raw/          chunk RAW hasil transfer dari Pi (arsip utuh, per kamera)
+        mavlink.tlog  /  session_start.json / session_end.json
+    """
     os.makedirs(root, exist_ok=True)
     d = os.path.join(root, time.strftime("%Y%m%d_%H%M%S") + "_dive")
-    os.makedirs(d, exist_ok=True)
+    os.makedirs(os.path.join(d, "compressed"), exist_ok=True)
+    os.makedirs(os.path.join(d, "raw"), exist_ok=True)
     return d
 
 
@@ -91,7 +99,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.setWindowTitle("DeepVertex · ROV Mission Console — TAHAP 1 (mode ROV)")
+        self.setWindowTitle("DeepVertex ROV Mission Console")
         self.resize(1620, 1000)
         self.sesi = _buat_dir_sesi(os.path.expanduser(args.outdir))
         self.last = {}
@@ -226,7 +234,7 @@ class RovConsole(QtWidgets.QMainWindow):
         jl.setSpacing(1)
         t = QtWidgets.QLabel("MISSION CONSOLE")
         t.setObjectName("HeaderTitle")
-        s = QtWidgets.QLabel("BlueROV2 · BlueOS · MAVLink — TAHAP 1 (mode ROV)")
+        s = QtWidgets.QLabel("")            # subjudul DIHAPUS (permintaan pemilik 13 Okt)
         s.setObjectName("HeaderSub")
         theme.set_peran(s, "faint")
         s.setWordWrap(True)
@@ -473,7 +481,9 @@ class RovConsole(QtWidgets.QMainWindow):
             self.seg_layout.set_dipilih(name)
         except Exception:                                  # noqa: BLE001
             pass
-        lb = theme.px(spec.get("lebar_kiri", 350))
+        # +28 buffer (audit 13 Okt): viewport harus >= lebar-minimum panel terlebar
+        # (440 px pada skala 120%) supaya TIDAK ada yang terklip tanpa jalur scroll.
+        lb = theme.px(spec.get("lebar_kiri", 350)) + theme.px(28)
         # rail KIRI dan KANAN dibuat SAMA LEBAR PERSIS (proporsional & simetris)
         for kol in (self.col_left, self.col_right):
             kol.setFixedWidth(lb)
@@ -657,7 +667,7 @@ class RovConsole(QtWidgets.QMainWindow):
         # ---- vehicle (pilot)
         p = W.Panel("VEHICLE (PILOT)", "arm · lights · tilt", domain="mission")
         row = QtWidgets.QHBoxLayout()
-        row.setSpacing(4)
+        row.setSpacing(6)
         self.cb_mode = QtWidgets.QComboBox()
         self.cb_mode.addItems([n for n, _m in MODE_LIST])
         self.cb_mode.setToolTip("mode ArduSub aktif T1 (otonom/posisi = coming soon)")
@@ -683,12 +693,12 @@ class RovConsole(QtWidgets.QMainWindow):
         row.addStretch(1)
         p.body_layout.addLayout(row)
         rowb = QtWidgets.QHBoxLayout()
-        rowb.setSpacing(4)
+        rowb.setSpacing(6)
         for wdg in (b_arm, b_dis, b_surf):
             rowb.addWidget(wdg, 1)
         p.body_layout.addLayout(rowb)
         row2 = QtWidgets.QHBoxLayout()
-        row2.setSpacing(4)
+        row2.setSpacing(6)
         lab = QtWidgets.QLabel("LIGHTS 0%")
         lab.setObjectName("MicroLabel")
         lab.setFixedWidth(theme.px(80))
@@ -771,7 +781,7 @@ class RovConsole(QtWidgets.QMainWindow):
         # ---- setup (kalibrasi)
         p = W.Panel("SETUP · CALIBRATION", "QGC/BlueOS style vehicle setup", domain="mission")
         grid = QtWidgets.QGridLayout()
-        grid.setSpacing(4)
+        grid.setSpacing(6)
         tombol = (("GYRO", lambda: self._cal("gyro")),
                   ("ACCEL (6-POS)…", self._cal_accel),
                   ("COMPASS", lambda: self._cal("mag")),
@@ -864,29 +874,54 @@ class RovConsole(QtWidgets.QMainWindow):
         # ---- capture
         p = W.Panel("CAPTURE", "record · snapshot", domain="mission")
         grid = QtWidgets.QGridLayout()
-        grid.setSpacing(4)
+        grid.setSpacing(6)
         self.btn_rec = {}
         self.btn_snap = {}
+        self.cb_mode = {}
         for i, (nama, _j, _p) in enumerate(STREAM_DEF):
             lab = QtWidgets.QLabel(nama.upper())
             lab.setObjectName("MicroLabel")
+            cb = QtWidgets.QComboBox()
+            cb.addItems(["COMPRESSED", "RAW"])
+            cb.setSizeAdjustPolicy(
+                QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            cb.setMinimumContentsLength(10)
+            cb.setToolTip("REC mode for this camera:\n"
+                          "COMPRESSED = .mkv video through the BlueOS stream (small)\n"
+                          "RAW = uncompressed frames via the onboard agent (big; "
+                          "files live on the Pi until you transfer them\n"
+                          "in the RAW CAPTURE panel → this session's raw/ folder)")
+            cb.currentTextChanged.connect(lambda teks, n=nama: self._catat(
+                "%s · REC mode → %s" % (n.upper(), teks)))
             b1 = QtWidgets.QPushButton("● REC")
             b1.setObjectName("BtnTiny")
             b1.setCheckable(True)
             b1.toggled.connect(lambda on, n=nama: self._toggle_rec(n, on))
             b2 = QtWidgets.QPushButton("SNAP")
             b2.setObjectName("BtnTiny")
+            b2.setToolTip("quick photo → compressed/ folder (.png)")
             b2.clicked.connect(lambda _, n=nama: self._snap(n))
             grid.addWidget(lab, i, 0)
-            grid.addWidget(b1, i, 1)
-            grid.addWidget(b2, i, 2)
+            grid.addWidget(cb, i, 1)
+            grid.addWidget(b1, i, 2)
+            grid.addWidget(b2, i, 3)
             self.btn_rec[nama] = b1
             self.btn_snap[nama] = b2
+            self.cb_mode[nama] = cb
         p.body_layout.addLayout(grid)
         self.lbl_sesi = QtWidgets.QLabel("session: " + os.path.basename(self.sesi))
         self.lbl_sesi.setObjectName("Faint")
         self.lbl_sesi.setWordWrap(True)
+        self.lbl_sesi.setToolTip(self.sesi)
         p.body_layout.addWidget(self.lbl_sesi)
+        self.lbl_save = QtWidgets.QLabel("save: compressed/ (video+photo) · raw/ (transfer)")
+        self.lbl_save.setObjectName("Faint")
+        self.lbl_save.setWordWrap(True)
+        self.lbl_save.setToolTip(
+            "Everything for this dive goes into\n%s\n"
+            "  compressed/ ← .mkv + .png from the live streams\n"
+            "  raw/        ← uncompressed chunks transferred from the Pi" % self.sesi)
+        p.body_layout.addWidget(self.lbl_save)
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
         self.lbl_disk.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_disk)
@@ -929,7 +964,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
         # ---- raw
         p = W.Panel("RAW (ONBOARD)", "onboard · transfer", domain="mission")
-        rp = RawPanel(self.args.raw_agent, outdir=self.sesi)
+        rp = RawPanel(self.args.raw_agent, outdir=os.path.join(self.sesi, "raw"))
         p.body_layout.addWidget(rp)
         p.panel_raw = rp
         P["raw"] = p
@@ -957,7 +992,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.stack_peta.addWidget(self.plot_misi)
         p.body_layout.addWidget(self.stack_peta, 1)
         rowp = QtWidgets.QHBoxLayout()
-        rowp.setSpacing(4)
+        rowp.setSpacing(6)
         self.b_peta = QtWidgets.QPushButton("MAP")
         self.b_peta.setObjectName("BtnTiny")
         self.b_peta.setCheckable(True)
@@ -1008,7 +1043,7 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addWidget(W.Placeholder(
             "COMING SOON",
             "Autonomous, VIO, dan pemetaan berjalan pada Tahap 2 (mode AUV, Jetson Orin Nano). "
-            "TAHAP 1 hanya mode ROV: pilot manual + capture."))
+            "Phase 1 is ROV mode only: manual pilot + capture."))
         P["soon"] = p
 
     # ================================================================ menu
@@ -1172,7 +1207,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def _menu_about(self):
         QtWidgets.QMessageBox.about(
             self, "DeepVertex ROV Console",
-            "Konsol Misi ROV — TAHAP 1 (mode ROV)\n"
+            "ROV Mission Console — Phase 1 (ROV mode)\n"
             "BlueROV2 via BlueOS · MAVLink (pymavlink) · GStreamer · PySide6\n"
             "Basis tampilan: konsol sim DeepVertex (satu bahasa desain).\n"
             "Features: gamepad teleop, calibration, motor test, failsafe, parameters, "
@@ -1332,11 +1367,36 @@ class RovConsole(QtWidgets.QMainWindow):
             self._rc_keep[8] = self._tilt
             self.bridge.rc_override({8: self._tilt})
 
+    _RAW_KAM = {"front": "front", "stereo L": "left", "stereo R": "right"}
+
+    def _raw_rec(self, nama, on):
+        """REC dengan mode RAW: kendalikan agen onboard (chunk di Pi → panel RAW)."""
+        kam = self._RAW_KAM.get(nama, "left")
+        if on:
+            try:
+                self.rawpanel.client.start(kam, self.rawpanel.sp_chunk.value())
+                self._catat("RAW REC %s (agent cam '%s') — files stay on the Pi; "
+                            "transfer via RAW panel → raw/" % (nama, kam))
+            except Exception as exc:                       # noqa: BLE001
+                self._catat("RAW REC %s failed: %r" % (nama, exc))
+                self.btn_rec[nama].setChecked(False)
+        else:
+            try:
+                self.rawpanel.client.stop(kam)
+                self._catat("RAW REC %s stopped — pull the chunks in RAW CAPTURE → raw/"
+                            % nama)
+            except Exception as exc:                       # noqa: BLE001
+                self._catat("RAW stop %s failed: %r" % (nama, exc))
+
     def _toggle_rec(self, nama, on):
+        cb = self.cb_mode.get(nama)
+        if cb is not None and cb.currentText() == "RAW":
+            self._raw_rec(nama, on)
+            return
         p = self.players[nama]
         if on:
-            path = os.path.join(self.sesi, "%s_%s" % (nama.replace(" ", "_"),
-                                                      time.strftime("%H%M%S")))
+            path = os.path.join(self.sesi, "compressed", "%s_%s" % (
+                nama.replace(" ", "_"), time.strftime("%H%M%S")))
             if p.start_record(path):
                 self.plot_misi.add_marker("rec")
             else:
@@ -1362,7 +1422,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("pad action error: %r" % exc)
 
     def _snap(self, nama):
-        path = os.path.join(self.sesi, "snap_%s_%s.png" % (
+        path = os.path.join(self.sesi, "compressed", "snap_%s_%s.png" % (
             nama.replace(" ", "_"), time.strftime("%H%M%S_")))
         ok = self.players[nama].snapshot(path)
         if ok:
@@ -1524,7 +1584,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def _buat_panel_guide(self):
         """Beginner SETUP guide (owner request 13 Oct): numbered steps."""
-        p = W.Panel("SETUP GUIDE (NEW ROV)", "steps 1-7 · ~10 min", domain="motion")
+        p = W.Panel("SETUP GUIDE (NEW ROV)", "steps 1-7", domain="motion")
         langkah = (
             (1, "Accelerometer", "ROV flat on the desk — follow the 6 positions.",
              "START…", self._cal_accel),

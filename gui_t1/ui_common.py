@@ -1,4 +1,4 @@
-"""ui_common.py — komponen UI bersama antara konsol sim (rov_dashboard.py) dan konsol T1.
+"""ui_common.py — komponen UI bersama untuk konsol T1 (Rate UI, Segmen, kosongkan).
 
 Segmen / FlowLayout / FlowBox / StatusBar DISALIN dari konsol sim (sudah migrasi
 PySide6) supaya konsol T1 memakai KOMPONEN & GAYA YANG SAMA — satu bahasa desain,
@@ -167,7 +167,7 @@ def kolom_rel(min_w=330, max_w=470):
     inner = QtWidgets.QWidget()
     lay = QtWidgets.QVBoxLayout(inner)
     lay.setContentsMargins(0, 0, 0, 0)
-    lay.setSpacing(4)                # rel: jarak antar panel 4 px (padat)
+    lay.setSpacing(6)                # rel: jarak antar panel 6 px
     lay.addStretch(1)
     sa = QtWidgets.QScrollArea()
     sa.setWidgetResizable(True)

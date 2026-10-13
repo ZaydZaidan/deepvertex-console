@@ -8,7 +8,7 @@ Ketergantungan: python3 stdlib + binary `gst-launch-1.0` (sudah ada di BlueOS).
 
 Protokol HTTP (JSON):
   GET  /status                -> status service, disk, capture aktif
-  POST /capture/start         -> {"cam": "left"|"right"|"both", "chunk_mb": 1024}
+  POST /capture/start         -> {"cam": "left"|"right"|"front"|"both", "chunk_mb": 1024}
   POST /capture/stop          -> {"cam": ...}
   GET  /files                 -> daftar chunk (path relatif, ukuran, mtime)
   GET  /sha256/<path>         -> sha256 file (dihitung streaming, di-cache)
@@ -98,16 +98,21 @@ def _sha256_of(path):
 # capture
 # --------------------------------------------------------------------------- #
 def _gst_cmd(cam, dir_sesi):
-    w, h, fps = ARGS.width, ARGS.height, ARGS.fps
+    # front (Low-Light USB) via USB2: resolusi RAW dibatasi (default 640x480).
+    if cam == "front":
+        w, h, fps = ARGS.front_width, ARGS.front_height, ARGS.fps
+    else:
+        w, h, fps = ARGS.width, ARGS.height, ARGS.fps
     loc = os.path.join(dir_sesi, "chunk_%05d.yuv")
     out = ["multifilesink", "location=%s" % loc,
            "next-file=max-size", "max-file-size=%d" % (ARGS.chunk_mb * 1024 * 1024)]
     if ARGS.test:
         src = ["videotestsrc", "is-live=true"]
     else:
-        dev = ARGS.device_left if cam == "left" else ARGS.device_right
+        dev = {"left": ARGS.device_left, "right": ARGS.device_right,
+               "front": getattr(ARGS, "device_front", None)}.get(cam)
         if not dev:
-            raise RuntimeError("device %s belum diisi (--device-%s)" % (cam, cam))
+            raise RuntimeError("device %s not set (--device-%s)" % (cam, cam))
         src = ["v4l2src", "device=%s" % dev, "do-timestamp=true", "io-mode=2"]
     # PENTING: caps harus SATU token dengan koma (gst-launch menggabung token
     # berspasi tanpa koma menjadi string caps yang gagal di-parse).
@@ -118,7 +123,7 @@ def _gst_cmd(cam, dir_sesi):
 def capture_start(cam, chunk_mb=None):
     with LOCK:
         if cam in CAPTURES and CAPTURES[cam]["proc"].poll() is None:
-            return {"ok": False, "error": "capture %s sudah aktif" % cam}
+            return {"ok": False, "error": "capture %s is already active" % cam}
         if chunk_mb:
             ARGS.chunk_mb = int(chunk_mb)
         sesi = "%s_%s" % (cam, _now_tag())
@@ -137,7 +142,7 @@ def capture_start(cam, chunk_mb=None):
                          "cmd": " ".join(cmd)}
         time.sleep(0.4)
         if proc.poll() is not None:
-            err = "\n".join(list(log_err)[-4:]) or "gst-launch berhenti (exit=%s)" % proc.returncode
+            err = "\n".join(list(log_err)[-4:]) or "gst-launch exited (exit=%s)" % proc.returncode
             CAPTURES.pop(cam, None)
             return {"ok": False, "error": err}
         return {"ok": True, "session": sesi, "chunk_mb": ARGS.chunk_mb}
@@ -147,7 +152,7 @@ def capture_stop(cam):
     with LOCK:
         ent = CAPTURES.pop(cam, None)
     if not ent:
-        return {"ok": False, "error": "tidak ada capture aktif untuk %s" % cam}
+        return {"ok": False, "error": "no active capture for %s" % cam}
     proc = ent["proc"]
     if proc.poll() is None:
         proc.terminate()                      # RAW: file chunk tak butuh EOS
@@ -334,18 +339,24 @@ def main():
     ap = argparse.ArgumentParser(description="DeepVertex raw capture agent (T1)")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--dir", default=os.path.expanduser("~/raw_captures"),
-                    help="direktori penyimpanan chunk RAW")
-    ap.add_argument("--chunk-mb", type=int, default=1024, help="ukuran potongan file (MB)")
+                    help="directory for the RAW chunk files")
+    ap.add_argument("--chunk-mb", type=int, default=1024, help="file chunk size (MB)")
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--fps", type=int, default=30)
-    ap.add_argument("--device-left", default=None, help="mis. /dev/video0")
-    ap.add_argument("--device-right", default=None, help="mis. /dev/video2")
+    ap.add_argument("--device-left", default=None, help="e.g. /dev/video0")
+    ap.add_argument("--device-right", default=None, help="e.g. /dev/video2")
+    ap.add_argument("--device-front", default=None,
+                    help="e.g. /dev/video4 (front Low-Light USB camera)")
+    ap.add_argument("--front-width", type=int, default=640,
+                    help="RAW width for the front camera (USB2 limit)")
+    ap.add_argument("--front-height", type=int, default=480,
+                    help="RAW height for the front camera (USB2 limit)")
     ap.add_argument("--min-free-mb", type=int, default=3000,
-                    help="hentikan capture otomatis bila sisa disk < ini (MB)")
-    ap.add_argument("--token", default=None, help="token auth (opsional; header X-Token)")
+                    help="auto-stop capture when free disk drops below this (MB)")
+    ap.add_argument("--token", default=None, help="auth token (optional; X-Token header)")
     ap.add_argument("--test", action="store_true",
-                    help="mode uji tanpa hardware: pakai videotestsrc (YUY2)")
+                    help="hardware-less test mode: videotestsrc (YUY2)")
     ARGS = ap.parse_args()
 
     os.makedirs(ARGS.dir, exist_ok=True)

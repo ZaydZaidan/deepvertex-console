@@ -97,14 +97,14 @@ def main():
     jalan(4.0)
     w.btn_rec["front"].setChecked(False)
     ok_stop = tunggu(lambda: not w.players["front"].is_recording(), 10)
-    files = sorted(glob.glob(os.path.join(w.sesi, "front_*")))
+    files = sorted(glob.glob(os.path.join(w.sesi, "compressed", "front_*")))
     size = os.path.getsize(files[-1]) if files else 0
     ok_rec = bool(files) and size > 50000
     print("[3] rekam front: stop_ok=%s size=%.0f B" % (ok_stop, size))
     lulus &= ok_rec
 
     w._snap("stereo L")
-    snaps = glob.glob(os.path.join(w.sesi, "snap_stereo_L_*.png"))
+    snaps = glob.glob(os.path.join(w.sesi, "compressed", "snap_stereo_L_*.png"))
     print("[4] snapshot stereo L:", bool(snaps))
     lulus &= bool(snaps)
 
@@ -276,6 +276,31 @@ def main():
         lulus &= bool(ok24)
     except Exception as exc:                               # noqa: BLE001
         print("[24] aksi pad GAGAL:", repr(exc))
+        lulus = False
+
+    # [25] alur file: folder compressed/ + raw/ ada; snap masuk compressed/;
+    #      mode RAW mengarah ke agen onboard (bukan recorder lokal)
+    try:
+        ok25 = os.path.isdir(os.path.join(w.sesi, "compressed")) and \
+            os.path.isdir(os.path.join(w.sesi, "raw"))
+        komp = os.path.join(w.sesi, "compressed")
+        sebelum = set(os.listdir(komp))
+        w._snap("front")
+        jalan(0.4)
+        ok25 = ok25 and (len(set(os.listdir(komp)) - sebelum) >= 1)
+        w.cb_mode["stereo L"].setCurrentText("RAW")
+        w.btn_rec["stereo L"].setChecked(True)
+        jalan(1.0)
+        import urllib.request as _u
+        st25 = json.load(_u.urlopen("http://127.0.0.1:8791/status", timeout=3))
+        ok25 = ok25 and bool(((st25.get("captures") or {}).get("left") or {}).get("aktif"))
+        w.btn_rec["stereo L"].setChecked(False)
+        jalan(0.6)
+        w.cb_mode["stereo L"].setCurrentText("COMPRESSED")
+        print("[25] alur file compressed/raw + routing RAW:", ok25)
+        lulus &= bool(ok25)
+    except Exception as exc:                               # noqa: BLE001
+        print("[25] alur file GAGAL:", repr(exc))
         lulus = False
 
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)

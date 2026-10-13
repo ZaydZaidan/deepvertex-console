@@ -56,7 +56,7 @@ class Panel(QtWidgets.QFrame):
         # membungkus ke baris berikutnya — bukan memotong teks (aturan keras pemilik).
         head.setMinimumHeight(24)     # mockup: .phead min-height 25px
         h = QtWidgets.QHBoxLayout(head)
-        h.setContentsMargins(8, 3, 8, 3)
+        h.setContentsMargins(theme.px(12), theme.px(6), theme.px(12), theme.px(6))
         h.setSpacing(6)
         self.domain = domain
         self.mark = DomainMark(domain)
@@ -81,8 +81,9 @@ class Panel(QtWidgets.QFrame):
         self.body.setObjectName("PanelBody")
         self.body.setAttribute(Qt.WA_StyledBackground, True)   # lihat komentar di StatusBar
         self.body_layout = QtWidgets.QVBoxLayout(self.body)
-        self.body_layout.setContentsMargins(6, 6, 6, 6)     # padat: rel kanan harus muat utuh
-        self.body_layout.setSpacing(4)
+        self.body_layout.setContentsMargins(theme.px(12), theme.px(10),
+                                            theme.px(12), theme.px(12))
+        self.body_layout.setSpacing(6)
 
         outer.addWidget(head)
         outer.addWidget(self.body, 1)
@@ -129,7 +130,7 @@ class Readout(QtWidgets.QWidget):
         self.lab.setObjectName("MicroLabel")
         row = QtWidgets.QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(4)
+        row.setSpacing(6)
         # `color` (cara lama) tetap diterima: bila hex-nya warna aksen palet aktif,
         # nilainya tampil sebagai aksen; selain itu nilai biasa.
         self.peran = peran or ("accent" if theme.token_dari(color) == "accent" else "ink")

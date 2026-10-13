@@ -19,3 +19,6 @@ plugins/
 
 # libxcb-cursor (Qt6 xcb) hasil ekstraksi tanpa sudo (installer yang mengurus)
 tools/
+
+# User data (gamepad presets per machine)
+gamepad_presets.json

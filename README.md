@@ -13,14 +13,31 @@ BlueOS (its only custom component, the RAW recorder, is deployed as a BlueOS ext
 |---|---|
 | `gui_t1/` | The T1 console ("ROV Mission Console", PySide6) — live 3-stream view, full MAVLink telemetry HUD, teleop, calibration / motor test / failsafe / parameter tools, OSM map, compressed capture. Folder overview: `gui_t1/README.md`; deep working notes (run, recipes, tests): `gui_t1/README_T1.md`. |
 | `onboard/` | `raw_agent.py` — onboard RAW recorder (production on the Pi via the BlueOS extension scaffold in `onboard/extension/`). |
-| `tests/` | Hardware-free test suite: `test_video.py`, `test_raw.py`, `test_console.py` (**17/17 PASS**, uses `fake_vehicle.py`), `probe_layout.py` (real-DPI layout check), `debug_misc*.py` (diagnostics). |
+| `tests/` | Hardware-free test suite: `test_video.py`, `test_raw.py`, `test_console.py` (**all checks PASS** — includes preset-stress, gamepad-page, pad REC/PHOTO and file-flow checks; uses `fake_vehicle.py`), `probe_layout.py` (real-DPI layout scan for ALL presets), `probe_scroll.py`, `probe_padmap.py`, `debug_misc*.py`. |
 | `install/` | `install_topside.sh` — topside installer. |
 | `migrate_pyqt5_to_pyside6.py` | One-shot binding migration script (58 replacements). |
 
-## Status (12 Oct 2026)
+## Where files go (one folder per dive)
 
-Console **v2.2 + ArduSub/QGC tech-spec fixes** — all tests PASS without hardware
-(`test_console` 17/17). Key capabilities:
+Every session creates a clearly split folder — compressed media and RAW archives never mix:
+
+    ~/DeepVertex-ROV-Captures/<YYYYMMDD_HHMMSS>_dive/
+        compressed/     .mkv video + .png snapshots from the live BlueOS streams
+        raw/            unmcompressed chunks pulled from the Pi (RAW transfer)
+        mavlink.tlog    full MAVLink telemetry log
+        session_start.json / session_end.json
+
+Per camera you choose the REC mode in the CAPTURE panel: **COMPRESSED** (video via the
+BlueOS stream) or **RAW** (uncompressed via the onboard agent; files live on the Pi
+until you press TRANSFER ► in the RAW CAPTURE panel, which verifies sha256 and drops
+them into this session's `raw/`). Cameras: **front = Blue Robotics Low-Light HD USB**
+(RAW limited to ≤640×480 on USB2) and **stereo = Arducam B0495C** (AR0234 global
+shutter, native YUY2; recommended 1280×720@30 for streaming). SNAPSHOT is always a
+quick .png into `compressed/`.
+
+## Status (13 Oct 2026)
+
+Console **v2.3** — all tests PASS without hardware. Key capabilities:
 
 - 3 camera streams at once (front + stereo L/R) from the BlueOS camera manager;
 - MAVLink 2 telemetry: attitude + compass dials, depth/temp, battery, QGC-style
