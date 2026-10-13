@@ -253,12 +253,27 @@ def main():
         d23 = _pm.PadMapDialog(w.gamepad, w)
         d23.show()
         ok23 = (d23.lbl["axis_fwd"].text() not in ("", "—")) and \
-            (d23.lbl["deadman_buttons"].text() != "")
+            (d23.lbl["deadman_buttons"].text() != "") and \
+            ("btn_record" in w.gamepad.cfg) and ("btn_photo" in w.gamepad.cfg) and \
+            (d23.lbl["btn_record"].text() != "") and (d23.lbl["btn_photo"].text() != "")
         d23.close()
         print("[23] dialog pad mapping konstruksi:", ok23)
         lulus &= bool(ok23)
     except Exception as exc:                               # noqa: BLE001
         print("[23] dialog pad mapping GAGAL:", repr(exc))
+        lulus = False
+
+    # [24] tombol fisik REC/PHOTO di pad → jalur yang sama dengan tombol GUI
+    try:
+        ok24 = hasattr(w.gamepad, "sig_aksi")
+        w._aksi_pad("photo")
+        w._aksi_pad("record")
+        w._aksi_pad("record")          # balikkan (stop) agar tidak menggantung
+        ok24 = ok24 and ("pad:" in " ".join(w.log.toPlainText().splitlines()[-5:]))
+        print("[24] aksi pad record/photo:", ok24)
+        lulus &= bool(ok24)
+    except Exception as exc:                               # noqa: BLE001
+        print("[24] aksi pad GAGAL:", repr(exc))
         lulus = False
 
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)

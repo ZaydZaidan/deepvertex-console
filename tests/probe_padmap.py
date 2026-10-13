@@ -97,16 +97,37 @@ def main():
     # 3) jalur tombol konsol (handler yang dipakai PAD MAPPING…) — tanpa exec
     try:
         import padmap as pm
+        _pm = pm
         d2 = pm.PadMapDialog(w.gamepad, w)
         d2.show()
         jalan(0.4)
         d2.close()
         print("handler tombol (dialog kedua): OK")
+        # uji visual INTERAKTIF deterministik: widget BERSIH (tanpa overwrite tick
+        # gamepad asli 20 Hz) — payload palsu harus membuat elemen menyala.
+        diag = _pm.PadDiagram()
+        diag.resize(640, 400)
+        diag.set_live([0.6, -0.8, 0.0, -0.5, 0.4, 0.0, -1.0, 0.6],
+                      [True, False, False, True, False, True] + [False] * 7)
+        diag.show()
+        jalan(0.4)
+        shot2 = os.path.join(SCRATCH, "padmap_live.png")
+        diag.grab().save(shot2)
+        print("screenshot live:", shot2)
+        diag.close()
     except Exception:                                  # noqa: BLE001
         print("!! dialog kedua GAGAL:")
         print("EXC>>>")
         print(traceback.format_exc())
         print("<<<EXC")
+
+    # tutup konsol dengan rapi (stop gamepad/bridge/players) — menghindari race
+    # teardown thread evdev (segfault saat exit).
+    try:
+        w.close()
+        app.processEvents()
+    except Exception:                                  # noqa: BLE001
+        pass
 
 
 if __name__ == "__main__":

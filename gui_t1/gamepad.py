@@ -37,6 +37,7 @@ CFG_DEFAULT = {
     "invert_tilt": True,
     "deadman_buttons": [4, 5],
     "btn_center_cam": 0, "btn_arm_toggle": -1, "btn_mode_cycle": 8, "btn_depth_hold": 6,
+    "btn_record": 3, "btn_photo": 1,     # □ = record toggle, ○ = photo (bisa diremap)
     # btn_arm_toggle = -1: ARM lewat PAD DIMATIKAN sampai uji kolam (tombol ARM di GUI
     # memakai konfirmasi checklist). Aktifkan lagi (9 = Options) saat uji kolam dimulai.
     "mode_base": 19, "mode_hold": 2, "mode_cycle": [19, 2, 0],
@@ -53,6 +54,7 @@ CFG_DEFAULT = {
 class Gamepad(QtCore.QObject):
     sig_status = QtCore.Signal(str)
     sig_live = QtCore.Signal(dict)      # {axes:[...], buttons:[bool..], deadman, tilt, mode_idx}
+    sig_aksi = QtCore.Signal(str)       # edge aksi: "record" / "photo" / "arm" / "mode" / "center"
 
     def __init__(self, bridge, cfg_path=None, parent=None):
         super().__init__(parent)
@@ -309,10 +311,13 @@ class Gamepad(QtCore.QObject):
         # tombol (edge)
         sekarang = time.monotonic()
         for idx, aksi in ((c["btn_arm_toggle"], "arm"), (c["btn_mode_cycle"], "mode"),
-                          (c["btn_center_cam"], "center")):
+                          (c["btn_center_cam"], "center"),
+                          (c.get("btn_record", -1), "record"), (c.get("btn_photo", -1), "photo")):
             kini = self._btn(idx)
             if kini and not self._prev_btn.get(idx, False):
-                if aksi == "arm":
+                if aksi in ("record", "photo"):
+                    self.sig_aksi.emit(aksi)
+                elif aksi == "arm":
                     self.bridge.queue_arm(not bool(self.bridge.state.get("armed")))
                 elif aksi == "mode" and sekarang - self._last_mode_send > c["mode_repeat_s"]:
                     daftar = c["mode_cycle"]

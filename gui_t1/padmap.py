@@ -1,10 +1,12 @@
 """padmap.py — GAMEPAD MAPPING page (owner request 13 Oct).
 
-Shows a PICTURE of the controller (like the BlueROV2 operation guide diagram)
-with game-style button names (LB / RB / left stick / D-PAD ...), so users can
-see exactly which physical control each mapping means ("LY [1] is which one?").
+Shows a PICTURE of the controller with game-style button names (LB / RB / left
+stick / D-PAD ...), so users can see exactly which physical control each mapping
+means ("LY [1] is which one?").
 
 - CHANGE captures the next pressed button / moved axis (live from the pad).
+- The picture is INTERACTIVE: pressing buttons / moving sticks on the real pad
+  lights up the matching element on the drawing in real time.
 - SAVE AS… stores the current mapping as a named preset (e.g. "Custom A");
   the active preset loads automatically on the next start.
 - Presets live in gamepad_presets.json next to the app.
@@ -18,7 +20,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
 import theme
 
-# (cfg key, title, kind, tooltip description, diagram highlight target)
+# (cfg key, title, kind, tooltip description, remap-highlight target)
+# target: element id string or list; "auto_btn"/"auto_axis" = derive from cfg value
 FUNGSI = (
     ("axis_fwd",   "Forward / back",        "axis",
      "Push the LEFT STICK up / down (shown as LY [1])",
@@ -37,19 +40,25 @@ FUNGSI = (
      "dpad"),
     ("deadman_buttons", "DEADMAN — hold to move", "tombol",
      "Hold LB or RB (L1 / R1): no thrust reaches the ROV unless held",
-     "bumpers"),
+     ["lb", "rb"]),
     ("btn_arm_toggle",  "ARM / DISARM",     "tombol",
      "Face buttons — △ = Y (top) · ○ = B (right) · × = A (bottom) · □ = X (left)",
-     "face"),
+     "auto_btn"),
     ("btn_mode_cycle",  "Cycle flight mode", "tombol",
      "SHARE (Select) — MANUAL → ALT_HOLD → back",
-     "share"),
+     "auto_btn"),
     ("btn_depth_hold",  "Depth hold — hold", "tombol",
      "Hold LT (L2) = ALT_HOLD; release = back to MANUAL",
-     "triggers"),
+     "auto_btn"),
     ("btn_center_cam",  "Camera back to center", "tombol",
      "Press the button = camera tilt returns to 50%",
-     "face"),
+     "auto_btn"),
+    ("btn_record",  "Record video (toggle)", "tombol",
+     "Press = start / stop recording the front camera (default □ — X left)",
+     "auto_btn"),
+    ("btn_photo",   "Take photo (snapshot)", "tombol",
+     "Press = save a snapshot of the front camera (default ○ — B right)",
+     "auto_btn"),
 )
 
 _TOMBOL_EN = (
@@ -63,6 +72,13 @@ _SUMBU_EN = (
     "RX — right stick ←/→", "RY — right stick ↑/↓", "R2 trigger axis",
     "D-PAD ←/→", "D-PAD ↑/↓",
 )
+
+# raw button index -> diagram element id
+_BTN_ELEMEN = {0: "b0", 1: "b1", 2: "b2", 3: "b3", 4: "lb", 5: "rb",
+               6: "lt", 7: "rt", 8: "share", 9: "options", 11: "l3", 12: "r3"}
+# raw axis index -> diagram element id
+_AX_ELEMEN = {0: "stick_l", 1: "stick_l", 3: "stick_r", 4: "stick_r",
+              6: "dpad", 7: "dpad"}
 
 
 def _acc():
@@ -99,16 +115,52 @@ def _nama_sumbu(idx):
 
 
 class PadDiagram(QtWidgets.QWidget):
-    """Top-down drawing of the DualShock pad with game-style labels."""
+    """Professional top-down drawing of the DualShock pad + LIVE interactivity.
+
+    - set_live(axes, buttons): lights up whatever is being held on the real pad.
+    - set_tandai(ids): highlights the element(s) being remapped (list or str).
+    Canvas coordinates: 500 x 280 units, scaled to the widget by `f`.
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.tandai = None
-        self.setMinimumSize(theme.px(440), theme.px(220))
+        self._hl = []          # highlight dari remap
+        self._ax = [0.0] * 8   # live axes (ternormalisasi)
+        self._btn = [False] * 13
+        self._ada_live = False
+        self.setMinimumSize(theme.px(500), theme.px(300))
 
-    def set_tandai(self, target):
-        self.tandai = target
+    # ------------------------------------------------------------- API publik
+    def set_tandai(self, ids):
+        if ids is None:
+            self._hl = []
+        elif isinstance(ids, (list, tuple, set)):
+            self._hl = list(ids)
+        else:
+            self._hl = [ids]
         self.update()
+
+    def set_live(self, axes, buttons):
+        try:
+            if axes is not None:
+                self._ax = [float(v) for v in axes]
+            if buttons is not None:
+                self._btn = [bool(b) for b in buttons]
+            self._ada_live = True
+            self.update()
+        except Exception:                              # noqa: BLE001
+            pass
+
+    def _nyala(self, elemen):
+        """True bila elemen harus menyala (sedang ditekan / sedang diremap)."""
+        if elemen in self._hl:
+            return True
+        if not self._ada_live:
+            return False
+        for idx, el in _BTN_ELEMEN.items():
+            if el == elemen and idx < len(self._btn) and self._btn[idx]:
+                return True
+        return False
 
     # ------------------------------------------------------------------ paint
     def paintEvent(self, _ev):                          # noqa: N802 (Qt)
@@ -116,86 +168,114 @@ class PadDiagram(QtWidgets.QWidget):
         try:
             p.setRenderHint(QtGui.QPainter.Antialiasing)
             acc = _acc()
-            f = min(self.width() / 440.0, self.height() / 220.0)
-            ox = (self.width() - 440.0 * f) / 2.0
-            oy = (self.height() - 220.0 * f) / 2.0
+            f = min(self.width() / 500.0, self.height() / 280.0)
+            ox = (self.width() - 500.0 * f) / 2.0
+            oy = (self.height() - 280.0 * f) / 2.0
 
             def R(x, y, w, h):
                 return QtCore.QRectF(ox + x * f, oy + y * f, w * f, h * f)
 
-            def teks_kecil(r, txt, warna=(235, 235, 235, 190), px=8.5):
+            def teks(r, txt, warna=(235, 235, 235, 200), px=8.0):
                 p.setPen(QtGui.QColor(*warna))
                 ft = p.font()
                 ft.setPixelSize(max(7, int(theme.px(px)) - 2))
                 p.setFont(ft)
                 p.drawText(r, Qt.AlignCenter, txt)
 
-            def kotak(x, y, w, h, txt=None, tandai=False, px=7.5):
-                r = R(x, y, w, h)
-                p.setPen(QtGui.QPen(acc if tandai else QtGui.QColor(255, 255, 255, 60),
-                                    1.6 if tandai else 1.0))
-                p.setBrush(_dgn_alpha(acc, 70) if tandai
+            def bar(x, y, w, h, elemen, txt, px=8.0, r=8):
+                on = self._nyala(elemen)
+                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 58),
+                                    1.8 if on else 1.0))
+                p.setBrush(_dgn_alpha(acc, 80) if on
                            else QtGui.QColor(255, 255, 255, 14))
-                p.drawRoundedRect(r, 6 * f, 6 * f)
+                p.drawRoundedRect(R(x, y, w, h), r * f, r * f)
                 if txt:
-                    teks_kecil(r, txt, (240, 240, 240, 220) if not tandai else acc.getRgb())
+                    teks(R(x, y, w, h), txt,
+                         acc.getRgb() if on else (238, 238, 238, 210), px)
 
-            # body
+            # ---------- silhouette: grips + body ----------
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QColor(255, 255, 255, 12))
+            p.drawEllipse(R(66, 158, 108, 108))
+            p.drawEllipse(R(326, 158, 108, 108))
             p.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 52), 1.2))
-            p.setBrush(QtGui.QColor(255, 255, 255, 10))
-            p.drawRoundedRect(R(20, 8, 400, 198), 36 * f, 36 * f)
+            p.setBrush(QtGui.QColor(255, 255, 255, 12))
+            p.drawRoundedRect(R(70, 40, 360, 200), 62 * f, 62 * f)
 
-            hl = self.tandai
-            # triggers + bumpers
-            kotak(50, 2, 120, 12, "LT (L2)", tandai=(hl == "triggers"))
-            kotak(270, 2, 120, 12, "RT (R2)", tandai=(hl == "triggers"))
-            kotak(50, 17, 120, 13, "LB (L1)", tandai=(hl == "bumpers"))
-            kotak(270, 17, 120, 13, "RB (R1)", tandai=(hl == "bumpers"))
+            # ---------- shoulder cluster (outside top edge) ----------
+            bar(112, 4, 84, 15, "lt", "LT (L2)", px=7.5, r=7)
+            bar(304, 4, 84, 15, "rt", "RT (R2)", px=7.5, r=7)
+            bar(112, 23, 84, 16, "lb", "LB (L1)", px=7.5, r=8)
+            bar(304, 23, 84, 16, "rb", "RB (R1)", px=7.5, r=8)
 
-            # share / options / touchpad
-            kotak(150, 62, 36, 16, "SHARE", tandai=(hl == "share"), px=6.5)
-            kotak(254, 62, 36, 16, "OPTIONS", px=6.5)
-            kotak(188, 44, 64, 38, "TOUCHPAD", px=6.5)
+            # ---------- touchpad + share/options ----------
+            bar(215, 52, 70, 36, "touchpad", "TOUCHPAD", px=7.0, r=8)
+            bar(168, 56, 36, 15, "share", "SHARE", px=6.5, r=6)
+            bar(296, 56, 40, 15, "options", "OPTIONS", px=6.0, r=6)
 
-            # D-PAD cross
-            p.setPen(QtGui.QPen(acc if hl == "dpad" else QtGui.QColor(255, 255, 255, 60),
-                                1.6 if hl == "dpad" else 1.0))
-            p.setBrush(_dgn_alpha(acc, 70) if hl == "dpad"
-                       else QtGui.QColor(255, 255, 255, 16))
-            p.drawRoundedRect(R(97, 70, 16, 62), 5 * f, 5 * f)
-            p.drawRoundedRect(R(74, 93, 62, 16), 5 * f, 5 * f)
-            teks_kecil(R(74, 50, 62, 12), "D-PAD")
+            # ---------- D-PAD (tiap panah menyala individual saat ditekan) ----------
+            on = self._nyala("dpad")
+            dl = self._ax[6] if len(self._ax) > 6 else 0.0   # HAT0X: -1 kiri / +1 kanan
+            du = self._ax[7] if len(self._ax) > 7 else 0.0   # HAT0Y: -1 atas / +1 bawah
+            p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 58),
+                                1.6 if on else 1.0))
 
-            # sticks
-            for cx, cy, target, label in ((118, 160, "stick_l", "LEFT STICK"),
-                                          (322, 160, "stick_r", "RIGHT STICK")):
-                on = hl == target
-                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 60),
-                                    1.6 if on else 1.0))
-                p.setBrush(_dgn_alpha(acc, 70) if on
-                           else QtGui.QColor(255, 255, 255, 16))
+            def panah(x, y, w, h, nyala):
+                p.setPen(QtGui.QPen(acc if (nyala or on) else QtGui.QColor(255, 255, 255, 58),
+                                    1.6 if (nyala or on) else 1.0))
+                p.setBrush(_dgn_alpha(acc, 120) if nyala
+                           else (_dgn_alpha(acc, 80) if on
+                                 else QtGui.QColor(255, 255, 255, 15)))
+                p.drawRoundedRect(R(x, y, w, h), 5 * f, 5 * f)
+
+            panah(120, 103, 16, 20, du < -0.5)     # atas
+            panah(120, 141, 16, 20, du > 0.5)      # bawah
+            panah(99, 124, 20, 16, dl < -0.5)      # kiri
+            panah(147, 124, 20, 16, dl > 0.5)      # kanan
+            panah(120, 124, 16, 16, False)         # inti
+            teks(R(96, 164, 64, 12), "D-PAD", px=7.5)
+
+            # ---------- sticks (dengan knob LIVE offset) ----------
+            for cx, cy, elemen, label, ax_i, ay_i in (
+                    (140, 200, "stick_l", "LEFT STICK", 0, 1),
+                    (360, 200, "stick_r", "RIGHT STICK", 3, 4)):
+                on = self._nyala(elemen)
+                dx = self._ax[ax_i] if len(self._ax) > ax_i else 0.0
+                dy = self._ax[ay_i] if len(self._ax) > ay_i else 0.0
+                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 58),
+                                    1.8 if on else 1.0))
+                p.setBrush(_dgn_alpha(acc, 80) if on
+                           else QtGui.QColor(255, 255, 255, 15))
                 p.drawEllipse(R(cx - 24, cy - 24, 48, 48))
-                p.setBrush(QtGui.QColor(255, 255, 255, 40))
-                p.drawEllipse(R(cx - 9, cy - 9, 18, 18))
-                teks_kecil(R(cx - 46, cy + 28, 92, 12), label)
+                p.setPen(QtCore.Qt.NoPen)
+                p.setBrush(_dgn_alpha(acc, 200) if (on or abs(dx) > 0.15 or abs(dy) > 0.15)
+                           else QtGui.QColor(255, 255, 255, 46))
+                kx = cx + max(-13.0, min(13.0, dx * 13.0))
+                ky = cy + max(-13.0, min(13.0, dy * 13.0))
+                p.drawEllipse(R(kx - 9, ky - 9, 18, 18))
+                p.setPen(QtGui.QColor(235, 235, 235, 200))
+                teks(R(cx - 46, cy + 28, 92, 12), label, px=7.5)
 
-            # face buttons diamond
-            face = hl == "face"
+            # ---------- face buttons diamond ----------
+            for cx, cy, elemen, txt in ((352, 104, "b2", "△"),   # Y top
+                                        (379, 131, "b1", "○"),   # B right
+                                        (352, 158, "b0", "×"),   # A bottom
+                                        (325, 131, "b3", "□")):  # X left
+                on = self._nyala(elemen)
+                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 72),
+                                    1.8 if on else 1.0))
+                p.setBrush(_dgn_alpha(acc, 110) if on
+                           else QtGui.QColor(255, 255, 255, 15))
+                p.drawEllipse(R(cx - 13, cy - 13, 26, 26))
+                teks(R(cx - 13, cy - 13, 26, 26), txt,
+                     acc.getRgb() if on else (240, 240, 240, 235), px=10.0)
 
-            def tombol_bulat(cx, cy, r, txt, tandai):
-                p.setPen(QtGui.QPen(acc if tandai else QtGui.QColor(255, 255, 255, 72),
-                                    1.6 if tandai else 1.0))
-                p.setBrush(_dgn_alpha(acc, 70) if tandai
-                           else QtGui.QColor(255, 255, 255, 16))
-                p.drawEllipse(R(cx - r, cy - r, 2 * r, 2 * r))
-                teks_kecil(R(cx - r, cy - r, 2 * r, 2 * r), txt,
-                           (240, 240, 240, 230) if not tandai else acc.getRgb(), px=10.5)
-
-            tombol_bulat(335, 76, 13, "△", face)     # Y top
-            tombol_bulat(362, 103, 13, "○", face)    # B right
-            tombol_bulat(335, 130, 13, "×", face)    # A bottom
-            tombol_bulat(308, 103, 13, "□", face)    # X left
-            teks_kecil(R(286, 50, 98, 12), "FACE BUTTONS")
+            # ---------- L3 / R3 (tekanan stick) ----------
+            for cx, cy, elemen in ((140, 200, "l3"), (360, 200, "r3")):
+                if self._nyala(elemen):
+                    p.setPen(QtGui.QPen(acc, 1.8))
+                    p.setBrush(QtCore.Qt.NoBrush)
+                    p.drawEllipse(R(cx - 12, cy - 12, 24, 24))
         finally:
             p.end()
 
@@ -207,13 +287,13 @@ class PadMapDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.gamepad = gamepad
         self.setModal(False)
-        self.resize(theme.px(880), theme.px(610))
+        self.resize(theme.px(920), theme.px(640))
         t = QtWidgets.QLabel("GAMEPAD MAPPING — see & change every control")
         t.setObjectName("PanelTitle")
         ket = QtWidgets.QLabel(
-            "For beginners: click CHANGE on a row, then press the button / move the "
-            "stick you want. The picture shows which physical control each mapping "
-            "means. Save it as a named preset (e.g. \u201cCustom A\u201d).")
+            "Press any button or move a stick on the real pad — the picture lights up "
+            "live. To remap: click CHANGE on a row, then press the new button / move "
+            "the new stick. Save it as a named preset (e.g. \u201cCustom A\u201d).")
         ket.setWordWrap(True)
         theme.set_peran(ket, "dim")
         v = QtWidgets.QVBoxLayout(self)
@@ -221,7 +301,7 @@ class PadMapDialog(QtWidgets.QDialog):
         v.addWidget(ket)
 
         tengah = QtWidgets.QHBoxLayout()
-        tengah.setSpacing(theme.px(10))
+        tengah.setSpacing(theme.px(12))
         self.gambar = PadDiagram()
         tengah.addWidget(self.gambar, 0)
 
@@ -252,10 +332,9 @@ class PadMapDialog(QtWidgets.QDialog):
         v.addLayout(tengah)
 
         legenda = QtWidgets.QLabel(
-            "LEFT STICK ←/→ = LX [0] · LEFT STICK ↑/↓ = LY [1] · "
-            "RIGHT STICK ←/→ = RX [3] · RIGHT STICK ↑/↓ = RY [4] · "
-            "D-PAD ↑/↓ = camera tilt [7] · LB/RB (L1/R1) = deadman · "
-            "LT (L2) = depth-hold. Numbers in [ ] are the raw pad index.")
+            "LEFT STICK = LX [0] ←/→ · LY [1] ↑/↓   |   RIGHT STICK = RX [3] ←/→ · "
+            "RY [4] ↑/↓   |   D-PAD = camera tilt [7]   |   LB/RB (L1/R1) = deadman   |   "
+            "LT (L2) = depth-hold. Numbers in [ ] are the raw pad indexes.")
         legenda.setWordWrap(True)
         theme.set_peran(legenda, "faint")
         v.addWidget(legenda)
@@ -356,13 +435,29 @@ class PadMapDialog(QtWidgets.QDialog):
             self.lbl_status.setText("could not save the preset")
 
     # ------------------------------------------------------------------ remap
+    def _target_elemen(self, key):
+        """Elemen diagram yang harus menyala saat baris `key` dipilih utk remap."""
+        hl = self.tandai.get(key)
+        try:
+            if hl == "auto_btn":
+                val = int(self.gamepad.cfg.get(key, -1))
+                return [_BTN_ELEMEN[val]] if val in _BTN_ELEMEN else []
+            if hl == "auto_axis":
+                val = int(self.gamepad.cfg.get(key, -1))
+                return [_AX_ELEMEN[val]] if val in _AX_ELEMEN else []
+        except (TypeError, ValueError):
+            return []
+        if isinstance(hl, (list, tuple)):
+            return list(hl)
+        return [hl] if hl else []
+
     def _mulai_tangkap(self, key):
         self._tangkap = key
         self._prev_axes = None
         for _k, l in self.lbl.items():
             l.setStyleSheet("")
         self.lbl[key].setStyleSheet("color:%s; font-weight:800" % theme.warna("accent"))
-        self.gambar.set_tandai(self.tandai.get(key))
+        self.gambar.set_tandai(self._target_elemen(key))
         self.lbl_status.setText("WAITING FOR INPUT — press a button / move an axis "
                                 "for “%s”…" % key)
         try:
@@ -377,6 +472,10 @@ class PadMapDialog(QtWidgets.QDialog):
         self._segarkan()
 
     def _live(self, live):
+        try:
+            self.gambar.set_live(live.get("axes"), live.get("buttons"))
+        except Exception:                              # noqa: BLE001
+            pass
         try:
             if self._tangkap is None:
                 return

@@ -157,6 +157,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._tiles_timer.start(600)
         self.gamepad.sig_status.connect(self._catat)
         self.gamepad.sig_live.connect(self._teleop_update)
+        self.gamepad.sig_aksi.connect(self._aksi_pad)
 
         # integrator peta (estimasi dead-reckoning; label jelas di panel)
         self.plot_misi.ancor()
@@ -1342,6 +1343,23 @@ class RovConsole(QtWidgets.QMainWindow):
                 self.btn_rec[nama].setChecked(False)
         else:
             p.stop_record()
+
+    def _aksi_pad(self, aksi):
+        """Tombol fisik REC/PHOTO di gamepad → jalur SAMA dengan tombol GUI."""
+        try:
+            if aksi == "record":
+                b = self.btn_rec.get("front")
+                if b is not None:
+                    b.setChecked(not b.isChecked())    # memicu _toggle_rec via toggled
+                    self._catat("pad: record %s (front)" %
+                                ("start" if b.isChecked() else "stop"))
+                else:
+                    self._toggle_rec("front", True)
+            elif aksi == "photo":
+                self._snap("front")
+                self._catat("pad: photo → front")
+        except Exception as exc:                           # noqa: BLE001
+            self._catat("pad action error: %r" % exc)
 
     def _snap(self, nama):
         path = os.path.join(self.sesi, "snap_%s_%s.png" % (
