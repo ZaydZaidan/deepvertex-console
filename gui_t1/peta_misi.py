@@ -116,8 +116,9 @@ class PlotMisi(QtWidgets.QWidget):
         f.setPixelSize(theme.px(9))
         p.setFont(f)
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
-        p.drawText(QPointF(6, h - 8), "ESTIMASI (dead-reckoning) — posisi presisi: T2/VIO")
-        p.drawText(QPointF(6, 14), "area %.0fx%.0f m · lajur %.1f m" %
+        p.drawText(QPointF(6, h - 8),
+                   "ESTIMATED (dead-reckoning) — precise position: Stage 2 / VIO")
+        p.drawText(QPointF(6, 14), "area %.0f×%.0f m · lanes %.1f m" %
                    (2 * BOX, 2 * BOX, SPACING))
         # panah utara
         p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT_DIM), 1))

@@ -197,17 +197,11 @@ class RovConsole(QtWidgets.QMainWindow):
         baris = QtWidgets.QHBoxLayout(h)
         baris.setContentsMargins(12, 6, 12, 6)
         baris.setSpacing(12)
+        # LOGO MONO resmi (lockup, GAMBAR — bukan teks), sama seperti navbar web.
+        # Brand guide: lockup horizontal minimal 240 px lebar -> tinggi ≈ 65 px.
         self.brand_mark = QtWidgets.QLabel()
-        self.brand_mark.setFixedSize(31, 31)
-        brand = QtWidgets.QWidget()
-        bl = QtWidgets.QHBoxLayout(brand)
-        bl.setContentsMargins(0, 0, 0, 0)
-        bl.setSpacing(9)
-        bl.addWidget(self.brand_mark)
-        self.brand_word = QtWidgets.QLabel("DeepVertex")
-        self.brand_word.setObjectName("BrandWord")
-        bl.addWidget(self.brand_word)
-        baris.addWidget(brand)
+        self.brand_mark.setFixedSize(240, 65)
+        baris.addWidget(self.brand_mark)
         sep = QtWidgets.QFrame()
         sep.setObjectName("StatusSep")
         sep.setFixedSize(1, 26)
@@ -244,16 +238,19 @@ class RovConsole(QtWidgets.QMainWindow):
         self.chip_rec = W.Chip("rec")
         self.chip_fs = W.Chip("fs")          # failsafe sedang aktif?
         self.chip_ekf = W.Chip("ekf")        # kesehatan EKF
+        # audit UI 13 Okt: chip MODE/ARM/PAD tidak lagi ditempel di baris chip —
+        # informasinya sudah dibawa BANNER BESAR (hindari duplikasi; sisa: LINK/REC/FS/EKF)
         for c, teks in ((self.chip_link, "menunggu"), (self.chip_mode, "—"),
                         (self.chip_arm, "—"), (self.chip_pad, "off"), (self.chip_rec, "—"),
                         (self.chip_fs, "—"), (self.chip_ekf, "—")):
             self._chip(c, "ink_faint", teks)
+        for c in (self.chip_link, self.chip_rec, self.chip_fs, self.chip_ekf):
             self.chip_bar.tambah(c)
         # BANNER STATUS BESAR (permintaan pemilik 13 Okt): MODE & ARMED/DISARMED
         # harus langsung terbaca — pilot TIDAK boleh "buta" soal status kendaraan.
         self.lbl_mode_big = QtWidgets.QLabel("MODE · —")
         self.lbl_arm_big = QtWidgets.QLabel("—")
-        self.lbl_pad_big = QtWidgets.QLabel("PAD · tidak ada")
+        self.lbl_pad_big = QtWidgets.QLabel("PAD · NOT FOUND")
         for lb in (self.lbl_mode_big, self.lbl_arm_big, self.lbl_pad_big):
             lb.setAlignment(Qt.AlignCenter)
         baris.addWidget(self.lbl_mode_big)
@@ -275,6 +272,10 @@ class RovConsole(QtWidgets.QMainWindow):
                 pass
 
     def _set_mark_merek(self):
+        """Pasang LOCKUP MONO resmi sesuai terang/gelapnya bidang — sama seperti web.
+
+        (Bone di bidang ink, Ink di bidang ivory; file mono dari brand kit/web.)
+        """
         gelap = True
         try:
             bg = theme.hexa("bg")
@@ -282,12 +283,20 @@ class RovConsole(QtWidgets.QMainWindow):
             gelap = (0.299 * r + 0.587 * g + 0.114 * b) < 128
         except Exception:                                  # noqa: BLE001
             pass
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ikon",
-                            "dvx_mark_terang.png" if gelap else "dvx_mark_gelap.png")
-        pix = QtGui.QPixmap(path)
-        if not pix.isNull():
-            self.brand_mark.setPixmap(pix.scaled(31, 31, Qt.KeepAspectRatio,
-                                                 Qt.SmoothTransformation))
+        nama = ("lockup-dark-mono-tight.svg" if gelap
+                else "lockup-light-mono-tight.svg")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ikon", nama)
+        try:
+            from PySide6.QtSvg import QSvgRenderer
+            rnd = QSvgRenderer(path)
+            pix = QtGui.QPixmap(240, 65)
+            pix.fill(QtGui.QColor(0, 0, 0, 0))
+            p = QtGui.QPainter(pix)
+            rnd.render(p)
+            p.end()
+            self.brand_mark.setPixmap(pix)
+        except Exception:                                  # noqa: BLE001
+            pass
 
     # ================================================================ statusbar
     def _bangun_statusbar(self):
@@ -409,7 +418,7 @@ class RovConsole(QtWidgets.QMainWindow):
         tile = W.CameraTile(key.replace("cam_", ""), judul=False)
         tile.mode_gambar = "contain"     # T1 nyata: frame kamera ditampilkan UTUH
         tile.tinggi_maks = tinggi
-        tile.set_status("menunggu stream …")
+        tile.set_status("waiting for stream …")
         p.body_layout.addWidget(tile, 1)
         p.tile = tile
         return p
@@ -726,15 +735,15 @@ class RovConsole(QtWidgets.QMainWindow):
         self.b_ned.setToolTip("plot NED: area survei + lajur rencana + jejak")
         self.b_peta.clicked.connect(lambda: self._pilih_peta(0))
         self.b_ned.clicked.connect(lambda: self._pilih_peta(1))
-        b_anc = QtWidgets.QPushButton("TARUH ANCHOR")
+        b_anc = QtWidgets.QPushButton("PLACE ANCHOR")
         b_anc.setObjectName("BtnTiny")
         b_anc.setToolTip("klik: peta masuk mode pin - klik satu titik di peta = anchor (0,0) lokal")
         b_anc.clicked.connect(self._siapkan_anchor)
-        b_iku = QtWidgets.QPushButton("IKUTI ROV")
+        b_iku = QtWidgets.QPushButton("FOLLOW ROV")
         b_iku.setObjectName("BtnTiny")
         b_iku.setToolTip("pandangan peta kembali mengikuti posisi estimasi ROV")
         b_iku.clicked.connect(lambda: self.peta.pusatkan_ke_robot())
-        b_res = QtWidgets.QPushButton("RESET ESTIMASI")
+        b_res = QtWidgets.QPushButton("RESET EST.")
         b_res.setObjectName("BtnTiny")
         b_res.setToolTip("nol-kan posisi estimasi & jejak (mulai dari sini)")
         b_res.clicked.connect(self._reset_estimasi)
@@ -882,7 +891,7 @@ class RovConsole(QtWidgets.QMainWindow):
                 return
             self._pad_kini = bool(konek)
             on = theme.warna("ok") if konek else theme.warna("ink_faint")
-            self.lbl_pad_big.setText("PAD · %s" % ("SIAP" if konek else "tidak ada"))
+            self.lbl_pad_big.setText("PAD · %s" % ("READY" if konek else "NOT FOUND"))
             self.lbl_pad_big.setStyleSheet(
                 "color:%s; font-size:%dpx; font-weight:700; letter-spacing:1.2px;"
                 " padding:3px 10px; border:1px solid %s;"
@@ -1189,7 +1198,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self._peta_trail_t = now
             self.plot_misi.tambah_jejak()
             self.peta.add_gt(n, e)
-        self.lbl_pose.setText("N %.1f  E %.1f (ESTIMASI)" % (n, e))
+        self.lbl_pose.setText("N %.1f  E %.1f (EST.)" % (n, e))
 
     def closeEvent(self, ev):
         try:
