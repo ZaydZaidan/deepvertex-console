@@ -112,6 +112,11 @@ Prerequisite for test_raw/test_console: the RAW agent running on :8791, e.g.
 - **File flow**: session folders split `compressed/` vs `raw/`; CAPTURE rows have a
   per-camera COMPRESSED/RAW mode; RAW agent supports the front camera too
   (`--device-front`, ≤640×480); snapshots always land in `compressed/`.
+- **Per-sensor PRE-FLIGHT**: a SENSORS row in PRE-FLIGHT CHECK with GYRO / ACCEL /
+  MAG (compass count from COMPASS_DEV_ID*) / BARO / BATTERY / MOTOR / RC IN chips,
+  driven by the SYS_STATUS present+healthy bitmasks — a broken or missing sensor is
+  named directly ("FAULT" / "NOT FOUND"); the PRE-ARM chip tooltip now carries the
+  latest vehicle status text.
 - **Storage guard + time estimate**: while recording you see the estimated minutes
   left until the SAFE LIMIT (topside for compressed .mkv, the Pi for RAW), plus a
   snapshot-count estimate. Below the warn margin the ALERT strip turns amber; below

@@ -403,6 +403,13 @@ class MavBridge(QtCore.QObject):
                         & mavutil.mavlink.MAV_SYS_STATUS_PREARM_CHECK)
                 except Exception:                              # noqa: BLE001
                     pass
+                try:
+                    # bitmask sensor (utk PRE-FLIGHT per-sensor): present / healthy / enabled
+                    self.state["sys_present"] = int(msg.onboard_control_sensors_present)
+                    self.state["sys_healthy"] = int(msg.onboard_control_sensors_health)
+                    self.state["sys_enabled"] = int(msg.onboard_control_sensors_enabled)
+                except Exception:                              # noqa: BLE001
+                    pass
                 c = msg.current_battery / 100.0
                 self.state["curr"] = c if c > 0.05 else None
                 self.state["remaining"] = msg.battery_remaining if msg.battery_remaining != -1 else None

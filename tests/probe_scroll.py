@@ -75,6 +75,15 @@ def main():
         jalan(0.5)
     w._apply_preset("setup")
     jalan(0.6)
+    # tangkapan tambahan: preset pilot, semua rel di-scroll bawah (PRE-FLIGHT ▸ SENSORS)
+    w._apply_preset("pilot-focus")
+    jalan(0.6)
+    for s2 in w.findChildren(QtWidgets.QScrollArea):
+        s2.verticalScrollBar().setValue(s2.verticalScrollBar().maximum())
+    jalan(0.5)
+    shot3 = os.path.join(SCRATCH, "probe_pilot_bawah.png")
+    w.grab().save(shot3)
+    print("screenshot pilot-bawah:", shot3)
 
     pf = w.P["failsafe"]
     btns = [b for b in pf.findChildren(QtWidgets.QPushButton)

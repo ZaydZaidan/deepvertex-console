@@ -409,6 +409,35 @@ def main():
         print("[29] storage GAGAL:", repr(exc))
         lulus = False
 
+    # [30] preflight memeriksa SETIAP sensor & menyebut sensor yang error
+    try:
+        pf = w.P["preflight"].panel_preflight
+        st = w.bridge.state
+        allbits = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 15) | (1 << 24)
+        w.bridge.params["COMPASS_DEV_ID"] = 71146
+        st["sys_present"] = allbits
+        st["sys_healthy"] = allbits
+        pf._perbarui()
+        ok30 = (pf.sensor_txt.get("s_gyro") == "ok") and \
+            ("ok" in pf.sensor_txt.get("s_mag", ""))
+        st["sys_healthy"] = allbits & ~(1 << 2)          # MAG rusak
+        pf._perbarui()
+        ok30 = ok30 and (pf.sensor_txt.get("s_mag") == "FAULT")
+        st["sys_present"] = allbits & ~(1 << 3)          # BARO tidak terpasang
+        pf._perbarui()
+        ok30 = ok30 and (pf.sensor_txt.get("s_baro") == "NOT FOUND")
+        st["sys_present"] = 0
+        st["sys_healthy"] = 0
+        pf._perbarui()
+        ok30 = ok30 and (pf.sensor_txt.get("s_gyro") == "NOT FOUND")
+        st.pop("sys_present", None)
+        st.pop("sys_healthy", None)
+        print("[30] preflight per-sensor:", ok30)
+        lulus &= bool(ok30)
+    except Exception as exc:                               # noqa: BLE001
+        print("[30] preflight sensor GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

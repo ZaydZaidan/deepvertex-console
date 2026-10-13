@@ -721,6 +721,40 @@ class PreflightPanel(QtWidgets.QWidget):
             self.chip[k] = c
             self.chip_bar.tambah(c)
         v.addWidget(self.chip_bar)
+
+        # ---- SENSORS: pastikan SEMUA sensor tersambung & sehat; yang error
+        # disebutkan NAMANYA (permintaan pemilik 13 Okt).
+        tl = QtWidgets.QLabel("SENSORS (robot):")
+        tl.setObjectName("MicroLabel")
+        v.addWidget(tl)
+        self.chip_sensor = {}
+        self.sensor_txt = {}
+        self.chip_bar_s = U.FlowBox(spacing=4)
+        for k, nama, tip in (
+                ("s_gyro", "GYRO", "3D gyro health from SYS_STATUS — FAULT = check IMU / "
+                                   "run gyro calibration"),
+                ("s_accel", "ACCEL", "3D accelerometer health — FAULT = recalibrate "
+                                     "(ACCEL 6-POS) / check IMU"),
+                ("s_mag", "MAG", "Compass health + detected compass count (COMPASS_DEV_ID*) — "
+                                 "FAULT = recalibrate compass / check wiring"),
+                ("s_baro", "BARO", "Barometer (absolute pressure) health — FAULT = depth "
+                                   "reading will be wrong"),
+                ("s_batt", "BATTERY", "Battery monitor health (voltage/current) — FAULT = "
+                                      "check the power module"),
+                ("s_motor", "MOTOR", "Motor outputs (ESC/PWM) health — FAULT = check "
+                                     "thrusters / wiring"),
+                ("s_rc", "RC IN", "RC receiver input — 'n/a' is normal when flying with the "
+                                  "GCS gamepad only")):
+            c = W.Chip(nama)
+            c.setToolTip(tip)
+            try:
+                c.set_state("ink_faint", "—")
+            except Exception:                              # noqa: BLE001
+                pass
+            self.chip_sensor[k] = c
+            self.chip_bar_s.tambah(c)
+        v.addWidget(self.chip_bar_s)
+
         self.lbl_status = QtWidgets.QLabel("waiting for data …")
         self.lbl_status.setObjectName("MicroLabel")
         self.lbl_status.setWordWrap(True)
@@ -784,6 +818,16 @@ class PreflightPanel(QtWidgets.QWidget):
             except Exception:                              # noqa: BLE001
                 pass
 
+    def _set_sensor(self, key, warna, teks):
+        self.sensor_txt[key] = "%s" % teks
+        c = self.chip_sensor.get(key)
+        if c is None:
+            return
+        try:
+            c.set_state(warna, teks)
+        except Exception:                              # noqa: BLE001
+            pass
+
     def _set(self, key, warna, teks):
         c = self.chip.get(key)
         if c is None:
@@ -838,6 +882,43 @@ class PreflightPanel(QtWidgets.QWidget):
             self._set("prearm", "ok", "ready")
         else:
             self._set("prearm", "ink_faint", "—")
+        try:
+            self.chip["prearm"].setToolTip(str(s.get("last_text") or ""))
+        except Exception:                                  # noqa: BLE001
+            pass
+
+        # ---- SENSORS per-sensor (mask bit SYS_STATUS MAVLink)
+        pres = s.get("sys_present")
+        hea = s.get("sys_healthy")
+
+        def _st(mask, mandatory=True):
+            if pres is None or hea is None:
+                return ("ink_faint", "—")
+            if not (int(pres) & mask):
+                return ("err", "NOT FOUND") if mandatory else ("ink_faint", "n/a")
+            if int(hea) & mask:
+                return ("ok", "ok")
+            return ("err", "FAULT")
+
+        n_mag = 0
+        for prm in ("COMPASS_DEV_ID", "COMPASS_DEV_ID2", "COMPASS_DEV_ID3"):
+            try:
+                if int(float(self.bridge.params.get(prm) or 0)) > 0:
+                    n_mag += 1
+            except (TypeError, ValueError):
+                pass
+        for key, mask, wajib in (("s_gyro", 1 << 0, True), ("s_accel", 1 << 1, True),
+                                 ("s_mag", 1 << 2, True), ("s_baro", 1 << 3, True),
+                                 ("s_batt", 1 << 24, False),
+                                 ("s_motor", 1 << 15, False),
+                                 ("s_rc", 1 << 16, False)):
+            warna, teks = _st(mask, wajib)
+            if key == "s_mag" and warna == "ok":
+                if n_mag:
+                    teks = "ok (%d compass)" % n_mag
+                else:
+                    warna, teks = "err", "FAULT (0 compass)"
+            self._set_sensor(key, warna, teks)
 
         # ringkasan
         kurang = [k for k, c in self.cb.items() if not c.isChecked()]
