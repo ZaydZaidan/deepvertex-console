@@ -128,7 +128,7 @@ class PadDiagram(QtWidgets.QWidget):
         self._ax = [0.0] * 8   # live axes (ternormalisasi)
         self._btn = [False] * 13
         self._ada_live = False
-        self.setMinimumSize(theme.px(500), theme.px(300))
+        self.setMinimumSize(theme.px(480), theme.px(300))
 
     # ------------------------------------------------------------- API publik
     def set_tandai(self, ids):
@@ -168,12 +168,13 @@ class PadDiagram(QtWidgets.QWidget):
         try:
             p.setRenderHint(QtGui.QPainter.Antialiasing)
             acc = _acc()
-            f = min(self.width() / 500.0, self.height() / 280.0)
+            f = min(self.width() / 500.0, self.height() / 296.0)
             ox = (self.width() - 500.0 * f) / 2.0
-            oy = (self.height() - 280.0 * f) / 2.0
+            oy = (self.height() - 296.0 * f) / 2.0
 
             def R(x, y, w, h):
-                return QtCore.QRectF(ox + x * f, oy + y * f, w * f, h * f)
+                # +8 unit: margin atas supaya bar bahu tidak menempel tepi widget
+                return QtCore.QRectF(ox + x * f, oy + (y + 8) * f, w * f, h * f)
 
             def teks(r, txt, warna=(235, 235, 235, 200), px=8.0):
                 p.setPen(QtGui.QColor(*warna))
@@ -287,7 +288,14 @@ class PadMapDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.gamepad = gamepad
         self.setModal(False)
-        self.resize(theme.px(920), theme.px(640))
+        # ukuran mengikuti layar: jangan pernah lebih besar dari area tersedia
+        # (audit 13 Okt: di layar laptop 768p dialog versi lama terpotong di bawah)
+        try:
+            scr = QtWidgets.QApplication.primaryScreen().availableGeometry()
+            self.resize(max(theme.px(700), min(theme.px(900), scr.width() - theme.px(40))),
+                        max(theme.px(460), min(theme.px(560), scr.height() - theme.px(60))))
+        except Exception:                              # noqa: BLE001
+            self.resize(theme.px(900), theme.px(560))
         t = QtWidgets.QLabel("GAMEPAD MAPPING — see & change every control")
         t.setObjectName("PanelTitle")
         ket = QtWidgets.QLabel(
@@ -306,6 +314,7 @@ class PadMapDialog(QtWidgets.QDialog):
         tengah.addWidget(self.gambar, 0)
 
         self.grid = QtWidgets.QGridLayout()
+        self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(4)
         self.lbl = {}
         self.tipe = {}
@@ -328,7 +337,19 @@ class PadMapDialog(QtWidgets.QDialog):
             self.tipe[key] = tipe
             self.tandai[key] = hl
             baris_no += 1
-        tengah.addLayout(self.grid, 1)
+        # grid mapping dibungkus SCROLL (audit 13 Okt: dialog harus muat di layar
+        # laptop 768p — tinggi tetap, isi baris digulung bila perlu)
+        isi = QtWidgets.QWidget()
+        isi.setLayout(self.grid)
+        gulung = QtWidgets.QScrollArea()
+        gulung.setWidgetResizable(True)
+        gulung.setFrameShape(QtWidgets.QFrame.NoFrame)
+        gulung.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        gulung.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        gulung.setWidget(isi)
+        gulung.setMinimumWidth(theme.px(390))
+        tengah.addWidget(gulung, 1)
+        self.gulung = gulung
         v.addLayout(tengah)
 
         legenda = QtWidgets.QLabel(
@@ -362,10 +383,16 @@ class PadMapDialog(QtWidgets.QDialog):
         row.addWidget(b_apply)
         row.addWidget(b_save)
         v.addLayout(row)
+        row_close = QtWidgets.QHBoxLayout()
+        row_close.addStretch(1)
         b_close = QtWidgets.QPushButton("CLOSE")
         b_close.setObjectName("BtnTiny")
+        b_close.setToolTip("close this page")
         b_close.clicked.connect(self.close)
-        v.addWidget(b_close)
+        row_close.addWidget(b_close)
+        v.addLayout(row_close)
+        v.addSpacing(theme.px(2))
+        self.b_close = b_close          # dipakai probe/test utk cek margin bawah
 
         self._tangkap = None
         self._prev_btn = set()

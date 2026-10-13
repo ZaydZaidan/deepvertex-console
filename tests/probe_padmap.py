@@ -93,6 +93,8 @@ def main():
     shot = os.path.join(SCRATCH, "padmap_dialog.png")
     d.grab().save(shot)
     print("screenshot dialog:", shot)
+    print("ukuran dialog:", d.width(), "x", d.height(),
+          "| CLOSE sisa bawah:", d.rect().bottom() - d.b_close.geometry().bottom())
 
     # 3) jalur tombol konsol (handler yang dipakai PAD MAPPING…) — tanpa exec
     try:

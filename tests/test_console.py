@@ -255,7 +255,9 @@ def main():
         ok23 = (d23.lbl["axis_fwd"].text() not in ("", "—")) and \
             (d23.lbl["deadman_buttons"].text() != "") and \
             ("btn_record" in w.gamepad.cfg) and ("btn_photo" in w.gamepad.cfg) and \
-            (d23.lbl["btn_record"].text() != "") and (d23.lbl["btn_photo"].text() != "")
+            (d23.lbl["btn_record"].text() != "") and (d23.lbl["btn_photo"].text() != "") and \
+            (d23.height() <= 710) and \
+            (d23.rect().bottom() - d23.b_close.geometry().bottom() >= 0)
         d23.close()
         print("[23] dialog pad mapping konstruksi:", ok23)
         lulus &= bool(ok23)
