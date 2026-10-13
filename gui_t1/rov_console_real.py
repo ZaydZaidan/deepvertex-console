@@ -842,6 +842,7 @@ class RovConsole(QtWidgets.QMainWindow):
         rowt.addWidget(self.sp_temp_crit)
         rowt.addStretch(1)
         p.body_layout.addLayout(rowt)
+        p.body_layout.addSpacing(theme.px(3))     # margin bawah (audit: baris TEMP mepet)
         self.panel_failsafe = p          # dipakai _safety_check (suhu) & guide
         P["failsafe"] = p
         P["guide"] = self._buat_panel_guide()
