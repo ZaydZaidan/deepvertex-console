@@ -12,7 +12,7 @@ interlocks, compressed **and** onboard-RAW capture with a clear per-dive file la
 pre-flight sensor health, failsafe management, and calibration tools — designed to be
 run by a dive crew, not by a software engineer.
 
-[![CI](https://github.com/DeepVertex/DeepVertex-Underwater-Drone-GUI-Installer/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepVertex/DeepVertex-Underwater-Drone-GUI-Installer/actions/workflows/ci.yml)
+[![CI](https://github.com/DeepVertex/deepvertex-console/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepVertex/deepvertex-console/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-1.0.0-00b3d6)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2024.04-333)
 ![License](https://img.shields.io/badge/license-Proprietary-e11d48)

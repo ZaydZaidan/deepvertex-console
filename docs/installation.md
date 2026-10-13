@@ -10,7 +10,7 @@ Two sides to install: the **topside** (the laptop that runs the console) and the
 ### One-shot installer (recommended)
 
 ```bash
-cd DeepVertex-Underwater-Drone-GUI-Installer
+cd deepvertex-console
 ./install/install_topside.sh
 ```
 
