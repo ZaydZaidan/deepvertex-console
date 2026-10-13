@@ -1,4 +1,4 @@
-# ROV Mission Console — STAGE 1 (ROV mode) — working notes
+# Marine Technology — ROV Console (Stage 1 · ROV mode) — working notes
 
 Console for the real ROV (BlueROV2 + BlueOS). Design basis & widgets = the current
 simulator GUI (ROV Mission Console, including the Sep 28, 2026 redesign); the binding is

@@ -114,7 +114,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.setWindowTitle("DeepVertex ROV Mission Console")
+        self.setWindowTitle("DeepVertex \u00b7 Marine Technology")
         self.resize(1620, 1000)
         # NAMA SESI (permintaan pemilik 13 Okt): bisa lewat --nama-sesi, atau
         # ditanya sekali saat start. Otomasi memakai --no-prompt / --nama-sesi "".
@@ -230,6 +230,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
         with open(os.path.join(self.sesi, "session.json"), "w", encoding="utf-8") as f:
             json.dump({"start": time.strftime("%Y-%m-%d %H:%M:%S"),
+                       "session_name": getattr(self, "nama_sesi", ""),
                        "mavlink": args.mavlink,
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
@@ -260,7 +261,7 @@ class RovConsole(QtWidgets.QMainWindow):
         jl = QtWidgets.QVBoxLayout(judul)
         jl.setContentsMargins(0, 0, 0, 0)
         jl.setSpacing(1)
-        t = QtWidgets.QLabel("MISSION CONSOLE")
+        t = QtWidgets.QLabel("Marine Technology")
         t.setObjectName("HeaderTitle")
         s = QtWidgets.QLabel("")            # subjudul DIHAPUS (permintaan pemilik 13 Okt)
         s.setObjectName("HeaderSub")
@@ -1244,7 +1245,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def _menu_about(self):
         QtWidgets.QMessageBox.about(
             self, "DeepVertex ROV Console",
-            "ROV Mission Console — Phase 1 (ROV mode)\n"
+            "Marine Technology \u2014 ROV console (Phase 1, ROV mode)\n"
             "BlueROV2 via BlueOS · MAVLink (pymavlink) · GStreamer · PySide6\n"
             "Basis tampilan: konsol sim DeepVertex (satu bahasa desain).\n"
             "Features: gamepad teleop, calibration, motor test, failsafe, parameters, "
@@ -1849,7 +1850,8 @@ def _terapkan_tema(app, nama=None, skala=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="ROV Mission Console — Phase 1 (ROV mode)")
+    ap = argparse.ArgumentParser(
+        description="DeepVertex Marine Technology \u2014 ROV console (Phase 1, ROV mode)")
     ap.add_argument("--mavlink", default="udpin:0.0.0.0:14550",
                     help="endpoint MAVLink (mis. udpin:0.0.0.0:14550 / udp:192.168.2.2:14550)")
     ap.add_argument("--front-port", type=int, default=5600)
