@@ -81,3 +81,30 @@ Prerequisite for test_raw/test_console: the RAW agent running on :8791, e.g.
 - **Compass calibration**: CANCEL → START (autosave) → on success with `autosaved=0`,
   send `DO_ACCEPT_MAG_CAL`; `MAG_CAL_PROGRESS/REPORT` ride the EXTRA3 stream and are
   explicitly subscribed.
+
+
+## What's new (13 Oct 2026)
+
+- **English-only UI** across the console and all runtime modules (labels, buttons,
+  tooltips, dialogs, notifications, status bar, CLI help).
+- **GAMEPAD MAPPING page** (Vehicle menu ▸ Gamepad mapping…, or PAD MAPPING… in TELEOP):
+  a painted controller diagram with game-style names (LB/RB, left stick, D-PAD …),
+  LIVE interactivity (pressing real buttons/moving sticks lights up the picture),
+  one-click CHANGE remap, and named presets saved to `gamepad_presets.json`
+  (auto-loaded at startup). New actions **btn_record** (default □) and **btn_photo**
+  (default ○) run the same code path as the GUI ● REC / SNAP buttons.
+- **Beginner SETUP GUIDE** panel (steps 1-7), **one-click failsafe defaults** for
+  BlueROV2 + Tattu 4S 10000 mAh (still editable), **water-temperature alerts**
+  (defaults warn 38 °C / crit 45 °C, editable).
+- **File flow**: session folders split `compressed/` vs `raw/`; CAPTURE rows have a
+  per-camera COMPRESSED/RAW mode; RAW agent supports the front camera too
+  (`--device-front`, ≤640×480); snapshots always land in `compressed/`.
+- **Saved settings live inside the app**: `gui_t1/saved/` — failsafe profile
+  (`failsafe.json`) and full parameter dumps (`params_<time>.json`); both panels show
+  the folder in-line, file dialogs open there by default (see `saved/README.txt`).
+- **Design pass**: larger paddings everywhere, explicit spin-box up/down arrow
+  buttons, clear combo dropdown arrows, compact right-aligned CLOSE buttons, dialogs
+  auto-fit the available screen, header subtitle removed (clean DeepVertex lockup),
+  rails widened and measured (no horizontal clipping in any preset).
+- Legacy simulator modules moved out of the app folder (see `../legacy_sim/` in the
+  work tree; they are not part of the delivery).
