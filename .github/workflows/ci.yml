@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: System packages (GStreamer + Xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gstreamer1.0-tools gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+            gstreamer1.0-libav libxcb-cursor0 xvfb
+
+      - name: Python packages
+        run: pip install PySide6 numpy pymavlink
+
+      - name: Compile everything
+        run: |
+          python -m py_compile gui_t1/*.py onboard/raw_agent.py tests/*.py
+
+      - name: Start RAW agent (test mode)
+        run: |
+          python onboard/raw_agent.py --test --port 8791 &
+          sleep 2
+          curl -fsS http://127.0.0.1:8791/status > /dev/null
+
+      - name: Console suite (headless)
+        working-directory: gui_t1
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" python ../tests/test_console.py
+
+      - name: Video + RAW suites
+        working-directory: gui_t1
+        run: |
+          xvfb-run -a python ../tests/test_video.py
+          xvfb-run -a python ../tests/test_raw.py

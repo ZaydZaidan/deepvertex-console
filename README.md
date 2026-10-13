@@ -1,80 +1,155 @@
-# DeepVertex — Underwater Drone GUI Installer (Stage 1 · ROV mode)
+<div align="center">
 
-Topside software package for the BlueROV2 coral-mapping delivery, Phase 1 (ROV mode):
-a QGroundControl-style mission console (PySide6) plus capture and onboard RAW support.
+<img src="gui_t1/ikon/deepvertex-app-icon.png" width="120" alt="DeepVertex"/>
 
-**PRIVATE repo — closed-source.** Distribution artifacts for the client (binary-only +
-license) are prepared separately during packaging; the robot itself stays on stock
-BlueOS (its only custom component, the RAW recorder, is deployed as a BlueOS extension).
+# DeepVertex Marine Technology Console
 
-## What's inside
+**BlueROV2 mission console for coral-mapping surveys — Phase 1 (ROV mode).**
 
-| Folder | Contents |
+A QGroundControl-style topside application (PySide6) for the BlueRobotics BlueROV2:
+three live camera streams, full MAVLink telemetry, gamepad teleop with safety
+interlocks, compressed **and** onboard-RAW capture with a clear per-dive file layout,
+pre-flight sensor health, failsafe management, and calibration tools — designed to be
+run by a dive crew, not by a software engineer.
+
+[![CI](https://github.com/DeepVertex/DeepVertex-Underwater-Drone-GUI-Installer/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepVertex/DeepVertex-Underwater-Drone-GUI-Installer/actions/workflows/ci.yml)
+![Version](https://img.shields.io/badge/version-1.0.0-00b3d6)
+![Platform](https://img.shields.io/badge/platform-Ubuntu%2024.04-333)
+![License](https://img.shields.io/badge/license-Proprietary-e11d48)
+![Python](https://img.shields.io/badge/python-3.12-3776ab)
+
+</div>
+
+![Console — Pilot Focus layout](docs/assets/console-pilot.png)
+
+---
+
+## Why this exists
+
+Underwater survey crews need one screen that answers three questions at all times:
+*is the ROV healthy, where is it, and is what I care about being recorded?* This
+console is built around that.
+
+- **Safety first** — dead-man enforced teleop, pre-flight sensor health from the
+  autopilot itself, leak/battery/temperature/link alerts, and a storage guard that
+  physically blocks REC/SNAP before a dive-critical disk fills up.
+- **Two qualities of recording, one clean file tree** — compressed video for quick
+  review, uncompressed RAW for photogrammetry, per camera, clearly split on disk.
+- **Built for the boat** — large legible text at 120% by default, high-contrast ink
+  theme for sunlight, everything reachable with the gamepad you already hold.
+
+## Feature highlights
+
+| Area | What you get |
 |---|---|
-| `gui_t1/` | The T1 console ("ROV Mission Console", PySide6) — live 3-stream view, full MAVLink telemetry HUD, teleop, calibration / motor test / failsafe / parameter tools, OSM map, compressed capture. Folder overview: `gui_t1/README.md`; deep working notes (run, recipes, tests): `gui_t1/README_T1.md`. |
-| `onboard/` | `raw_agent.py` — onboard RAW recorder (production on the Pi via the BlueOS extension scaffold in `onboard/extension/`). |
-| `tests/` | Hardware-free test suite: `test_video.py`, `test_raw.py`, `test_console.py` (**all checks PASS** — includes preset-stress, gamepad-page, pad REC/PHOTO and file-flow checks; uses `fake_vehicle.py`), `probe_layout.py` (real-DPI layout scan for ALL presets), `probe_scroll.py`, `probe_padmap.py`, `debug_misc*.py`. |
-| `install/` | `install_topside.sh` — topside installer. |
-| `migrate_pyqt5_to_pyside6.py` | One-shot binding migration script (58 replacements). |
+| **Video** | 3 simultaneous streams (front + stereo L/R via BlueOS), 16:9 tiles, live Hz + health, per-tile recording state |
+| **Telemetry** | Attitude + compass dials, depth/temperature, battery V/A/%, QGC-style sub instruments, MAVLink tlog per session |
+| **Teleop** | PS4 DualShock teleop (evdev), dead-man hold, MAX SPEED 25/50/75/100%, depth-hold, camera tilt + lights with percentages |
+| **Capture** | Per-camera **COMPRESSED \| RAW** REC mode, quick SNAP photos, live time-to-full estimate, safety margins + hard block |
+| **RAW pipeline** | Onboard agent (BlueOS extension) writes uncompressed chunks on the Pi; TRANSFER pulls them into the session with sha256 verification; Pi auto-stop guard |
+| **Pre-flight** | Per-sensor health chips (GYRO / ACCEL / MAG + compass count / BARO / BATTERY / MOTOR / RC), pre-arm bit + latest status text, 15-item Blue Robotics pre-dive checklist with ARM soft-gate |
+| **Safety systems** | Leak latch, battery low/critical, water-temperature alerts (editable), FAILSAFE status, link watchdog; red/amber alert strip + beep |
+| **Vehicle ops** | Arm/disarm, mode switch, SURFACE, accelerometer/compass/level/baro calibration dialogs, thruster test + MOTOR_DETECT, failsafe editor with one-click defaults (4S 10 Ah), parameter browser with SAVE/LOAD |
+| **Maps** | OSM map (offline-capable tile cache), anchor pinning, ROV dead-reckoning track (armed-gated), NED plot |
+| **Gamepad page** | Painted DS4 diagram with live button/stick feedback, one-click remap, named presets (e.g. "Custom A") auto-loaded per machine, pad REC/PHOTO buttons |
+| **UX** | 4 layouts (Pilot Focus / Mapping / Setup / Capture), global text scale (100/120/140%), ink & ivory themes, English-only UI, session naming, per-machine settings in `gui_t1/saved/` |
 
-## Where files go (one folder per dive)
+<table>
+<tr>
+<td><img src="docs/assets/console-setup.png" alt="Setup layout"/></td>
+<td><img src="docs/assets/gamepad-mapping.png" alt="Gamepad mapping page"/></td>
+</tr>
+<tr>
+<td align="center"><em>Setup layout — guided calibration & failsafe</em></td>
+<td align="center"><em>Gamepad mapping — DS4 diagram, remap, presets</em></td>
+</tr>
+</table>
 
-Every session creates a clearly split folder — compressed media and RAW archives never mix:
+## Hardware & software
 
-    ~/DeepVertex-ROV-Captures/<YYYYMMDD_HHMMSS>_dive/
-        compressed/     .mkv video + .png snapshots from the live BlueOS streams
-        raw/            unmcompressed chunks pulled from the Pi (RAW transfer)
-        mavlink.tlog    full MAVLink telemetry log
-        session_start.json / session_end.json
-
-Per camera you choose the REC mode in the CAPTURE panel: **COMPRESSED** (video via the
-BlueOS stream) or **RAW** (uncompressed via the onboard agent; files live on the Pi
-until you press TRANSFER ► in the RAW CAPTURE panel, which verifies sha256 and drops
-them into this session's `raw/`). Cameras: **front = Blue Robotics Low-Light HD USB**
-(RAW limited to ≤640×480 on USB2) and **stereo = Arducam B0495C** (AR0234 global
-shutter, native YUY2; recommended 1280×720@30 for streaming). SNAPSHOT is always a
-quick .png into `compressed/`.
-
-## Saved settings (inside the app)
-
-The console keeps your saved settings in its own `gui_t1/saved/` folder:
-`failsafe.json` (FAILSAFE & BATTERY panel → SAVE FILE) and
-`params_<timestamp>.json` full dumps (PARAMETERS panel → SAVE… / LOAD…).
-Both panels show the folder in-line and the file dialogs open there by default.
-
-## Status (13 Oct 2026)
-
-Console **v2.3** — all tests PASS without hardware. Key capabilities:
-
-- 3 camera streams at once (front + stereo L/R) from the BlueOS camera manager;
-- MAVLink 2 telemetry: attitude + compass dials, depth/temp, battery, QGC-style
-  INSTRUMENTS (Cam Tilt / Lights / Pilot Gain / Tether), SYS_STATUS pre-arm bit, link
-  watchdog + auto-reconnect, per-session telemetry tlog;
-- teleop with dead-man (MANUAL_CONTROL 20 Hz; RC-override keep-alive for camera tilt &
-  lights; pilot gain via `JS_GAIN_DEFAULT`);
-- vehicle ops à la QGC: arm/disarm (+ soft-gate against the pre-dive checklist), mode
-  change incl. SURFACE, gyro/baro/level calibration, 6-position accelerometer wizard,
-  compass calibration (QGC sequence), ArduSub-compliant motor test, failsafe & battery
-  panel (`ARMING_SKIPCHK` era), parameter browser;
-- OSM map à la rovgui + NED plot with a dead-reckoning position estimate (true position:
-  Stage 2 / VIO), capture markers; four layout presets (Pilot Focus / Mapping / Setup /
-  Capture);
-- capture: compressed recording + snapshots on the topside; RAW via the onboard agent;
-- AUTONOMOUS / VIO = *coming soon* (Stage 2, AUV mode).
+| Piece | Model |
+|---|---|
+| ROV | BlueRobotics BlueROV2 (Navigator + Raspberry Pi 4, BlueOS) |
+| Front camera | Blue Robotics Low-Light HD USB (RAW ≤ 640×480 over USB2) |
+| Stereo camera | **Arducam B0495C** — 2× AR0234 global shutter, YUYV 1920×1200 (streams at 1280×720@30) |
+| Battery | Tattu 4S 10000 mAh LiPo (25C) — failsafe defaults preset for this pack |
+| Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
+| Controller | Sony DualShock 4 (USB) |
 
 ## Quick start
 
-    cd gui_t1
-    bash demo_local.sh                 # full display demo, no hardware
-    bash run_console_real.sh           # against a real ROV (MAVLink 14550, streams 5600+)
+```bash
+# 1) Topside install (venv + PySide6 + GStreamer checks)
+./install/install_topside.sh
 
-## Notes
+# 2) Launch (defaults: ink theme, 120% text, RAW agent at the robot)
+./gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
 
-- Python venv lives in `gui_t1/.venv` (PySide6 6.12 + system site packages for
-  GStreamer / pymavlink).
-- `.mkv` recording needs the `h264parse` plugin (`gstreamer1.0-plugins-bad`); a
-  sudo-free bundle can live in `gui_t1/plugins/` and is loaded automatically.
-- `libxcb-cursor0` is required for X11 (bundled sudo-free in `gui_t1/tools/xcb/`).
-- The `-SBC-Installer` repo is parked (Stage 2; the Stage-1 raw-extension path covers
-  the robot side).
-- All documents in this project are written in English.
+# …or the launcher installed on the field laptop:
+deepvertexrov
+```
+
+First run asks for a **session name**; everything from that dive lands in
+`~/DeepVertex-ROV-Captures/<date>_<time>_<name>/` (see
+[docs/files-and-storage.md](docs/files-and-storage.md)).
+
+Full documentation index: [docs/](#documentation).
+
+## Documentation
+
+| Document | For |
+|---|---|
+| [docs/installation.md](docs/installation.md) | Topside + onboard install, tether & BlueOS setup, verification |
+| [docs/quickstart.md](docs/quickstart.md) | Your first 15 minutes: pre-flight, arm, fly, record, transfer |
+| [docs/user-guide.md](docs/user-guide.md) | Every panel, layout, alert and menu — the operator manual |
+| [docs/gamepad.md](docs/gamepad.md) | Default DS4 mapping, remapping, named presets, safety blocking |
+| [docs/files-and-storage.md](docs/files-and-storage.md) | Session folder layout, compressed vs RAW, storage guard, `saved/` |
+| [docs/architecture.md](docs/architecture.md) | Modules, threads, MAVLink layer, agent protocol, theming |
+| [docs/testing.md](docs/testing.md) | Test suite, probes, fake vehicle, agent test mode |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Field-proven fixes for the issues we actually hit |
+| [docs/roadmap.md](docs/roadmap.md) | Phase 2 (AUV + VIO), known limitations |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev environment, conventions, PR flow |
+| [SECURITY.md](SECURITY.md) | Vulnerability reporting & scope |
+
+## Repository layout
+
+```
+gui_t1/          The console (PySide6) — see gui_t1/README_T1.md for work notes
+onboard/         raw_agent.py + BlueOS extension scaffold (onboard RAW recorder)
+tests/           Hardware-free suite (30 checks), layout/scroll/pad probes,
+                 fake_vehicle.py, tether link check, parameter dump tools
+install/         install_topside.sh — one-shot topside setup
+docs/            Operator & developer documentation (this folder)
+progress/        Engineering log for the delivery (chronological)
+```
+
+## Testing
+
+The full suite runs without hardware (own fake autopilot + GStreamer test pipelines):
+
+```bash
+cd gui_t1
+.venv/bin/python ../tests/test_console.py     # 30 checks — PASS
+.venv/bin/python ../tests/test_video.py
+.venv/bin/python ../tests/test_raw.py
+.venv/bin/python ../tests/probe_layout.py     # geometry/truncation scan, 4 layouts
+.venv/bin/python ../tests/probe_scroll.py     # no-clip + scroll reachability scan
+.venv/bin/python ../tests/probe_padmap.py     # gamepad page + live-highlight shots
+```
+
+CI runs the same suite headlessly on every push (see `.github/workflows/ci.yml`).
+
+## Status & roadmap
+
+**Phase 1 (ROV mode) is feature-complete and field-tested** on the real BlueROV2 over
+the tether — teleop, capture, RAW transfer, failsafe and calibration flows were all
+exercised on hardware. Phase 2 locks in autonomous operation (AUV mode + VIO) on the
+Orin companion. Known limitations are listed in [docs/roadmap.md](docs/roadmap.md).
+
+## License
+
+**Proprietary — all rights reserved.** This repository is private; access does not
+grant any right to use, copy, modify or distribute. See [LICENSE](LICENSE) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (PySide6/Qt/GStreamer under
+LGPL — dynamically linked, unmodified).
