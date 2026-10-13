@@ -19,7 +19,7 @@ from pymavlink import mavutil
 
 PARAMS = [("FS_GCS_ENABLE", 0), ("FS_GCS_TIMEOUT", 5), ("FS_PILOT_INPUT", 0),
           ("FS_PILOT_TIMEOUT", 3), ("FS_LEAK_ENABLE", 2), ("BATT_LOW_VOLT", 13.2),
-          ("BATT_CRIT_VOLT", 12.5), ("BATT_LOW_MAH", 0), ("BATT_CRIT_MAH", 0),
+          ("BATT_CRT_VOLT", 12.5), ("BATT_LOW_MAH", 0), ("BATT_CRT_MAH", 0),
           ("BATT_FS_LOW_ACT", 0), ("BATT_FS_CRT_ACT", 0), ("ARMING_CHECK", 1),
           ("JS_GAIN_DEFAULT", 0.5)]
 
