@@ -462,6 +462,21 @@ class RovConsole(QtWidgets.QMainWindow):
         for kol in (self.col_left, self.col_right):
             kol.setFixedWidth(lb)
         self.vis = {}
+        # AUDIT 13 Okt (bug "window nyangkut" saat ganti-ganti preset cepat):
+        # takeAt() hanya mengeluarkan item dari layout — widget TIDAK di-parent-ulang,
+        # sehingga panel yang tidak dipakai preset baru tetap MELAYANG & TAMPIL di
+        # atas konten (panel "salah topik"). Sembunyikan SEMUA dulu; di bawah hanya
+        # yang benar-benar ditempatkan yang di-show() kembali.
+        for _w in self.P.values():
+            try:
+                _w.hide()
+            except Exception:                              # noqa: BLE001
+                pass
+        if getattr(self, "_baris_row", None) is not None:
+            try:
+                self._baris_row.hide()
+            except Exception:                              # noqa: BLE001
+                pass
         U.kosongkan(self._lay_left)
         U.kosongkan(self._lay_right)
         U.kosongkan(self._lay_mid)
@@ -469,11 +484,13 @@ class RovConsole(QtWidgets.QMainWindow):
             if key in self.P:
                 self._lay_left.addWidget(self.P[key])
                 self.vis[key] = self.P[key]
+                self.P[key].show()
         self._lay_left.addStretch(1)
         for key in spec.get("right", []):
             if key in self.P:
                 self._lay_right.addWidget(self.P[key])
                 self.vis[key] = self.P[key]
+                self.P[key].show()
         self._lay_right.addStretch(1)
         row_keys = spec.get("mid_row") or []
         row_di = int(spec.get("row_di", len(spec.get("mid", []))))
@@ -485,6 +502,7 @@ class RovConsole(QtWidgets.QMainWindow):
             stretch = st if st is not None else (1 if key in ("cam_front", "params") else 0)
             self._lay_mid.addWidget(self.P[key], stretch)
             self.vis[key] = self.P[key]
+            self.P[key].show()
         if row_keys and row_di >= len(mid):
             self._lay_mid.addWidget(self._baris_bawah(row_keys))
         # tanpa panel ber-stretch di kolom tengah (mode kamera rasio-penuh):
@@ -527,6 +545,7 @@ class RovConsole(QtWidgets.QMainWindow):
             rl.setSpacing(theme.px(6))
             self._baris_lay = rl
         U.kosongkan(self._baris_lay)
+        self._baris_row.show()
         self._baris_row.setMinimumHeight(150)
         self._baris_row.setMaximumHeight(300)
         for k in keys:

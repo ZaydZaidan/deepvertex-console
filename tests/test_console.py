@@ -183,6 +183,31 @@ def main():
           "(slider=%d spin=%d)" % (w.sl_tilt.value(), w.sp_tilt.value()))
     lulus &= bool(ok_tilt)
 
+    # [19] stress ganti-ganti preset cepat (bug "window nyangkut" 13 Okt)
+    try:
+        for _i in range(3):
+            for nm2 in ("pilot-focus", "capture", "mapping", "setup", "capture",
+                        "pilot-focus"):
+                w._apply_preset(nm2)
+                jalan(0.06)
+        w._apply_preset("pilot-focus")
+        jalan(0.3)
+        ok_str = True
+        for key, pnl in w.P.items():
+            if key in w.vis:
+                if not pnl.isVisible():
+                    print("   panel preset-aktif TAK tampil:", key)
+                    ok_str = False
+            else:
+                if pnl.isVisible():
+                    print("   panel NYANGKUT (bukan preset tapi tampil):", key)
+                    ok_str = False
+        print("[19] stress ganti preset tanpa nyangkut:", ok_str)
+        lulus &= bool(ok_str)
+    except Exception as exc:                               # noqa: BLE001
+        print("[19] stress ganti preset ERROR:", exc)
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
