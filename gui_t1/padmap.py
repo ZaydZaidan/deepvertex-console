@@ -1,7 +1,7 @@
 """padmap.py — GAMEPAD MAPPING page (owner request 13 Oct).
 
 Shows a PICTURE of the controller with game-style button names (LB / RB / left
-stick / D-PAD...), so users can see exactly which physical control each mapping
+stick / D-PAD ...), so users can see exactly which physical control each mapping
 means ("LY [1] is which one?").
 
 - CHANGE captures the next pressed button / moved axis (live from the pad).

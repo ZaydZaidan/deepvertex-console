@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Uji modul video (StreamPlayer): display + rekam + snapshot — tanpa hardware.
 
-Jalankan dari folder gui_t1:.venv/bin/python../tests/test_video.py
+Jalankan dari folder gui_t1:  .venv/bin/python ../tests/test_video.py
 (opsional: set GST_PLUGIN_PATH ke plugin h264parse hasil ekstraksi supaya rekaman mkv.)
 """
 import glob

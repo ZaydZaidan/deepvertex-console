@@ -172,7 +172,7 @@ class StreamPlayer(QtCore.QObject):
 
     # ------------------------------------------------------------------ rekam
     def rekam_bisa(self):
-        """(bisa, container) — mkv bila h264parse ada; kalau tidak,.h264 elementer."""
+        """(bisa, container) — mkv bila h264parse ada; kalau tidak, .h264 elementer."""
         if h264parse_tersedia():
             return True, "mkv"
         return True, "h264"

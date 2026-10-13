@@ -15,7 +15,7 @@ class Segmen(QtWidgets.QWidget):
     dipilih = QtCore.Signal(str)
 
     def __init__(self, opsi, parent=None):
-        """opsi = [(kunci, label, tooltip),...]"""
+        """opsi = [(kunci, label, tooltip), ...]"""
         super().__init__(parent)
         lay = QtWidgets.QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)

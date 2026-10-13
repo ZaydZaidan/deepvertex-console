@@ -9,7 +9,7 @@ Ketergantungan: python3 stdlib + binary `gst-launch-1.0` (sudah ada di BlueOS).
 Protokol HTTP (JSON):
   GET  /status                -> status service, disk, capture aktif
   POST /capture/start         -> {"cam": "left"|"right"|"front"|"both", "chunk_mb": 1024}
-  POST /capture/stop          -> {"cam":...}
+  POST /capture/stop          -> {"cam": ...}
   GET  /files                 -> daftar chunk (path relatif, ukuran, mtime)
   GET  /sha256/<path>         -> sha256 file (dihitung streaming, di-cache)
   GET  /download/<path>       -> unduh file (streaming)

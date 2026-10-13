@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""probe_readme.py — official README screenshots: default INK theme, tall canvas
-(no clipped panels), with everything alive (fake autopilot, 3 test camera streams,
-local RAW agent).
+"""probe_readme.py — README screenshots: default INK theme, window size exactly
+like running the console on the owner's screen (no tall canvas, no right-side
+clipping). Live demo data: fake autopilot, 3 camera test streams, local RAW agent.
 
 Run from gui_t1:   .venv/bin/python ../tests/probe_readme.py
 Output: ~/.hermes/cache/scratch/t1test/readme/<preset>.png + gamepad-mapping.png
@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GUI = os.path.join(HERE, "..", "gui_t1")
 sys.path.insert(0, GUI)
 
-from PySide6 import QtCore, QtWidgets  # noqa: E402
+from PySide6 import QtCore, QtWidgets   # noqa: E402
 
 SCRATCH = os.path.expanduser("~/.hermes/cache/scratch/t1test/readme")
 os.makedirs(SCRATCH, exist_ok=True)
@@ -51,7 +51,7 @@ def main():
          "--test", "--port", "8793"],
         stdout=subprocess.DEVNULL))
     anak.append(stream("smpte", "FRONT CAMERA", PORTS["front"]))
-    anak.append(stream("ball", "STEREO L (B0495C)", PORTS["left"]))
+    anak.append(stream("smpte", "STEREO L (B0495C)", PORTS["left"]))
     anak.append(stream("snow", "STEREO R (B0495C)", PORTS["right"]))
     time.sleep(2.0)
 
@@ -66,15 +66,14 @@ def main():
         port_stereo_R=PORTS["right"],
         raw_agent="http://127.0.0.1:8793",
         outdir=os.path.join(SCRATCH, "sesi"),
-        preset="pilot-focus", no_pad=True,
+        preset="pilot-focus", no_pad=False,      # DS4 asli -> PAD ready
         nama_sesi="Coral Survey A", no_prompt=True)
     w = rc.RovConsole(args)
-    # WA_DontShowOnScreen: jangan dipetakan ke window manager — WM (GNOME) membatasi
-    # tinggi window ke ukuran layar, sehingga canvas tinggi 2000+px tak pernah tercapai
-    # (itu sebab panel "terpotong" di screenshot). Dengan atribut ini resize dipatuhi
-    # penuh dan grab() tetap merender seluruh widget.
+    # WM (GNOME) membatasi tinggi window ke ukuran layar; atribut ini membuat resize
+    # dipatuhi penuh & grab() merender seluruh jendela. Ukuran window = SAMA dengan
+    # tampilan asli saat pemilik menjalankan di layarnya (1920x1163).
     w.setAttribute(QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen, True)
-    w.resize(1920, 2000)
+    w.resize(1920, 1163)
     w.show()
 
     def jalan(sec):
@@ -85,26 +84,29 @@ def main():
 
     jalan(8.0)
 
-    TINGGI = {"pilot-focus": 2800, "mapping": 2000, "setup": 2000,
-              "capture": 2400}
     for nama in ("pilot-focus", "mapping", "setup", "capture"):
-        w.resize(1920, TINGGI[nama])
         w._apply_preset(nama)
         jalan(1.2)
         for sa in w.findChildren(QtWidgets.QScrollArea):
             sa.verticalScrollBar().setValue(0)
-        jalan(0.5)
+        jalan(0.4)
         out = os.path.join(SCRATCH, "%s.png" % nama)
         w.grab().save(out)
-        sisa = [sa.verticalScrollBar().maximum()
-                for sa in w.findChildren(QtWidgets.QScrollArea)]
-        print("shot:", out, "| scroll-max:", sisa, "(0 semua = utuh)")
+        klip = []
+        for sa in w.findChildren(QtWidgets.QScrollArea):
+            dalam = sa.widget()
+            if dalam is not None and \
+                    dalam.minimumSizeHint().width() > sa.viewport().width() + 2:
+                klip.append(dalam.minimumSizeHint().width())
+        print("shot:", out, "| klip-H:",
+              "TIDAK ADA" if not klip else klip)
 
     try:
         import padmap as _pm
         w._apply_preset("pilot-focus")
         jalan(0.6)
         d = _pm.PadMapDialog(w.gamepad, w)
+        d.setAttribute(QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen, True)
         d.show()
         jalan(0.4)
         d.gambar.set_live([0.55, -0.6, 0.0, -0.3, 0.0, 0.0, 0.0, 0.0],

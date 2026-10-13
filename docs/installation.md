@@ -55,7 +55,7 @@ nmcli con up "Wired connection 1"
 3. Verify:
 
 ```bash
-cd gui_t1 &&.venv/bin/python../tests/real_rov_linkcheck.py
+cd gui_t1 && .venv/bin/python ../tests/real_rov_linkcheck.py
 # expects: ping ~5 ms, BlueOS web 200, MAVLink heartbeat stream
 ```
 

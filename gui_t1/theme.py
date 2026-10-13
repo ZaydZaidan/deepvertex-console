@@ -19,7 +19,7 @@ Nilai hex & rasio kontrasnya diambil dari rancangan terukur
 (`ROVGUI_REDESIGN/palet_dvx.py` + `MOCKUP_FINAL.html`); JANGAN diubah tanpa mengukur
 ulang — skrip pengukurnya ada di berekas uji kontras (`Progress/tools/uji_kontras_gui.py`).
 
-Kompatibilitas: nama token LAMA (BG, PANEL, ACCENT, TEXT_DIM,...) tetap bisa dipakai
+Kompatibilitas: nama token LAMA (BG, PANEL, ACCENT, TEXT_DIM, ...) tetap bisa dipakai
 (`theme.TEXT_DIM`) dan SELALU mengembalikan nilai palet AKTIF (module __getattr__),
 sehingga kode lama tidak perlu diubah sekaligus dan tetap ikut berganti tema.
 """
@@ -190,7 +190,7 @@ def nilai(nama=None):
 
 
 def domain(nama_domain):
-    """Warna penanda domain ('digital', 'mission',...)."""
+    """Warna penanda domain ('digital', 'mission', ...)."""
     return warna(DOMAIN.get(nama_domain, "neutral"))
 
 

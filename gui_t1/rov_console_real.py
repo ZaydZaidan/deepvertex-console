@@ -10,7 +10,7 @@ FUNGSI (gaya QGC): teleop gamepad (MANUAL_CONTROL + deadman), ARM/DISARM/mode,
 compass/level/baro), MOTOR TEST, FAILSAFE+BATERAI, browser PARAMETER,
 PRE-FLIGHT CHECK (status hidup + checklist pre-dive resmi Blue Robotics).
 
-Jalankan:./run_console_real.sh [opsi]   (lihat --help)
+Jalankan: ./run_console_real.sh [opsi]   (lihat --help)
 """
 import argparse
 import json
@@ -54,7 +54,7 @@ def _slug(nama):
     for ch in (nama or "").strip().lower():
         if ch.isalnum() or ch in "-_":
             out.append(ch)
-        elif ch in ".":
+        elif ch in " .":
             out.append("_")
     s = "".join(out)
     while "__" in s:
@@ -66,7 +66,7 @@ def _buat_dir_sesi(root, nama=""):
     """Struktur sesi (audit 13 Okt — alur file jelas & siap delivery):
 
     <root>/<YYYYMMDD_HHMMSS>_<nama-sesi>/
-        compressed/   video.mkv + snapshot.png (jalur stream BlueOS)
+        compressed/   video .mkv + snapshot .png (jalur stream BlueOS)
         raw/          chunk RAW hasil transfer dari Pi (arsip utuh, per kamera)
         mavlink.tlog  /  session_start.json / session_end.json
     """
@@ -932,7 +932,7 @@ class RovConsole(QtWidgets.QMainWindow):
                 QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             cb.setMinimumContentsLength(10)
             cb.setToolTip("REC mode for this camera:\n"
-                          "COMPRESSED =.mkv video through the BlueOS stream (small)\n"
+                          "COMPRESSED = .mkv video through the BlueOS stream (small)\n"
                           "RAW = uncompressed frames via the onboard agent (big; "
                           "files live on the Pi until you transfer them\n"
                           "in the RAW CAPTURE panel → this session's raw/ folder)")
@@ -973,7 +973,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_save.setWordWrap(True)
         self.lbl_save.setToolTip(
             "Everything for this dive goes into\n%s\n"
-            "  compressed/ ←.mkv +.png from the live streams\n"
+            "  compressed/ ← .mkv + .png from the live streams\n"
             "  raw/        ← uncompressed chunks transferred from the Pi" % self.sesi)
         p.body_layout.addWidget(self.lbl_save)
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
@@ -1523,7 +1523,7 @@ class RovConsole(QtWidgets.QMainWindow):
             try:
                 self.lbl_save.setToolTip(
                     "Everything for this dive goes into\n%s\n"
-                    "  compressed/ ←.mkv +.png from the live streams\n"
+                    "  compressed/ ← .mkv + .png from the live streams\n"
                     "  raw/        ← uncompressed chunks transferred from the Pi"
                     % baru)
             except Exception:                          # noqa: BLE001

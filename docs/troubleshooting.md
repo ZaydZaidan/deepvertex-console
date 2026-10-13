@@ -42,7 +42,7 @@ For RAW: transfer and delete chunks on the Pi to get under the agent's margin.
 ## Camera tiles stay black
 
 - BlueOS camera manager streams must be addressed to your laptop on ports
-  5600/5601/5602 (UDP). Check with `gst-launch-1.0 udpsrc port=5600 !...` or just
+  5600/5601/5602 (UDP). Check with `gst-launch-1.0 udpsrc port=5600 ! ...` or just
   watch the tile's `Hz` counter.
 - Firewall: allow UDP 5600-5602.
 

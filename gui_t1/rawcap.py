@@ -132,6 +132,7 @@ class RawPanel(QtWidgets.QWidget):
         self.lbl.setWordWrap(True)
         lay.addWidget(self.lbl)
         self.lbl_disk = QtWidgets.QLabel("—")
+        self.lbl_disk.setWordWrap(True)   # jangan melebarkan rel
         self.lbl_disk.setObjectName("Faint")
         lay.addWidget(self.lbl_disk)
 
@@ -179,6 +180,11 @@ class RawPanel(QtWidgets.QWidget):
         lay.addLayout(row1b)
 
         self.list = QtWidgets.QListWidget()
+        # Nama chunk panjang JANGAN melebarkan panel (audit: min 825 px > rel 442 ->
+        # terpotong di kanan). Elide tengah + tanpa scrollbar horizontal + min kecil.
+        self.list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.list.setTextElideMode(QtCore.Qt.ElideMiddle)
+        self.list.setMinimumWidth(0)
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.list.setMinimumHeight(110)
         lay.addWidget(self.list, 1)

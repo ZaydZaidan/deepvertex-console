@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Probe geometri konsol di DISPLAY nyata (DPI sama dengan sesi pemilik).
 
-Jalankan dari gui_t1:.venv/bin/python../tests/probe_layout.py
+Jalankan dari gui_t1:   .venv/bin/python ../tests/probe_layout.py
 Mengukur: lebar rail, ukuran dial, readout vs kebutuhan teks, TOMBOL TERPOTONG,
 CHECKBOX TERPOTONG; menyimpan 2 screenshot (pilot + mapping) untuk verifikasi visual.
 """

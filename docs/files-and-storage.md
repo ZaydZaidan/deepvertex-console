@@ -6,7 +6,7 @@
 ~/DeepVertex-ROV-Captures/
 └── 20261014_103000_coral_survey_a/        ← <date>_<time>_<session-name>
     ├── compressed/                        ← everything from the live streams
-    │   ├── front_103512.mkv               ←.mkv video (or.h264 fallback)
+    │   ├── front_103512.mkv               ← .mkv video (or .h264 fallback)
     │   ├── stereo_L_103512.mkv
     │   └── snap_stereo_L_103844.png       ← SNAP photos (.png)
     ├── raw/                               ← uncompressed chunks pulled from the Pi
