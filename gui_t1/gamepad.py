@@ -87,6 +87,19 @@ class Gamepad(QtCore.QObject):
         self._timer = QtCore.QTimer(self)
         self._timer.timeout.connect(self._tick)
 
+        # preset pad BERNAMA (permintaan pemilik 13 Okt): muat preset aktif dari
+        # gamepad_presets.json bila ada (mapping custom user).
+        self.presets_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                         "gamepad_presets.json")
+        try:
+            with open(self.presets_path, encoding="utf-8") as f:
+                _data = json.load(f)
+            _ganti = (_data.get("presets") or {}).get(_data.get("aktif"))
+            if isinstance(_ganti, dict):
+                self.terapkan_cfg(_ganti)
+        except Exception:                              # noqa: BLE001
+            pass
+
     # ------------------------------------------------------------------ hidup
     def cari_device(self):
         if evdev is None:
@@ -138,6 +151,36 @@ class Gamepad(QtCore.QObject):
         self._timer.start(int(1000 / max(2.0, self.cfg["rate_hz"])))
         self.aktif = True
         self.sig_status.emit("gamepad terhubung: %s (%s)" % (dev.name, dev.path))
+
+    def terapkan_cfg(self, ganti):
+        """Terapkan bagian config (preset pad). Key tak dikenal diabaikan."""
+        dipakai = []
+        for k, val in (ganti or {}).items():
+            if k in self.cfg:
+                self.cfg[k] = val
+                dipakai.append(k)
+        try:
+            self.tilt = int(max(self.cfg["tilt_min"],
+                                min(self.cfg["tilt_max"], self.tilt)))
+        except Exception:                                  # noqa: BLE001
+            pass
+        return dipakai
+
+    def simpan_preset(self, nama, sub=None):
+        """Simpan config aktif (atau `sub`) sebagai preset bernama + jadikan aktif."""
+        try:
+            with open(self.presets_path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:                                  # noqa: BLE001
+            data = {"aktif": None, "presets": {}}
+        data.setdefault("presets", {})[str(nama)] = dict(sub or self.cfg)
+        data["aktif"] = str(nama)
+        try:
+            with open(self.presets_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception:                                  # noqa: BLE001
+            return False
 
     def coba_hotplug(self):
         """Coba sambungkan pad yang dicolok BELAKANGAN, tanpa restart konsol."""

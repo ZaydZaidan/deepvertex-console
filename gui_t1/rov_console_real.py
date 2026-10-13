@@ -29,6 +29,7 @@ import vehicleops as VO
 from gamepad import Gamepad
 from maviface import MavBridge
 from peta_misi import PlotMisi
+import padmap
 from peta_panel import PetaPanel
 from rawcap import RawPanel
 from video import StreamPlayer, h264parse_tersedia
@@ -73,7 +74,8 @@ class RovConsole(QtWidgets.QMainWindow):
         },
         "setup": {
             "lebar_kiri": 350,
-            "left": ["setup", "motors", "failsafe"],
+            # panduan awam paling atas (langkah 1-7), lalu panel teknis
+            "left": ["guide", "setup", "motors", "failsafe"],
             "mid": ["params", "notif"],
             "right": ["preflight", "vehicle", "power"],
         },
@@ -346,6 +348,19 @@ class RovConsole(QtWidgets.QMainWindow):
                     and s.get("last_text_sev", 6) <= 4:
                 issues.append(("krit" if s.get("last_text_sev", 6) <= 3 else "warn",
                                "FAILSAFE — check vehicle"))
+            try:
+                _temp = s.get("temp")
+                if _temp is not None:
+                    _tw = float(self.sp_temp_warn.value())
+                    _tc = float(self.sp_temp_crit.value())
+                    if float(_temp) >= _tc:
+                        issues.append(("krit", "Water temp CRITICAL %.1f C"
+                                       % float(_temp)))
+                    elif float(_temp) >= _tw:
+                        issues.append(("warn", "Water temp high %.1f C"
+                                       % float(_temp)))
+            except Exception:                              # noqa: BLE001
+                pass
             if not s.get("link", True):
                 issues.append(("warn", "MAVLink lost — reconnecting"))
             if issues:
@@ -795,7 +810,41 @@ class RovConsole(QtWidgets.QMainWindow):
         # ---- failsafe
         p = W.Panel("FAILSAFE & BATERAI", "param FS_/BATT_ (gaya QGC Safety)", domain="mission")
         p.body_layout.addWidget(VO.FailsafePanel(self.bridge))
+        b_fs = QtWidgets.QPushButton("APPLY RECOMMENDED (4S 10000 mAh)")
+        b_fs.setObjectName("BtnTiny")
+        b_fs.setToolTip("tulis setelan default aman untuk BlueROV2 + Tattu 4S 10Ah\n"
+                        "(BATT_* + FS_*). Setelah ini SEMUA masih bisa diubah manual.")
+        b_fs.clicked.connect(self._apply_failsafe_defaults)
+        p.body_layout.addWidget(b_fs)
+        rowt = QtWidgets.QHBoxLayout()
+        rowt.setSpacing(theme.px(4))
+        _lt1 = QtWidgets.QLabel("TEMP warn")
+        _lt1.setObjectName("MicroLabel")
+        _lt2 = QtWidgets.QLabel("crit")
+        _lt2.setObjectName("MicroLabel")
+        self.sp_temp_warn = QtWidgets.QSpinBox()
+        self.sp_temp_warn.setRange(0, 80)
+        self.sp_temp_warn.setValue(38)
+        self.sp_temp_warn.setSuffix(" °C")
+        self.sp_temp_warn.setFixedWidth(theme.px(70))
+        self.sp_temp_warn.setToolTip("water-temp warning in the GUI (not an autopilot "
+                                     "param) — default 38 °C")
+        self.sp_temp_crit = QtWidgets.QSpinBox()
+        self.sp_temp_crit.setRange(0, 90)
+        self.sp_temp_crit.setValue(45)
+        self.sp_temp_crit.setSuffix(" °C")
+        self.sp_temp_crit.setFixedWidth(theme.px(70))
+        self.sp_temp_crit.setToolTip("critical water-temp threshold in the GUI — "
+                                     "default 45 °C")
+        rowt.addWidget(_lt1)
+        rowt.addWidget(self.sp_temp_warn)
+        rowt.addWidget(_lt2)
+        rowt.addWidget(self.sp_temp_crit)
+        rowt.addStretch(1)
+        p.body_layout.addLayout(rowt)
+        self.panel_failsafe = p          # dipakai _safety_check (suhu) & guide
         P["failsafe"] = p
+        P["guide"] = self._buat_panel_guide()
 
         # ---- parameter browser
         p = W.Panel("PARAMETERS", "PARAM_REQUEST_LIST / SET", domain="mission")
@@ -870,6 +919,11 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_pad.setObjectName("MicroLabel")
         self.lbl_pad.setWordWrap(True)
         p.body_layout.addWidget(self.lbl_pad)
+        b_map = QtWidgets.QPushButton("PAD MAPPING…")
+        b_map.setObjectName("BtnTiny")
+        b_map.setToolTip("see every button function + remap + saved presets")
+        b_map.clicked.connect(self._padmap_dialog)
+        p.body_layout.addWidget(b_map)
         P["teleop"] = p
 
         # ---- raw
@@ -1022,6 +1076,8 @@ class RovConsole(QtWidgets.QMainWindow):
         kal.addAction("Level horizon", lambda: self._cal("level"))
         kal.addAction("Barometer (ground pressure)", lambda: self._cal("baro"))
         veh.addAction("Unduh parameter", lambda: self.bridge.queue_param_list())
+        veh.addSeparator()
+        veh.addAction("Gamepad mapping…", self._padmap_dialog)
         hlp = mb.addMenu("&Help")
         hlp.addAction("Pre-dive checklist (Blue Robotics)", self._menu_checklist)
         hlp.addAction("About", self._menu_about)
@@ -1425,6 +1481,67 @@ class RovConsole(QtWidgets.QMainWindow):
                 self.P[k].tile._sync_tinggi()
         except Exception:                                  # noqa: BLE001
             pass
+
+    _FS_REKOMENDASI = (
+        ("BATT_CAPACITY", 10000), ("BATT_LOW_VOLT", 14.0), ("BATT_CRT_VOLT", 13.2),
+        ("BATT_LOW_MAH", 2000), ("BATT_CRT_MAH", 1000),
+        ("BATT_FS_LOW_ACT", 1), ("BATT_FS_CRT_ACT", 3),
+        ("FS_GCS_ENABLE", 2), ("FS_GCS_TIMEOUT", 5),
+        ("FS_PILOT_INPUT", 2), ("FS_PILOT_TIMEOUT", 3),
+        ("FS_LEAK_ENABLE", 2),
+    )
+
+    def _apply_failsafe_defaults(self):
+        """Default failsafe+ baterai utk BlueROV2 + Tattu 4S 10000 mAh (bisa diubah)."""
+        for nm, val in self._FS_REKOMENDASI:
+            self.bridge.queue_param_set(nm, val)
+        self._catat("failsafe defaults applied (BlueROV2 + 4S 10000 mAh) — "
+                    "%d params" % len(self._FS_REKOMENDASI))
+
+    def _padmap_dialog(self):
+        try:
+            padmap.PadMapDialog(self.gamepad, self).exec()
+        except Exception as exc:                           # noqa: BLE001
+            self._catat("gamepad mapping error: %r" % exc)
+
+    def _buat_panel_guide(self):
+        """Panduan SETUP untuk pemula (permintaan pemilik 13 Okt): langkah bernomor."""
+        p = W.Panel("SETUP GUIDE (NEW ROV)", "steps 1-7 · ~10 min", domain="motion")
+        langkah = (
+            (1, "Accelerometer", "ROV flat on the desk — follow the 6 positions.",
+             "START…", self._cal_accel),
+            (2, "Compass", "Rotate the ROV in all axes; keep metal away.",
+             "START…", lambda: self._cal("mag")),
+            (3, "Level horizon", "ROV perfectly level, then run.",
+             "START…", lambda: self._cal("level")),
+            (4, "Barometer (each dive)", "At the surface, before diving.",
+             "START…", lambda: self._cal("baro")),
+            (5, "Thrusters", "Props OFF on bench; in water use MOTOR DETECT.",
+             "OPEN…", self._motor_dialog),
+            (6, "Failsafe defaults", "One click for this robot (4S 10000 mAh).",
+             "APPLY…", self._apply_failsafe_defaults),
+            (7, "Gamepad", "See every button function + remap + presets.",
+             "OPEN…", self._padmap_dialog),
+        )
+        for num, judul, ket, teks_b, aksi in langkah:
+            baris = QtWidgets.QHBoxLayout()
+            baris.setSpacing(theme.px(6))
+            kol = QtWidgets.QVBoxLayout()
+            kol.setSpacing(0)
+            l1 = QtWidgets.QLabel("%d. %s" % (num, judul))
+            l1.setObjectName("RowLabel")
+            l2 = QtWidgets.QLabel(ket)
+            l2.setObjectName("Faint")
+            l2.setWordWrap(True)
+            kol.addWidget(l1)
+            kol.addWidget(l2)
+            b = QtWidgets.QPushButton(teks_b)
+            b.setObjectName("BtnTiny")
+            b.clicked.connect(aksi)
+            baris.addLayout(kol, 1)
+            baris.addWidget(b, 0, Qt.AlignTop)
+            p.body_layout.addLayout(baris)
+        return p
 
     def _pad_coba(self):
         try:

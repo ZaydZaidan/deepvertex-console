@@ -208,6 +208,44 @@ def main():
         print("[19] stress ganti preset ERROR:", exc)
         lulus = False
 
+    # [20] failsafe defaults (BlueROV2 + 4S 10000 mAh) sampai ke kendaraan
+    w._apply_failsafe_defaults()
+    ok_fs = tunggu(lambda: any(n == "FS_LEAK_ENABLE" for n, _v in
+                               baca_stats().get("param_set", [])), 8)
+    print("[20] failsafe defaults terkirim:", ok_fs)
+    lulus &= bool(ok_fs)
+
+    # [21] alert suhu client-side memicu strip alert
+    w.sp_temp_warn.setValue(10)
+    w.sp_temp_crit.setValue(12)
+    w._safety_check(dict(w.bridge.state, temp=20.0, link=True))
+    ok_t21 = (w._alert_kini is not None and "temp" in str(w._alert_kini[1]).lower())
+    w.sp_temp_warn.setValue(38)
+    w.sp_temp_crit.setValue(45)
+    w._safety_check(dict(w.bridge.state, temp=21.0, link=True))
+    ok_t21 = ok_t21 and (w._alert_kini is None)
+    print("[21] alert suhu client:", ok_t21)
+    lulus &= bool(ok_t21)
+
+    # [22] preset pad bernama: simpan -> file -> terapkan
+    ok_p22 = w.gamepad.simpan_preset("Custom A", {"scale_yaw": 0.9})
+    try:
+        with open(w.gamepad.presets_path, encoding="utf-8") as f:
+            data = json.load(f)
+        ok_p22 = ok_p22 and ("Custom A" in data.get("presets", {})) and \
+            data.get("aktif") == "Custom A"
+        w.gamepad.terapkan_cfg(data["presets"]["Custom A"])
+        ok_p22 = ok_p22 and abs(float(w.gamepad.cfg["scale_yaw"]) - 0.9) < 1e-6
+    except Exception as exc:                               # noqa: BLE001
+        print("   preset pad error:", exc)
+        ok_p22 = False
+    try:
+        os.remove(w.gamepad.presets_path)
+    except OSError:
+        pass
+    print("[22] preset pad bernama simpan/muat:", ok_p22)
+    lulus &= bool(ok_p22)
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
