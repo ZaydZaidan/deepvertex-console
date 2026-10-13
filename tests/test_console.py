@@ -378,6 +378,37 @@ def main():
         print("[28] nama sesi GAGAL:", repr(exc))
         lulus = False
 
+    # [29] estimasi storage + margin pengaman + blokir REC/SNAP saat penuh
+    try:
+        w._disk_free_mb = 900.0
+        w._disk_blok = True
+        komp = os.path.join(w.sesi, "compressed")
+        sebelum = set(os.listdir(komp))
+        w._snap("front")
+        jalan(0.3)
+        ok29 = (set(os.listdir(komp)) == sebelum)
+        ok29 = ok29 and any("SNAP blocked" in t
+                            for t in w.log.toPlainText().splitlines()[-5:])
+        w.btn_rec["front"].setChecked(True)        # compressed → harus ditolak
+        jalan(0.3)
+        ok29 = ok29 and (not w.btn_rec["front"].isChecked())
+        ok29 = ok29 and any("REC blocked" in t
+                            for t in w.log.toPlainText().splitlines()[-5:])
+        w._safety_check(dict(w.bridge.state, link=True))
+        ok29 = ok29 and (w._alert_kini is not None and
+                         "STORAGE" in str(w._alert_kini[1]).upper())
+        # estimasi: free 2400, laju 60 MB/min → (2400-1500)/60 = 15 min
+        est29 = w._est_menit(2400.0, 60.0)
+        ok29 = ok29 and (est29 is not None and abs(est29 - 15.0) < 0.6)
+        w._disk_free_mb = None
+        w._disk_blok = False
+        w._safety_check(dict(w.bridge.state, link=True))
+        print("[29] estimasi & blokir storage:", ok29)
+        lulus &= bool(ok29)
+    except Exception as exc:                               # noqa: BLE001
+        print("[29] storage GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

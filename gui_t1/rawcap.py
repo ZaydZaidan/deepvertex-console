@@ -8,6 +8,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -117,6 +118,9 @@ class RawPanel(QtWidgets.QWidget):
         self.client = RawClient(agent, parent=self)
         self.files_info = {}                                # rel -> size
         self.verified = {}                                  # rel -> path lokal
+        self.last_status = {}                               # status terakhir agen
+        self._prev_free = None                              # (t, free_mb) Pi
+        self._rate_mbpm = 0.0                               # laju RAW (EMA)
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -236,14 +240,38 @@ class RawPanel(QtWidgets.QWidget):
             d = {"ok": False, "error": str(d)}
         if tag == "status":
             if d.get("ok"):
+                self.last_status = d
                 caps = d.get("captures") or {}
                 aktif = ", ".join(k for k, v in caps.items() if isinstance(v, dict) and v.get("aktif"))
                 self.lbl.setText(f"RAW agent OK ({'test' if d.get('test') else 'device'}) — "
                                  f"active capture: {aktif or 'none'}")
-                self.lbl_disk.setText(f"Pi free: {d.get('disk_free_mb', '?')} MB "
-                                      f"(min {d.get('min_free_mb', '?')} MB) — Pi dir "
-                                      f"{d.get('dir', '?')}  →  transfer pulls into this "
-                                      f"session's raw/")
+                # estimasi sisa waktu RAW: laju dari turunnya free-space Pi
+                fr = d.get("disk_free_mb")
+                mn = float(d.get("min_free_mb") or 0)
+                now = time.time()
+                if aktif and fr is not None and self._prev_free is not None:
+                    dt = now - self._prev_free[0]
+                    dd = self._prev_free[1] - float(fr)
+                    if dt > 0.5 and dd > 0:
+                        inst = dd / (dt / 60.0)
+                        self._rate_mbpm = (0.7 * self._rate_mbpm + 0.3 * inst
+                                           if self._rate_mbpm else inst)
+                if not aktif:
+                    self._rate_mbpm = 0.0
+                if fr is not None:
+                    self._prev_free = (now, float(fr))
+                est = None
+                if aktif and self._rate_mbpm >= 1.0 and fr is not None:
+                    sisa = float(fr) - mn
+                    est = max(0.0, sisa) / self._rate_mbpm
+                ekor = (f" · ~{int(est)} min RAW left (@ {self._rate_mbpm:.0f} MB/min)"
+                        if est is not None else
+                        (" · measuring RAW rate…" if aktif else
+                         " · start RAW to see time left"))
+                self.lbl_disk.setText(f"Pi free: {fr if fr is not None else '?'} MB "
+                                      f"(auto-stop at {d.get('min_free_mb', '?')} MB){ekor} "
+                                      f"— Pi dir {d.get('dir', '?')}  →  transfer pulls "
+                                      f"into this session's raw/")
             else:
                 self.lbl.setText("RAW agent unreachable")
                 self.lbl.setToolTip(str(d.get("error", "")))

@@ -112,6 +112,12 @@ Prerequisite for test_raw/test_console: the RAW agent running on :8791, e.g.
 - **File flow**: session folders split `compressed/` vs `raw/`; CAPTURE rows have a
   per-camera COMPRESSED/RAW mode; RAW agent supports the front camera too
   (`--device-front`, ≤640×480); snapshots always land in `compressed/`.
+- **Storage guard + time estimate**: while recording you see the estimated minutes
+  left until the SAFE LIMIT (topside for compressed .mkv, the Pi for RAW), plus a
+  snapshot-count estimate. Below the warn margin the ALERT strip turns amber; below
+  the hard margin (default 1.5 GB topside) REC and SNAP are BLOCKED with a
+  "transfer/clean up first" message — RAW start is blocked when the Pi hits its own
+  auto-stop margin + 200 MB.
 - **Session naming**: type the session name at startup (dialog, prefilled) or via
   `--nama-sesi`; rename anytime from CAPTURE ▸ SESSION NAME… (folder + subfolders move
   together); `--no-prompt` for automation.

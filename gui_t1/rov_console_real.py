@@ -39,6 +39,11 @@ STREAM_DEF = (
     ("stereo L", "CAM · STEREO L (B0495C)", 5601),
     ("stereo R", "CAM · STEREO R (B0495C)", 5602),
 )
+# Margin pengaman storage (permintaan pemilik 13 Okt):
+#   < MIN_FREE  -> REC & SNAP DIBLOKIR (transfer/bersihkan dulu)
+#   < WARN_FREE -> peringatan kuning di strip ALERT
+MIN_FREE_TOP_MB = 1500
+WARN_FREE_TOP_MB = 5000
 MODE_LIST = (("MANUAL", VO.MODE_MANUAL), ("STABILIZE", VO.MODE_STABILIZE),
              ("ALT_HOLD (depth hold)", VO.MODE_ALT_HOLD), ("SURFACE", VO.MODE_SURFACE))
 
@@ -204,6 +209,12 @@ class RovConsole(QtWidgets.QMainWindow):
         self._peta_timer.start(200)
 
         self.rawpanel = self.P["raw"].panel_raw
+        # status storage utk estimasi & guard (diisi oleh _update_disk)
+        self._disk_free_mb = None
+        self._disk_prev = None            # (t, free_mb)
+        self._disk_rate_mbpm = 0.0        # laju tulis EMA (MB/menit)
+        self._disk_blok = False
+        self._rec_aktif = set()           # nama kamera yang sedang REC (compressed)
         self.pf = self.P["preflight"].panel_preflight
         self.pf.sumber = {"players": self.players, "gamepad": self.gamepad,
                           "rawpanel": self.rawpanel, "sesi": self.sesi}
@@ -399,6 +410,14 @@ class RovConsole(QtWidgets.QMainWindow):
                                        % float(_temp)))
             except Exception:                              # noqa: BLE001
                 pass
+            fr = self._disk_free_mb
+            if fr is not None:
+                if fr < MIN_FREE_TOP_MB:
+                    issues.append(("krit", "TOPSIDE STORAGE FULL — REC/SNAP blocked; "
+                                           "transfer/clean up"))
+                elif fr < WARN_FREE_TOP_MB:
+                    issues.append(("warn", "Topside storage low — %.1f GB free"
+                                   % (fr / 1000.0)))
             if not s.get("link", True):
                 issues.append(("warn", "MAVLink lost — reconnecting"))
             if issues:
@@ -963,6 +982,13 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
         self.lbl_disk.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_disk)
+        self.lbl_est = QtWidgets.QLabel("estimate: —")
+        self.lbl_est.setObjectName("Faint")
+        self.lbl_est.setWordWrap(True)
+        self.lbl_est.setToolTip("Estimated time until the SAFE LIMIT (%d MB margin);\n"
+                                "REC and SNAP are blocked below it — transfer RAW to\n"
+                                "the topside / clean up to unblock." % MIN_FREE_TOP_MB)
+        p.body_layout.addWidget(self.lbl_est)
         self.lbl_cap_last = QtWidgets.QLabel("")      # kosong sampai ada rekaman
         self.lbl_cap_last.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_cap_last)
@@ -1411,6 +1437,14 @@ class RovConsole(QtWidgets.QMainWindow):
         """REC dengan mode RAW: kendalikan agen onboard (chunk di Pi → panel RAW)."""
         kam = self._RAW_KAM.get(nama, "left")
         if on:
+            _st = getattr(self.rawpanel, "last_status", {}) or {}
+            _free = _st.get("disk_free_mb")
+            _min = float(_st.get("min_free_mb") or 0)
+            if _free is not None and float(_free) < _min + 200:
+                self._catat("RAW REC blocked — the Pi is almost full (%s MB free). "
+                            "Transfer RAW chunks to the topside first." % _free)
+                self.btn_rec[nama].setChecked(False)
+                return
             try:
                 self.rawpanel.client.start(kam, self.rawpanel.sp_chunk.value())
                 self._catat("RAW REC %s (agent cam '%s') — files stay on the Pi; "
@@ -1431,16 +1465,23 @@ class RovConsole(QtWidgets.QMainWindow):
         if cb is not None and cb.currentText() == "RAW":
             self._raw_rec(nama, on)
             return
+        if on and self._disk_blok:
+            self._catat("REC blocked — topside storage full (< %d MB free). "
+                        "Transfer/clean up first." % MIN_FREE_TOP_MB)
+            self.btn_rec[nama].setChecked(False)
+            return
         p = self.players[nama]
         if on:
             path = os.path.join(self.sesi, "compressed", "%s_%s" % (
                 nama.replace(" ", "_"), time.strftime("%H%M%S")))
             if p.start_record(path):
+                self._rec_aktif.add(nama)
                 self.plot_misi.add_marker("rec")
             else:
                 self.btn_rec[nama].setChecked(False)
         else:
             p.stop_record()
+            self._rec_aktif.discard(nama)
 
     def _ganti_nama_sesi_dialog(self):
         nama, ok = QtWidgets.QInputDialog.getText(
@@ -1516,6 +1557,10 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("pad action error: %r" % exc)
 
     def _snap(self, nama):
+        if self._disk_blok:
+            self._catat("SNAP blocked — topside storage full (< %d MB free). "
+                        "Transfer/clean up first." % MIN_FREE_TOP_MB)
+            return
         path = os.path.join(self.sesi, "compressed", "snap_%s_%s.png" % (
             nama.replace(" ", "_"), time.strftime("%H%M%S_")))
         ok = self.players[nama].snapshot(path)
@@ -1533,13 +1578,49 @@ class RovConsole(QtWidgets.QMainWindow):
             except OSError:
                 pass
 
+    def _est_menit(self, free_mb, rate_mbpm):
+        """Sisa menit sampai batas aman (None bila laju belum terukur)."""
+        if free_mb is None or rate_mbpm is None or rate_mbpm < 5.0:
+            return None
+        sisa = free_mb - MIN_FREE_TOP_MB
+        if sisa <= 0:
+            return 0.0
+        return sisa / rate_mbpm
+
     def _update_disk(self):
         import shutil
         try:
             du = shutil.disk_usage(self.sesi)
-            self.lbl_disk.setText("disk topside: %.1f GB free" % (du.free / 1e9))
+            free_mb = du.free / 1e6
+            self._disk_free_mb = free_mb
+            now = time.time()
+            if self._disk_prev is not None and self._rec_aktif:
+                dt = now - self._disk_prev[0]
+                d = self._disk_prev[1] - free_mb
+                if dt > 0.5 and d > 0:
+                    inst = d / (dt / 60.0)
+                    self._disk_rate_mbpm = (0.7 * self._disk_rate_mbpm + 0.3 * inst
+                                            if self._disk_rate_mbpm else inst)
+            self._disk_prev = (now, free_mb)
+            self._disk_blok = free_mb < MIN_FREE_TOP_MB
         except OSError:
-            pass
+            return
+        gb = (self._disk_free_mb or 0) / 1e3
+        if self._disk_blok:
+            self.lbl_disk.setText("disk topside: %.1f GB free — FULL (REC/SNAP "
+                                  "blocked; transfer/clean up)" % gb)
+        else:
+            self.lbl_disk.setText("disk topside: %.1f GB free (block below %.1f GB)"
+                                  % (gb, MIN_FREE_TOP_MB / 1000.0))
+        est = self._est_menit(self._disk_free_mb, self._disk_rate_mbpm)
+        snaps = int(max(0.0, (self._disk_free_mb or 0) - MIN_FREE_TOP_MB) / 2.5)
+        if self._rec_aktif and est is not None:
+            self.lbl_est.setText("estimate: ~%d min of recording left (@ %.0f MB/min) "
+                                 "· ≈ %d snaps" % (int(est), self._disk_rate_mbpm, snaps))
+        elif self._rec_aktif:
+            self.lbl_est.setText("estimate: measuring write speed… · ≈ %d snaps" % snaps)
+        else:
+            self.lbl_est.setText("estimate: start REC to see time left · ≈ %d snaps" % snaps)
 
     def _teleop_update(self, live):
         vals = live.get("axes") or []
