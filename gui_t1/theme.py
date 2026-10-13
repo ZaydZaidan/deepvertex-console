@@ -432,20 +432,16 @@ QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover {
     background: $line_hi;
 }
 QDoubleSpinBox::up-arrow, QSpinBox::up-arrow {
-    width: 0; height: 0;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-bottom: 6px solid $ink_dim;
+    image: url("__PANAH_UP__"); width: 13px; height: 9px;
 }
 QDoubleSpinBox::down-arrow, QSpinBox::down-arrow {
-    width: 0; height: 0;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-top: 6px solid $ink_dim;
+    image: url("__PANAH_DOWN__"); width: 13px; height: 9px;
 }
 QDoubleSpinBox::up-arrow:hover, QSpinBox::up-arrow:hover {
-    border-bottom-color: $accent_text;
+    image: url("__PANAH_UP_A__");
 }
 QDoubleSpinBox::down-arrow:hover, QSpinBox::down-arrow:hover {
-    border-top-color: $accent_text;
+    image: url("__PANAH_DOWN_A__");
 }
 QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus { border-color: $accent; }
 QComboBox {
@@ -459,10 +455,9 @@ QComboBox::drop-down {
 }
 QComboBox::drop-down:hover { background: $line_hi; }
 QComboBox::down-arrow {
-    width: 0; height: 0;
-    border-left: 5px solid transparent; border-right: 5px solid transparent;
-    border-top: 6px solid $ink_dim;
+    image: url("__PANAH_DOWN__"); width: 13px; height: 9px;
 }
+QComboBox::down-arrow:hover { image: url("__PANAH_DOWN_A__"); }
 QComboBox:focus { border-color: $accent; }
 QComboBox QAbstractItemView { background: $panel; color: $ink;
                               border: 1px solid $line; selection-background-color: $line_hi; }
@@ -505,6 +500,43 @@ _OBJ = ("MicroLabel", "Unit", "HeaderSub", "PanelTitle", "PanelHint", "CtlLabel"
         "RowValue", "MapBar", "BrandWord")
 
 
+def _ikon_panah(arah, warna_hex, ukuran=(13, 9)):
+    """Chevron PNG kecil utk QSS spinbox/combo — dibuat runtime & di-cache.
+
+    (Audit 13 Okt: trik segitiga via `border` di QSS tidak ter-render di build Qt
+    ini — tombol +/- dan dropdown tampil KOTAK POLOS. Ikon gambar = pasti tampil.)
+    """
+    import tempfile
+    from PySide6 import QtCore as _Qc, QtGui as _Qg
+    d = os.path.join(tempfile.gettempdir(), "dv_qss_ikon")
+    os.makedirs(d, exist_ok=True)
+    nama = "chev_%s_%s_%dx%d.png" % (arah, str(warna_hex).strip("#"),
+                                     ukuran[0], ukuran[1])
+    path = os.path.join(d, nama)
+    if os.path.exists(path):
+        return path
+    pm = _Qg.QPixmap(ukuran[0] * 2, ukuran[1] * 2)          # 2x: tajam di layar
+    pm.fill(_Qc.Qt.transparent)
+    pt = _Qg.QPainter(pm)
+    pt.setRenderHint(_Qg.QPainter.Antialiasing)
+    pena = _Qg.QPen(_Qg.QColor(warna_hex))
+    pena.setWidthF(4.6)
+    pena.setCapStyle(_Qc.Qt.RoundCap)
+    pena.setJoinStyle(_Qc.Qt.RoundJoin)
+    pt.setPen(pena)
+    w, h = ukuran[0] * 2, ukuran[1] * 2
+    m = 4.0
+    if arah == "down":
+        pt.drawPolyline([_Qc.QPointF(m, m), _Qc.QPointF(w / 2, h - m),
+                         _Qc.QPointF(w - m, m)])
+    else:
+        pt.drawPolyline([_Qc.QPointF(m, h - m), _Qc.QPointF(w / 2, m),
+                         _Qc.QPointF(w - m, h - m)])
+    pt.end()
+    pm.save(path, "PNG")
+    return path
+
+
 def _aturan_peran():
     out = []
     for obj in _OBJ:
@@ -523,6 +555,22 @@ def qss(nama=None):
         # scrollbar) — proporsi tetap utuh di 100/120/140% (audit grid 13 Okt).
         out = re.sub(r"([0-9]+(?:\.[0-9]+)?)px",
                      lambda m: "%dpx" % px(float(m.group(1))), out)
+    # Ikon PNG panah spinbox/combo (audit 13 Okt — trik border QSS tampil kotak polos;
+    # ikon gambar dijamin ter-render). Dibuat runtime & di-cache.
+    try:
+        _cd = t.get("ink_dim", "#93A1B1")
+        _ca = t.get("accent_text") or t.get("accent", "#00E5FF")
+        _sk = max(1.0, float(SKALA))
+        _uk = (int(13 * _sk), int(9 * _sk))
+        out = (out.replace("__PANAH_UP__", _ikon_panah("up", _cd, _uk))
+                  .replace("__PANAH_DOWN__", _ikon_panah("down", _cd, _uk))
+                  .replace("__PANAH_UP_A__", _ikon_panah("up", _ca, _uk))
+                  .replace("__PANAH_DOWN_A__", _ikon_panah("down", _ca, _uk)))
+    except Exception:                                   # noqa: BLE001
+        out = (out.replace('url("__PANAH_UP__")', "none")
+                  .replace('url("__PANAH_DOWN__")', "none")
+                  .replace('url("__PANAH_UP_A__")', "none")
+                  .replace('url("__PANAH_DOWN_A__")', "none"))
     return out
 
 
