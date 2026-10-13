@@ -501,7 +501,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["flight"] = p
 
         # ---- instruments ala QGC (NAMED_VALUE_FLOAT / SERVO_OUTPUT_RAW)
-        p = W.Panel("INSTRUMENTS · SUB (QGC)", "cam tilt · lights · gain · tether", domain="field")
+        p = W.Panel("INSTRUMENTS · SUB (QGC)", "cam tilt · lights · gain · water", domain="field")
         grid2 = QtWidgets.QGridLayout()
         grid2.setSpacing(6)
         # AUDIT FUNGSI (13 Okt): hanya yang BENAR-BENAR punya data dari robot ini.
@@ -530,7 +530,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["power"] = p
 
         # ---- vehicle (pilot)
-        p = W.Panel("VEHICLE (PILOT)", "mode · arm — uji kolam dulu", domain="mission")
+        p = W.Panel("VEHICLE (PILOT)", "mode · arm — bench-check first", domain="mission")
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(4)
         self.cb_mode = QtWidgets.QComboBox()
@@ -704,7 +704,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["notif"] = p
 
         # ---- capture
-        p = W.Panel("CAPTURE", "rekam compressed · snapshot", domain="mission")
+        p = W.Panel("CAPTURE", "record compressed · snapshot", domain="mission")
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(4)
         self.btn_rec = {}
@@ -732,7 +732,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
         self.lbl_disk.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_disk)
-        self.lbl_cap_last = QtWidgets.QLabel("terakhir: —")
+        self.lbl_cap_last = QtWidgets.QLabel("")      # kosong sampai ada rekaman
         self.lbl_cap_last.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_cap_last)
         P["capture"] = p
@@ -766,14 +766,14 @@ class RovConsole(QtWidgets.QMainWindow):
         P["teleop"] = p
 
         # ---- raw
-        p = W.Panel("RAW (ONBOARD)", "chunk YUYV · transfer + verifikasi", domain="mission")
+        p = W.Panel("RAW (ONBOARD)", "YUYV chunks · transfer + verify", domain="mission")
         rp = RawPanel(self.args.raw_agent, outdir=self.sesi)
         p.body_layout.addWidget(rp)
         p.panel_raw = rp
         P["raw"] = p
 
         # ---- peta misi: peta OSM (ala rovgui asli) + plot NED + estimasi
-        p = W.Panel("PETA MISI", "peta OSM + jejak estimasi (T2: VIO)", domain="mission")
+        p = W.Panel("PETA MISI", "OSM map + estimated track (T2: VIO)", domain="mission")
         self.peta = PetaPanel()
         # default T1: perairan Kepulauan Seribu (dekat dermaga Pulau Pramuka).
         # Operator mengganti titik anchor kapan saja lewat "TARUH ANCHOR" (klik peta).
@@ -1115,7 +1115,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("rekaman tersimpan: " + path)
             try:
                 mb = os.path.getsize(path) / 1e6
-                self.lbl_cap_last.setText("terakhir: %s · %.1f MB" %
+                self.lbl_cap_last.setText("last: %s · %.1f MB" %
                                           (os.path.basename(path), mb))
             except OSError:
                 pass
@@ -1124,7 +1124,7 @@ class RovConsole(QtWidgets.QMainWindow):
         import shutil
         try:
             du = shutil.disk_usage(self.sesi)
-            self.lbl_disk.setText("disk topside: %.1f GB bebas" % (du.free / 1e9))
+            self.lbl_disk.setText("disk topside: %.1f GB free" % (du.free / 1e9))
         except OSError:
             pass
 
@@ -1147,8 +1147,8 @@ class RovConsole(QtWidgets.QMainWindow):
         except Exception:                                  # noqa: BLE001
             pass
         btns = [i for i, b in enumerate(live.get("buttons") or []) if b]
-        self.lbl_pad.setText("pad: %s | deadman %s | tombol %s | tilt %d µs" % (
-            live.get("nama") or "—", "DITEKAN" if live.get("deadman") else "LEPAS",
+        self.lbl_pad.setText("pad: %s | deadman %s | btn %s | tilt %d µs" % (
+            live.get("nama") or "—", "HELD" if live.get("deadman") else "RELEASED",
             btns or "—", live.get("tilt", 1500)))
         self._chip(self.chip_pad, "ok" if live.get("konek") else "warn",
                    "siap" if live.get("konek") else "tidak ada")
