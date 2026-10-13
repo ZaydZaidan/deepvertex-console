@@ -84,6 +84,9 @@ class Gamepad(QtCore.QObject):
         self.aktif = False
         # hook UJI tanpa hardware: peta idx->nilai (-1..1) / idx->bool
         self.sim_axes = None
+        # MODE MAPPING (halaman PAD MAPPING terbuka): input pad HANYA utk UI.
+        self._output_block_n = 0        # penghitung dialog yang memblokir
+        self.output_blocked = False
         self.sim_buttons = None
 
         self._timer = QtCore.QTimer(self)
@@ -264,6 +267,24 @@ class Gamepad(QtCore.QObject):
         return bool(self.buttons.get(kode, 0)) if kode is not None else False
 
     # ------------------------------------------------------------------ tick
+    def set_output_block(self, on=True):
+        """Blokir output ke kendaraan (dipakai saat halaman PAD MAPPING terbuka).
+
+        Input pad TETAP mengalir ke UI lewat sig_live (remap + highlight), tapi
+        TIDAK ada perintah yang dikirim: manual control netral, override tilt
+        dilepas, dan tombol edge (arm/mode/center/record/photo) diabaikan.
+        Pakai penghitung supaya aman bila dialog dibuka lebih dari sekali.
+        """
+        self._output_block_n = max(0, self._output_block_n + (1 if on else -1))
+        baru = self._output_block_n > 0
+        if baru and not self.output_blocked:
+            try:
+                self.bridge.rc_release()
+            except Exception:                          # noqa: BLE001
+                pass
+        self.output_blocked = baru
+        return self.output_blocked
+
     def _tick(self):
         c = self.cfg
         dz = c["deadzone"]
@@ -288,6 +309,28 @@ class Gamepad(QtCore.QObject):
 
         if self.sim_axes is not None:
             self._konek = True
+
+        if self.output_blocked:
+            # MODE MAPPING: kendaraan tidak disentuh sama sekali — hanya UI yang
+            # menerima data (sig_live utk dialog remap). Manual control netral dan
+            # tombol edge TIDAK diproses (contoh: D-PAD atas tidak menggerakkan tilt).
+            try:
+                self.bridge.send_manual_control(0, 0, 500, 0, 0)
+            except Exception:                          # noqa: BLE001
+                pass
+            self.last_out = (0, 0, 500, 0)
+            try:
+                self.sig_live.emit({
+                    "axes": [self._norm_axis(i) for i in range(len(c["axis_order"]))],
+                    "buttons": [self._btn(i) for i in range(len(c["btn_order"]))],
+                    "deadman": any(self._btn(b) for b in c["deadman_buttons"]),
+                    "tilt": self.tilt, "lights": self.lights,
+                    "nama": self.dev_name, "konek": self._konek,
+                })
+            except Exception:                          # noqa: BLE001
+                pass
+            return
+
         deadman = any(self._btn(b) for b in c["deadman_buttons"])
         if deadman:
             x = int(fwd * 1000 * c["scale_fwd"])

@@ -335,6 +335,31 @@ def main():
         print("[26] save/load GAGAL:", repr(exc))
         lulus = False
 
+    # [27] mode MAPPING memblokir output ke ROV (permintaan pemilik 13 Okt):
+    #      D-PAD atas TIDAK boleh menggerakkan tilt selama halaman pad terbuka.
+    try:
+        import padmap as _padmap
+        g = w.gamepad
+        g.sim_axes = {7: -1.0}            # D-PAD atas (axis_tilt default [7])
+        time.sleep(0.08)
+        g._tick()
+        g._tick()
+        tilt_gerak = g.tilt
+        d27 = _padmap.PadMapDialog(g, w)
+        ok27 = (g.output_blocked is True)
+        t_blok0 = g.tilt
+        time.sleep(0.08)
+        g._tick()                          # D-PAD atas ditahan — harus DIABAIKAN
+        ok27 = ok27 and (g.tilt == t_blok0) and (g.last_out == (0, 0, 500, 0))
+        d27.close()
+        ok27 = ok27 and (g.output_blocked is False)
+        g.sim_axes = None
+        print("[27] mapping memblokir output ke ROV:", ok27)
+        lulus &= bool(ok27)
+    except Exception as exc:                               # noqa: BLE001
+        print("[27] blokir mapping GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

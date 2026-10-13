@@ -401,8 +401,28 @@ class PadMapDialog(QtWidgets.QDialog):
             self.gamepad.sig_live.connect(self._live)
         except Exception:                              # noqa: BLE001
             pass
+        # MODE MAPPING (permintaan pemilik 13 Okt): selama halaman ini terbuka,
+        # input pad TIDAK boleh menggerakkan ROV — mis. D-PAD atas tidak men-tilt
+        # kamera. Output diblokir sampai dialog ditutup.
+        try:
+            self.gamepad.set_output_block(True)
+        except Exception:                              # noqa: BLE001
+            pass
+        self.finished.connect(self._lepas_blokir)
         self._muat_presets()
         self._segarkan()
+
+    def _lepas_blokir(self, *_a):
+        try:
+            self.gamepad.set_output_block(False)
+        except Exception:                              # noqa: BLE001
+            pass
+
+    def closeEvent(self, ev):                          # noqa: N802 (Qt)
+        # semua jalur tutup (tombol CLOSE, X jendela, ESC) WAJIB melepas blokir;
+        # `finished` tidak selalu terpancar utk dialog non-modal yang di-close().
+        self._lepas_blokir()
+        super().closeEvent(ev)
 
     # ------------------------------------------------------------------ preset
     @property
