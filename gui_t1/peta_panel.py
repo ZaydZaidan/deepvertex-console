@@ -307,7 +307,7 @@ class PetaPanel(QtWidgets.QWidget):
             if len(rencana["kotak"]) == 2:
                 x, y = ke_layar(sudut[0][0], sudut[0][1])
                 p.setPen(QtGui.QPen(QtGui.QColor(theme.ORANGE)))
-                f = p.font(); f.setPointSize(8); p.setFont(f)
+                f = p.font(); f.setPointSize(theme.px(8)); p.setFont(f)
                 p.drawText(int(x) + 6, int(y) - 6, "AREA %.1f x %.1f m"
                            % (rencana["kotak"][0], rencana["kotak"][1]))
         # JALUR RENCANA: garis putus-putus (konvensi yang sama dengan plot pasca-misi).
@@ -801,7 +801,7 @@ class PetaPanel(QtWidgets.QWidget):
                 p.drawText(int(cxp + jarak_piksel) + 2, int(cyp) - 3, "%g m" % langkah)
         # keterangan: anchor, skala, atribusi OSM
         p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT)))
-        f = p.font(); f.setPointSize(8); p.setFont(f)
+        f = p.font(); f.setPointSize(theme.px(8)); p.setFont(f)
         p.drawText(8, 14, "anchor %.5f, %.5f (%s) · zoom %d · %.2f m/px"
                    % (self.anchor["lat"], self.anchor["lon"],
                       self.anchor.get("sumber", "manual"), z, mpx))

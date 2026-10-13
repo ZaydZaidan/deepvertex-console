@@ -26,6 +26,7 @@ sehingga kode lama tidak perlu diubah sekaligus dan tetap ikut berganti tema.
 
 import glob
 import os
+import re
 from string import Template
 
 # --------------------------------------------------------------------------- #
@@ -92,6 +93,25 @@ LABEL = {"legacy": "Legacy · amber (as-is)", "abyss": "Dark · abyss",
          "ink": "Ink · black", "ivory": "Light · ivory"}
 BAWAAN = "abyss"                     # field bawaan (keputusan pemilik 28 Sep 2026)
 GELAP = ("legacy", "abyss", "ink")   # dipakai uji kecerahan piksel per mode
+
+# ------------------------------------------------- skala teks (keterbacaan field)
+# Untuk dipakai di kapal / matahari terik: SEMUA ukuran huruf QSS + px() widget
+# dikalikan SKALA (1.0 normal · 1.2 besar · 1.4 ekstra).
+SKALA = 1.0
+
+
+def set_skala(x):
+    global SKALA
+    try:
+        SKALA = max(0.8, min(2.0, float(x)))
+    except (TypeError, ValueError):
+        SKALA = 1.0
+    return SKALA
+
+
+def px(n):
+    """Ukuran piksel yang mengikuti skala teks aktif."""
+    return int(round(float(n) * SKALA))
 
 # Penanda domain di kepala panel (kotak 6 px + tulisan).
 DOMAIN = {"digital": "accent", "mission": "coral", "field": "orange",
@@ -444,7 +464,12 @@ def qss(nama=None):
     """Stylesheet penuh untuk palet `nama` (bawaan: palet aktif)."""
     t = nilai(nama)
     t["font"] = keluarga()
-    return _QSS.substitute(t) + "\n" + Template(_aturan_peran()).substitute(t)
+    out = _QSS.substitute(t) + "\n" + Template(_aturan_peran()).substitute(t)
+    if SKALA != 1.0:
+        # semua font-size QSS diskalakan sekaligus (satu tempat, tak ada yang terlewat)
+        out = re.sub(r"font-size:\s*([0-9.]+)px",
+                     lambda m: "font-size: %dpx" % px(float(m.group(1))), out)
+    return out
 
 
 def set_prop(w, nama, nilai):
@@ -514,13 +539,13 @@ def apply(nama, app=None):
 def mono(size, weight=400):
     """Gaya angka: rupa huruf turunan (digit tabular) pada ukuran tertentu."""
     return ('font-family: %s; font-size: %dpx; font-weight: %d;'
-            % (keluarga(), int(size), int(weight)))
+            % (keluarga(), px(size), int(weight)))
 
 
 def micro(size=10, color=None):
     """Label mikro UPPERCASE; lantai ukuran 10 px (rancangan §7.5)."""
     return "font-size: %dpx; letter-spacing: 1.2px; color: %s;" % (
-        int(max(10, size)), color or warna("ink_faint"))
+        px(max(10, size)), color or warna("ink_faint"))
 
 
 # --------------------------------------------------------------------------- #

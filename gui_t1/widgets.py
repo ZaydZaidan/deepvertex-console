@@ -193,7 +193,7 @@ class Meter(QtWidgets.QWidget):
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
         f = p.font()
         f.setFamily(theme.FONT_UI)
-        f.setPixelSize(10)
+        f.setPixelSize(theme.px(10))
         p.setFont(f)
         p.drawText(QRectF(0, 0, self.label_w - 4, h), Qt.AlignLeft | Qt.AlignVCenter, self.label.upper())
 
@@ -221,7 +221,7 @@ class Meter(QtWidgets.QWidget):
 
         p.setPen(QtGui.QColor(theme.TEXT))
         f.setFamily(theme.FONT_MONO)
-        f.setPixelSize(10)
+        f.setPixelSize(theme.px(10))
         p.setFont(f)
         txt = "--" if self._v is None else (
             f"{self._v:+.{self.decimals}f}" if self.signed else f"{self._v:.{self.decimals}f}")
@@ -245,12 +245,12 @@ class Chip(QtWidgets.QWidget):
     def lebar_teks(self):
         """Lebar yang dibutuhkan titik + kunci + nilai (agar nilai tidak terpotong)."""
         f = QtGui.QFont(theme.KELUARGA if hasattr(theme, "KELUARGA") else theme.FONT_UI)
-        f.setPixelSize(9)
+        f.setPixelSize(theme.px(9))
         f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0.9)
         lebar = 16 + QtGui.QFontMetricsF(f).horizontalAdvance(self._text.upper())
         if self._detail:
             fv = QtGui.QFont(f)
-            fv.setPixelSize(10)
+            fv.setPixelSize(theme.px(10))
             fv.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0)
             lebar += 5 + QtGui.QFontMetricsF(fv).horizontalAdvance(str(self._detail))
         return int(lebar) + 8
@@ -279,13 +279,13 @@ class Chip(QtWidgets.QWidget):
         p.drawEllipse(QPointF(8, h / 2), 3, 3)
         f = p.font()
         f.setFamily(theme.FONT_UI)
-        f.setPixelSize(9)
+        f.setPixelSize(theme.px(9))
         p.setFont(f)
         # Dua gaya teks seperti rancangan: KUNCI kecil redup (uppercase, tracking) dan
         # NILAI lebih terang (angka tabular) — bukan satu deret teks berwarna sama.
         fk = p.font()
         fk.setFamily(theme.FONT_UI)
-        fk.setPixelSize(9)
+        fk.setPixelSize(theme.px(9))
         fk.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0.9)
         kunci = self._text.upper()
         p.setFont(fk)
@@ -294,7 +294,7 @@ class Chip(QtWidgets.QWidget):
         if self._detail:
             lebar_kunci = QtGui.QFontMetricsF(fk).horizontalAdvance(kunci) + 5
             fv = p.font()
-            fv.setPixelSize(10)
+            fv.setPixelSize(theme.px(10))
             fv.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0)
             p.setFont(fv)
             p.setPen(QtGui.QColor(theme.TEXT))
@@ -516,13 +516,13 @@ class CameraTile(QtWidgets.QWidget):
             judul = self._off_title if self._off is not None else "PREVIEW OFF"
             alasan = self._off if self._off is not None else self._muted
             f.setFamily(theme.FONT_UI)
-            f.setPixelSize(11)
+            f.setPixelSize(theme.px(11))
             f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.6)
             p.setFont(f)
             p.setPen(QtGui.QColor(theme.WARN if self._off is not None else theme.TEXT_DIM))
             p.drawText(QRectF(area.x(), area.y(), area.width(), area.height() / 2),
                        Qt.AlignBottom | Qt.AlignHCenter, judul)
-            f.setPixelSize(9)
+            f.setPixelSize(theme.px(9))
             p.setFont(f)
             p.setPen(QtGui.QColor(theme.TEXT_FAINT))
             p.drawText(QRectF(area.x() + 6, area.y() + area.height() / 2 + 2,
@@ -549,14 +549,14 @@ class CameraTile(QtWidgets.QWidget):
         else:
             p.setPen(QtGui.QColor(theme.TEXT_FAINT))
             f.setFamily(theme.FONT_UI)
-            f.setPixelSize(10)
+            f.setPixelSize(theme.px(10))
             f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.6)
             p.setFont(f)
             p.drawText(area, Qt.AlignCenter, self.status or "NO SIGNAL")
 
         f = p.font()
         f.setFamily(theme.FONT_UI)
-        f.setPixelSize(9)
+        f.setPixelSize(theme.px(9))
         f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.4)
         p.setFont(f)
         p.setPen(QtGui.QColor(theme.TEXT_DIM))
@@ -567,7 +567,7 @@ class CameraTile(QtWidgets.QWidget):
             p.setPen(QtGui.QColor(theme.OK if self._rate > 15 else theme.WARN))
             f.setFamily(theme.FONT_MONO)
             f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0)
-            f.setPixelSize(9)
+            f.setPixelSize(theme.px(9))
             p.setFont(f)
             p.drawText(QRectF(6, 0, self.width() - 12, top), Qt.AlignRight | Qt.AlignVCenter,
                        f"{self._rate:5.1f} Hz")
@@ -604,13 +604,13 @@ class Placeholder(QtWidgets.QWidget):
         p.drawRect(QRectF(0.5, 0.5, self.width() - 1, self.height() - 1))
         f = p.font()
         f.setFamily(theme.FONT_UI)
-        f.setPixelSize(11)
+        f.setPixelSize(theme.px(11))
         f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.6)
         p.setFont(f)
         p.setPen(QtGui.QColor(theme.TEXT_DIM))
         p.drawText(QRectF(0, self.height() / 2 - 22, self.width(), 22),
                    Qt.AlignCenter, self.title.upper())
-        f.setPixelSize(9)
+        f.setPixelSize(theme.px(9))
         f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0.4)
         p.setFont(f)
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
@@ -692,7 +692,7 @@ class Horizon(QtWidgets.QWidget):
 
         f = p.font()
         f.setFamily(theme.FONT_MONO)
-        f.setPixelSize(8)
+        f.setPixelSize(theme.px(8))
         p.setFont(f)
         for d in (-20, -10, 10, 20):
             y = d * px_per_deg
@@ -766,7 +766,7 @@ class Kompas(QtWidgets.QWidget):
                        QPointF(math.cos(rad) * r, math.sin(rad) * r))
         f = p.font()
         f.setFamily(theme.FONT_UI)
-        f.setPixelSize(11)
+        f.setPixelSize(theme.px(11))
         f.setBold(True)
         p.setFont(f)
         fm = QtGui.QFontMetricsF(f)
@@ -793,7 +793,7 @@ class Kompas(QtWidgets.QWidget):
         # angka heading di tengah (tetap)
         f2 = p.font()
         f2.setFamily(theme.FONT_MONO)
-        f2.setPixelSize(15)
+        f2.setPixelSize(theme.px(15))
         f2.setBold(True)
         p.setFont(f2)
         fm2 = QtGui.QFontMetricsF(f2)
@@ -802,7 +802,7 @@ class Kompas(QtWidgets.QWidget):
         p.drawText(QPointF(cx - fm2.horizontalAdvance(teks) / 2, cy + 6), teks)
         f3 = p.font()
         f3.setFamily(theme.FONT_UI)
-        f3.setPixelSize(8)
+        f3.setPixelSize(theme.px(8))
         p.setFont(f3)
         fm3 = QtGui.QFontMetricsF(f3)
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
@@ -864,7 +864,7 @@ class TrajectoryPlot(QtWidgets.QWidget):
         b = self._bounds()
         if b is None:
             p.setPen(QtGui.QColor(theme.TEXT_FAINT))
-            f = p.font(); f.setFamily(theme.FONT_UI); f.setPixelSize(10)
+            f = p.font(); f.setFamily(theme.FONT_UI); f.setPixelSize(theme.px(10))
             f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 1.4)
             p.setFont(f)
             p.drawText(area, Qt.AlignCenter, "WAITING FOR TRAJECTORY DATA")
@@ -887,7 +887,7 @@ class TrajectoryPlot(QtWidgets.QWidget):
         step = 1.0
         while step * scale < 34:
             step *= 2 if step in (1, 2, 5, 10, 20, 50) else 5
-        f = p.font(); f.setFamily(theme.FONT_MONO); f.setPixelSize(9); p.setFont(f)
+        f = p.font(); f.setFamily(theme.FONT_MONO); f.setPixelSize(theme.px(9)); p.setFont(f)
         n_start = math.floor(n0 / step) * step
         while n_start <= n1 + step:
             y = to_xy(n_start, ce).y()
@@ -969,7 +969,7 @@ class TrajectoryPlot(QtWidgets.QWidget):
         # ---- baris statistik: lebar diukur, jadi tidak mungkin saling tumpuk ----
         s = self.stats
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
-        f.setFamily(theme.FONT_MONO); f.setPixelSize(9); p.setFont(f)
+        f.setFamily(theme.FONT_MONO); f.setPixelSize(theme.px(9)); p.setFont(f)
         fm = QtGui.QFontMetrics(f)
         items = [("GT", s.get("gt_len")), ("VIO", s.get("vio_len")), ("ERR", s.get("err")),
                  ("RMSE", s.get("rmse")), ("SKALA", s.get("scale"))]

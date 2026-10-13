@@ -31,7 +31,7 @@ def main():
     time.sleep(1.0)
 
     import rov_console_real as rc
-    rc._terapkan_tema(app)          # WAJIB: QSS + font tema (kalau tidak, tampil polos)
+    rc._terapkan_tema(app, "abyss", 1.2)   # WAJIB: QSS+font tema, skala teks operasional
 
     args = SimpleNamespace(
         mavlink="udpin:0.0.0.0:14580",

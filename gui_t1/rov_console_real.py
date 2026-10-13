@@ -335,7 +335,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.seg_layout.set_dipilih(name)
         except Exception:                                  # noqa: BLE001
             pass
-        lb = int(spec.get("lebar_kiri", 350))
+        lb = theme.px(spec.get("lebar_kiri", 350))
         # rail KIRI dan KANAN dibuat SAMA LEBAR PERSIS (proporsional & simetris)
         for kol in (self.col_left, self.col_right):
             kol.setFixedWidth(lb)
@@ -506,7 +506,7 @@ class RovConsole(QtWidgets.QMainWindow):
         row2.setSpacing(4)
         lab = QtWidgets.QLabel("LIGHTS 0%")
         lab.setObjectName("MicroLabel")
-        lab.setFixedWidth(80)
+        lab.setFixedWidth(theme.px(80))
         self.lab_lights = lab
         self.sl_lights = QtWidgets.QSlider(Qt.Horizontal)
         self.sl_lights.setRange(0, 100)
@@ -514,7 +514,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.sl_lights.valueChanged.connect(self._set_lights)
         lab2 = QtWidgets.QLabel("TILT 50%")
         lab2.setObjectName("MicroLabel")
-        lab2.setFixedWidth(68)
+        lab2.setFixedWidth(theme.px(68))
         self.lab_tilt = lab2
         b_tc = QtWidgets.QPushButton("50%")
         b_tc.setObjectName("BtnTiny")
@@ -792,6 +792,18 @@ class RovConsole(QtWidgets.QMainWindow):
             a.triggered.connect(lambda _=False, n=nama: self._ganti_tema(n))
             self.grup_tema.addAction(a)
             vm.addAction(a)
+        vm.addSeparator()
+        # ukuran teks — keterbacaan di kapal / matahari terik (12 Okt 2026)
+        self.grup_teks = QtGui.QActionGroup(self)
+        self.grup_teks.setExclusive(True)
+        for teks_a, nilai_a in (("Ukuran teks: Normal (100%)", 1.0),
+                                ("Ukuran teks: Besar (120%)", 1.2),
+                                ("Ukuran teks: Ekstra (140%)", 1.4)):
+            a = QtGui.QAction(teks_a, self, checkable=True)
+            a.setChecked(abs(theme.SKALA - nilai_a) < 0.01)
+            a.triggered.connect(lambda _=False, v=nilai_a: self._ganti_skala(v))
+            self.grup_teks.addAction(a)
+            vm.addAction(a)
         veh = mb.addMenu("&Vehicle")
         veh.addAction("ARM", lambda: self._arm(True))
         veh.addAction("DISARM", lambda: self._arm(False))
@@ -819,6 +831,17 @@ class RovConsole(QtWidgets.QMainWindow):
     def _ganti_tema(self, nama):
         theme.apply(nama, QtWidgets.QApplication.instance())
         self._set_mark_merek()
+
+    def _ganti_skala(self, x):
+        """Ganti ukuran teks GLOBAL (QSS + widget gambar sendiri) secara hidup."""
+        theme.set_skala(x)
+        theme.apply(theme.aktif(), QtWidgets.QApplication.instance())
+        self.lab_lights.setFixedWidth(theme.px(80))
+        self.lab_tilt.setFixedWidth(theme.px(68))
+        self._apply_preset(self._preset)
+        for w_ in self.findChildren(QtWidgets.QWidget):
+            w_.update()
+        self._catat("ukuran teks -> %.0f%%" % (x * 100))
 
     def _menu_screenshot(self):
         p, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Simpan screenshot",
@@ -1116,13 +1139,15 @@ class RovConsole(QtWidgets.QMainWindow):
         super().closeEvent(ev)
 
 
-def _terapkan_tema(app):
+def _terapkan_tema(app, nama=None, skala=None):
     try:
         theme.muat_font()
     except Exception:                                      # noqa: BLE001
         pass
     try:
-        theme.apply(theme.aktif(), app)
+        if skala is not None:
+            theme.set_skala(skala)
+        theme.apply(nama or theme.aktif(), app)
     except Exception:                                      # noqa: BLE001
         pass
 
@@ -1140,6 +1165,10 @@ def main():
                     choices=("pilot-focus", "mapping", "setup", "capture"))
     ap.add_argument("--tlog", default="auto",
                     help="'off' nonaktif; jalur berkas tlog; 'auto' = <sesi>/mavlink.tlog")
+    ap.add_argument("--tema", default="abyss", choices=tuple(theme.tampil()),
+                    help="palet warna (ink = hitam ala rovgui) — bisa ganti live di View > Appearance")
+    ap.add_argument("--teks", type=float, default=1.2, metavar="SKALA",
+                    help="skala ukuran teks (1.0/1.2/1.4) utk keterbacaan di lapangan")
     ap.add_argument("--no-pad", action="store_true", help="jangan aktifkan teleop gamepad")
     ap.add_argument("--shot", default=None, help="simpan screenshot jendela ke PATH (uji tampilan)")
     ap.add_argument("--shot-after", type=float, default=6.0, help="detik sebelum screenshot")
@@ -1149,7 +1178,7 @@ def main():
     args.port_stereo_R = args.right_port
 
     app = QtWidgets.QApplication(sys.argv)
-    _terapkan_tema(app)
+    _terapkan_tema(app, getattr(args, "tema", None), getattr(args, "teks", None))
     w = RovConsole(args)
     w.show()
     if args.shot:

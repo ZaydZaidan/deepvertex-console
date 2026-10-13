@@ -113,7 +113,7 @@ class PlotMisi(QtWidgets.QWidget):
         # label
         f = p.font()
         f.setFamily(theme.FONT_UI)
-        f.setPixelSize(9)
+        f.setPixelSize(theme.px(9))
         p.setFont(f)
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
         p.drawText(QPointF(6, h - 8), "ESTIMASI (dead-reckoning) — posisi presisi: T2/VIO")

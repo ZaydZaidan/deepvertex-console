@@ -21,7 +21,12 @@ Stage 2/VIO), compressed capture + snapshot (topside), and **onboard RAW capture
 Options: `--front-port/--left-port/--right-port` (default 5600/5601/5602 — UDP stream
 ports from the BlueOS camera manager), `--raw-agent http://127.0.0.1:8765`,
 `--preset pilot-focus|mapping|setup|capture`, `--tlog auto|off|PATH` (per-session
-MAVLink telemetry log; default `auto` → `<session>/mavlink.tlog`).
+MAVLink telemetry log; default `auto` → `<session>/mavlink.tlog`),
+`--tema abyss|ink|ivory` (ink = neutral-black theme, same family as the sim),
+`--teks 1.0|1.2|1.4` (global text scale — for boat/bright-sun readability; default 1.2).
+
+**Theme & text size are switchable live**: menu View ▸ Appearance ▸ *Ink · black /
+Abyss / Ivory*, and *Ukuran teks: Normal 100% / Besar 120% / Ekstra 140%*.
 
 ## Display demo (no hardware)
 
