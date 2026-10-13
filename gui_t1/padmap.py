@@ -164,119 +164,162 @@ class PadDiagram(QtWidgets.QWidget):
 
     # ------------------------------------------------------------------ paint
     def paintEvent(self, _ev):                          # noqa: N802 (Qt)
+        """Gaya SDL2 Gamepad Tool (referensi pemilik 13 Okt): line-art terang,
+        outline tegas, TANPA label kecil di gambar — elemen diidentifikasi lewat
+        posisi + sorotan aksen saat disentuh/diremap."""
         p = QtGui.QPainter(self)
         try:
             p.setRenderHint(QtGui.QPainter.Antialiasing)
             acc = _acc()
-            f = min(self.width() / 500.0, self.height() / 296.0)
-            ox = (self.width() - 500.0 * f) / 2.0
-            oy = (self.height() - 296.0 * f) / 2.0
+            f = min(self.width() / 520.0, self.height() / 305.0)
+            ox = (self.width() - 520.0 * f) / 2.0
+            oy = (self.height() - 305.0 * f) / 2.0
 
             def R(x, y, w, h):
-                # +8 unit: margin atas supaya bar bahu tidak menempel tepi widget
-                return QtCore.QRectF(ox + x * f, oy + (y + 8) * f, w * f, h * f)
+                return QtCore.QRectF(ox + x * f, oy + y * f, w * f, h * f)
 
-            def teks(r, txt, warna=(235, 235, 235, 200), px=8.0):
-                p.setPen(QtGui.QColor(*warna))
+            OL = QtGui.QColor(14, 17, 21)          # outline gelap
+            BODY = QtGui.QColor(224, 228, 233)     # badan terang
+            DETAIL = QtGui.QColor(246, 248, 250)   # detail terang
+            SHADE = QtGui.QColor(199, 205, 212)    # shading lembut
+            GLYPH = QtGui.QColor(62, 68, 76)       # simbol tombol
+
+            def wpen(on=False, lebar=2.2):
+                return QtGui.QPen(acc if on else OL, (lebar + 0.9) if on else lebar)
+
+            def wbrush(dasar, on=False, alfa=150):
+                return _dgn_alpha(acc, alfa) if on else dasar
+
+            def teks_kecil(r, txt, px=7.0, warna=None):
+                p.setPen(warna or GLYPH)
                 ft = p.font()
-                ft.setPixelSize(max(7, int(theme.px(px)) - 2))
+                ft.setPixelSize(max(7, int(theme.px(px))))
+                ft.setWeight(QtGui.QFont.Weight.DemiBold)
                 p.setFont(ft)
                 p.drawText(r, Qt.AlignCenter, txt)
 
-            def bar(x, y, w, h, elemen, txt, px=8.0, r=8):
-                on = self._nyala(elemen)
-                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 58),
-                                    1.8 if on else 1.0))
-                p.setBrush(_dgn_alpha(acc, 80) if on
-                           else QtGui.QColor(255, 255, 255, 14))
-                p.drawRoundedRect(R(x, y, w, h), r * f, r * f)
-                if txt:
-                    teks(R(x, y, w, h), txt,
-                         acc.getRgb() if on else (238, 238, 238, 210), px)
+            def teks_glyph(r, txt, on):
+                p.setPen(OL if on else GLYPH)          # di atas aksen: gelap agar kontras
+                ft = p.font()
+                ft.setPixelSize(max(10, int(theme.px(12.5))))
+                ft.setWeight(QtGui.QFont.Weight.Bold)
+                p.setFont(ft)
+                p.drawText(r, Qt.AlignCenter, txt)
 
-            # ---------- silhouette: grips + body ----------
-            p.setPen(QtCore.Qt.NoPen)
-            p.setBrush(QtGui.QColor(255, 255, 255, 12))
-            p.drawEllipse(R(66, 158, 108, 108))
-            p.drawEllipse(R(326, 158, 108, 108))
-            p.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 52), 1.2))
-            p.setBrush(QtGui.QColor(255, 255, 255, 12))
-            p.drawRoundedRect(R(70, 40, 360, 200), 62 * f, 62 * f)
+            # ---------- siluet badan: union rect pusat + 2 grip (dirotasi) ----------
+            tubuh = QtGui.QPainterPath()
+            tubuh.addRoundedRect(R(112, 46, 296, 148), 54 * f, 54 * f)
+            for masuk in (1, -1):
+                cx = 260 + masuk * 128
+                t = QtGui.QTransform()
+                t.translate(ox + cx * f, oy + 192 * f)
+                t.rotate(masuk * 16)
+                t.translate(-(ox + cx * f), -(oy + 192 * f))
+                q = QtGui.QPainterPath()
+                q.addRoundedRect(R(cx - 56, 100, 112, 166), 56 * f, 56 * f)
+                tubuh = tubuh.united(t.map(q))
+            p.setPen(QtGui.QPen(OL, 2.2))
+            p.setBrush(BODY)
+            p.drawPath(tubuh)
 
-            # ---------- shoulder cluster (outside top edge) ----------
-            bar(112, 4, 84, 15, "lt", "LT (L2)", px=7.5, r=7)
-            bar(304, 4, 84, 15, "rt", "RT (R2)", px=7.5, r=7)
-            bar(112, 23, 84, 16, "lb", "LB (L1)", px=7.5, r=8)
-            bar(304, 23, 84, 16, "rb", "RB (R1)", px=7.5, r=8)
+            # ---------- bahu: trigger (pilin tinggi) + bumper (bar) ----------
+            for xs, tg, bm in ((168, "lt", "lb"), (280, "rt", "rb")):
+                on_t = self._nyala(tg)
+                p.setPen(wpen(on_t))
+                p.setBrush(wbrush(SHADE, on_t))
+                p.drawRoundedRect(R(xs, 8, 72, 20), 10 * f, 10 * f)
+                teks_kecil(R(xs, 8, 72, 20), "LT (L2)" if tg == "lt" else "RT (R2)")
+                on_b = self._nyala(bm)
+                p.setPen(wpen(on_b))
+                p.setBrush(wbrush(DETAIL, on_b))
+                # menempel ke tepi atas body (area datar x168..352, top y46)
+                p.drawRoundedRect(R(xs, 30, 72, 20), 9 * f, 9 * f)
+                teks_kecil(R(xs, 30, 72, 20), "LB (L1)" if bm == "lb" else "RB (R1)")
 
-            # ---------- touchpad + share/options ----------
-            bar(215, 52, 70, 36, "touchpad", "TOUCHPAD", px=7.0, r=8)
-            bar(168, 56, 36, 15, "share", "SHARE", px=6.5, r=6)
-            bar(296, 56, 40, 15, "options", "OPTIONS", px=6.0, r=6)
+            # ---------- touchpad + PS + share/options ----------
+            on_tp = self._nyala("touchpad")
+            p.setPen(wpen(on_tp))
+            p.setBrush(wbrush(SHADE, on_tp))
+            p.drawRoundedRect(R(224, 62, 72, 48), 9 * f, 9 * f)
+            teks_kecil(R(224, 62, 72, 48), "TOUCHPAD", px=6.5)
+            p.setPen(QtGui.QPen(_dgn_alpha(GLYPH, 90), 1.2))
+            p.drawLine(R(232, 104, 56, 1).topLeft(), R(232, 104, 56, 1).topRight())
+            for xs, el in ((178, "share"), (306, "options")):
+                on = self._nyala(el)
+                p.setPen(wpen(on, 1.8))
+                p.setBrush(wbrush(DETAIL, on))
+                p.drawRoundedRect(R(xs, 66, 36, 16), 8 * f, 8 * f)
+                teks_kecil(R(xs, 66, 36, 16),
+                           "SHARE" if el == "share" else "OPTIONS", px=6.0)
+            p.setPen(QtGui.QPen(OL, 2.0))
+            p.setBrush(DETAIL)
+            p.drawEllipse(R(246, 120, 28, 28))
+            p.setPen(QtGui.QPen(SHADE, 2.2))
+            p.setBrush(QtCore.Qt.NoBrush)
+            p.drawEllipse(R(251, 125, 18, 18))
+            teks_kecil(R(246, 150, 28, 11), "PS", px=7.0)
 
-            # ---------- D-PAD (tiap panah menyala individual saat ditekan) ----------
-            on = self._nyala("dpad")
+            # ---------- D-PAD (cross; panah menyala per-arah) ----------
+            on_d = self._nyala("dpad")
             dl = self._ax[6] if len(self._ax) > 6 else 0.0   # HAT0X: -1 kiri / +1 kanan
             du = self._ax[7] if len(self._ax) > 7 else 0.0   # HAT0Y: -1 atas / +1 bawah
-            p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 58),
-                                1.6 if on else 1.0))
+            cross = QtGui.QPainterPath()
+            cross.addRoundedRect(R(139, 92, 22, 78), 7 * f, 7 * f)
+            cross.addRoundedRect(R(111, 120, 78, 22), 7 * f, 7 * f)
+            p.setPen(QtGui.QPen(OL, 2.2))
+            p.setBrush(DETAIL)
+            p.drawPath(cross)
+            teks_kecil(R(105, 68, 66, 12), "D-PAD", px=7.5)
+            for (x, y, w2, h2), aktif in (((139, 92, 22, 28), du < -0.5),
+                                          ((139, 142, 22, 28), du > 0.5),
+                                          ((111, 120, 28, 22), dl < -0.5),
+                                          ((161, 120, 28, 22), dl > 0.5)):
+                if aktif or on_d:
+                    p.setPen(wpen(False, 1.4))
+                    p.setBrush(_dgn_alpha(acc, 165))
+                    p.drawRoundedRect(R(x, y, w2, h2), 6 * f, 6 * f)
 
-            def panah(x, y, w, h, nyala):
-                p.setPen(QtGui.QPen(acc if (nyala or on) else QtGui.QColor(255, 255, 255, 58),
-                                    1.6 if (nyala or on) else 1.0))
-                p.setBrush(_dgn_alpha(acc, 120) if nyala
-                           else (_dgn_alpha(acc, 80) if on
-                                 else QtGui.QColor(255, 255, 255, 15)))
-                p.drawRoundedRect(R(x, y, w, h), 5 * f, 5 * f)
+            # ---------- tombol face (bentuk DS4, tanpa label tambahan) ----------
+            for cx, cy, el, gl in ((370, 92, "b2", "\u25b3"),
+                                   (398, 120, "b1", "\u25cb"),
+                                   (370, 148, "b0", "\u00d7"),
+                                   (342, 120, "b3", "\u25a1")):
+                on = self._nyala(el)
+                p.setPen(wpen(on, 2.0))
+                p.setBrush(wbrush(DETAIL, on))
+                p.drawEllipse(R(cx - 15, cy - 15, 30, 30))
+                teks_glyph(R(cx - 15, cy - 15, 30, 30), gl, on)
 
-            panah(120, 103, 16, 20, du < -0.5)     # atas
-            panah(120, 141, 16, 20, du > 0.5)      # bawah
-            panah(99, 124, 20, 16, dl < -0.5)      # kiri
-            panah(147, 124, 20, 16, dl > 0.5)      # kanan
-            panah(120, 124, 16, 16, False)         # inti
-            teks(R(96, 164, 64, 12), "D-PAD", px=7.5)
-
-            # ---------- sticks (dengan knob LIVE offset) ----------
-            for cx, cy, elemen, label, ax_i, ay_i in (
-                    (140, 200, "stick_l", "LEFT STICK", 0, 1),
-                    (360, 200, "stick_r", "RIGHT STICK", 3, 4)):
-                on = self._nyala(elemen)
+            # ---------- analog stick: dish cekung + knob LIVE ----------
+            for cx, cy, el, el3, ax_i, ay_i in (
+                    (152, 200, "stick_l", "l3", 0, 1),
+                    (368, 200, "stick_r", "r3", 3, 4)):
+                on = self._nyala(el) or self._nyala(el3)
                 dx = self._ax[ax_i] if len(self._ax) > ax_i else 0.0
                 dy = self._ax[ay_i] if len(self._ax) > ay_i else 0.0
-                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 58),
-                                    1.8 if on else 1.0))
-                p.setBrush(_dgn_alpha(acc, 80) if on
-                           else QtGui.QColor(255, 255, 255, 15))
-                p.drawEllipse(R(cx - 24, cy - 24, 48, 48))
-                p.setPen(QtCore.Qt.NoPen)
-                p.setBrush(_dgn_alpha(acc, 200) if (on or abs(dx) > 0.15 or abs(dy) > 0.15)
-                           else QtGui.QColor(255, 255, 255, 46))
-                kx = cx + max(-13.0, min(13.0, dx * 13.0))
-                ky = cy + max(-13.0, min(13.0, dy * 13.0))
-                p.drawEllipse(R(kx - 9, ky - 9, 18, 18))
-                p.setPen(QtGui.QColor(235, 235, 235, 200))
-                teks(R(cx - 46, cy + 28, 92, 12), label, px=7.5)
-
-            # ---------- face buttons diamond ----------
-            for cx, cy, elemen, txt in ((352, 104, "b2", "△"),   # Y top
-                                        (379, 131, "b1", "○"),   # B right
-                                        (352, 158, "b0", "×"),   # A bottom
-                                        (325, 131, "b3", "□")):  # X left
-                on = self._nyala(elemen)
-                p.setPen(QtGui.QPen(acc if on else QtGui.QColor(255, 255, 255, 72),
-                                    1.8 if on else 1.0))
-                p.setBrush(_dgn_alpha(acc, 110) if on
-                           else QtGui.QColor(255, 255, 255, 15))
-                p.drawEllipse(R(cx - 13, cy - 13, 26, 26))
-                teks(R(cx - 13, cy - 13, 26, 26), txt,
-                     acc.getRgb() if on else (240, 240, 240, 235), px=10.0)
-
-            # ---------- L3 / R3 (tekanan stick) ----------
-            for cx, cy, elemen in ((140, 200, "l3"), (360, 200, "r3")):
-                if self._nyala(elemen):
-                    p.setPen(QtGui.QPen(acc, 1.8))
-                    p.setBrush(QtCore.Qt.NoBrush)
-                    p.drawEllipse(R(cx - 12, cy - 12, 24, 24))
+                p.setPen(wpen(on, 2.2))
+                p.setBrush(wbrush(DETAIL, on))
+                p.drawEllipse(R(cx - 27, cy - 27, 54, 54))
+                p.setPen(QtGui.QPen(SHADE, 2.0))
+                p.setBrush(SHADE)
+                p.drawEllipse(R(cx - 17, cy - 17, 34, 34))
+                p.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 165), 2.0))
+                p.setBrush(QtCore.Qt.NoBrush)
+                p.drawArc(R(cx - 15, cy - 15, 30, 30), 40 * 16, 100 * 16)  # kilau cekung
+                aktif_knob = on or abs(dx) > 0.15 or abs(dy) > 0.15
+                p.setPen(QtGui.QPen(OL, 1.6))
+                p.setBrush(_dgn_alpha(acc, 190) if aktif_knob else BODY)
+                kx = cx + max(-12.0, min(12.0, dx * 12.0))
+                ky = cy + max(-12.0, min(12.0, dy * 12.0))
+                p.drawEllipse(R(kx - 12, ky - 12, 24, 24))
+                p.setPen(QtGui.QPen(_dgn_alpha(GLYPH, 120), 1.2))
+                p.setBrush(QtCore.Qt.NoBrush)
+                p.drawEllipse(R(kx - 4, ky - 4, 8, 8))
+                if self._nyala(el3):
+                    p.setPen(wpen(True, 2.0))
+                    p.drawEllipse(R(cx - 13, cy - 13, 26, 26))
+                teks_kecil(R(cx - 46, cy + 30, 92, 12),
+                           "LEFT STICK" if el == "stick_l" else "RIGHT STICK", px=7.5)
         finally:
             p.end()
 
