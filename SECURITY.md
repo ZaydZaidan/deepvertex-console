@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **security@deepvertex.id** (or contact the maintainer directly) with steps to
+Email **founders@deepvertex.tech** (or contact the maintainer directly) with steps to
 reproduce. Please do not open public issues for security matters. We acknowledge
 within 3 business days.
 
