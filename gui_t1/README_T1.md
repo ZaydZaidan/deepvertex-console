@@ -24,6 +24,13 @@ Or just type the launcher installed on this machine (shell function in `~/.bashr
     deepvertexrov --tema ivory --teks 1.4      # extra arguments are forwarded
     deepvertexrov --raw-agent http://127.0.0.1:8791   # e.g. local test agent
 
+Sessions: at startup the console asks for this session's name (dialog, prefilled
+"dive"; Cancel = "dive"). You can also set it up-front with `--nama-sesi "Coral
+Survey A"`, or rename the running session anytime from the CAPTURE panel
+(SESSION NAME…). The folder under ~/DeepVertex-ROV-Captures/<date>_<time>_<name>/
+moves together with its compressed/ + raw/ subfolders and the tlog. Automation
+uses `--no-prompt`.
+
 Options: `--front-port/--left-port/--right-port` (default 5600/5601/5602 — UDP stream
 ports from the BlueOS camera manager), `--raw-agent http://127.0.0.1:8765`,
 `--preset pilot-focus|mapping|setup|capture`, `--tlog auto|off|PATH` (per-session
@@ -105,6 +112,9 @@ Prerequisite for test_raw/test_console: the RAW agent running on :8791, e.g.
 - **File flow**: session folders split `compressed/` vs `raw/`; CAPTURE rows have a
   per-camera COMPRESSED/RAW mode; RAW agent supports the front camera too
   (`--device-front`, ≤640×480); snapshots always land in `compressed/`.
+- **Session naming**: type the session name at startup (dialog, prefilled) or via
+  `--nama-sesi`; rename anytime from CAPTURE ▸ SESSION NAME… (folder + subfolders move
+  together); `--no-prompt` for automation.
 - **Saved settings live inside the app**: `gui_t1/saved/` — failsafe profile
   (`failsafe.json`) and full parameter dumps (`params_<time>.json`); both panels show
   the folder in-line, file dialogs open there by default (see `saved/README.txt`).

@@ -57,6 +57,7 @@ def main():
     import vehicleops as VO
 
     args = SimpleNamespace(
+        nama_sesi=None, no_prompt=True,
         mavlink="udpin:0.0.0.0:14560",
         front_port=5620, left_port=5621, right_port=5622,
         port_front=5620, port_stereo_L=5621, port_stereo_R=5622,
@@ -358,6 +359,23 @@ def main():
         lulus &= bool(ok27)
     except Exception as exc:                               # noqa: BLE001
         print("[27] blokir mapping GAGAL:", repr(exc))
+        lulus = False
+
+    # [28] nama sesi bisa diinput/diganti — folder + label ikut berubah
+    try:
+        w._ganti_nama_sesi("Test Dive Alpha")
+        nm28 = os.path.basename(w.sesi)
+        ok28 = ("test_dive_alpha" in nm28) and os.path.isdir(w.sesi)
+        ok28 = ok28 and ("test_dive_alpha" in w.lbl_sesi.text().lower())
+        ok28 = ok28 and os.path.isdir(os.path.join(w.sesi, "compressed"))
+        w._ganti_nama_sesi("Test Dive Alpha")          # ganti ke nama sama: aman
+        ok28 = ok28 and os.path.isdir(w.sesi)
+        w._ganti_nama_sesi("")                          # kosong -> "dive"
+        ok28 = ok28 and ("_dive" in os.path.basename(w.sesi))
+        print("[28] nama sesi bisa diinput/diganti:", ok28)
+        lulus &= bool(ok28)
+    except Exception as exc:                               # noqa: BLE001
+        print("[28] nama sesi GAGAL:", repr(exc))
         lulus = False
 
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)

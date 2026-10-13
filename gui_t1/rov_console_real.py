@@ -43,16 +43,31 @@ MODE_LIST = (("MANUAL", VO.MODE_MANUAL), ("STABILIZE", VO.MODE_STABILIZE),
              ("ALT_HOLD (depth hold)", VO.MODE_ALT_HOLD), ("SURFACE", VO.MODE_SURFACE))
 
 
-def _buat_dir_sesi(root):
+def _slug(nama):
+    """Nama sesi → potongan aman utk nama folder (huruf/angka/-/_; max 40)."""
+    out = []
+    for ch in (nama or "").strip().lower():
+        if ch.isalnum() or ch in "-_":
+            out.append(ch)
+        elif ch in " .":
+            out.append("_")
+    s = "".join(out)
+    while "__" in s:
+        s = s.replace("__", "_")
+    return s.strip("_")[:40]
+
+
+def _buat_dir_sesi(root, nama=""):
     """Struktur sesi (audit 13 Okt — alur file jelas & siap delivery):
 
-    <root>/<YYYYMMDD_HHMMSS>_dive/
+    <root>/<YYYYMMDD_HHMMSS>_<nama-sesi>/
         compressed/   video .mkv + snapshot .png (jalur stream BlueOS)
         raw/          chunk RAW hasil transfer dari Pi (arsip utuh, per kamera)
         mavlink.tlog  /  session_start.json / session_end.json
     """
     os.makedirs(root, exist_ok=True)
-    d = os.path.join(root, time.strftime("%Y%m%d_%H%M%S") + "_dive")
+    d = os.path.join(root, "%s_%s" % (time.strftime("%Y%m%d_%H%M%S"),
+                                      _slug(nama) or "dive"))
     os.makedirs(os.path.join(d, "compressed"), exist_ok=True)
     os.makedirs(os.path.join(d, "raw"), exist_ok=True)
     return d
@@ -101,7 +116,20 @@ class RovConsole(QtWidgets.QMainWindow):
         self.args = args
         self.setWindowTitle("DeepVertex ROV Mission Console")
         self.resize(1620, 1000)
-        self.sesi = _buat_dir_sesi(os.path.expanduser(args.outdir))
+        # NAMA SESI (permintaan pemilik 13 Okt): bisa lewat --nama-sesi, atau
+        # ditanya sekali saat start. Otomasi memakai --no-prompt / --nama-sesi "".
+        _nama = getattr(args, "nama_sesi", None)
+        if _nama is None and not getattr(args, "no_prompt", False):
+            try:
+                _nama, _ok = QtWidgets.QInputDialog.getText(
+                    None, "Session name",
+                    "Name this session (blank = \u201cdive\u201d):",
+                    text="dive")
+                _nama = _nama.strip() if _ok else ""
+            except Exception:                              # noqa: BLE001
+                _nama = ""
+        self.nama_sesi = (_nama or "").strip()
+        self.sesi = _buat_dir_sesi(os.path.expanduser(args.outdir), self.nama_sesi)
         self.last = {}
         self._preset = args.preset if args.preset in self.SPESIFIKASI else self.PRESET_BAWAAN
         self._tilt = 1500
@@ -914,6 +942,15 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_sesi.setWordWrap(True)
         self.lbl_sesi.setToolTip(self.sesi)
         p.body_layout.addWidget(self.lbl_sesi)
+        row_sesi = QtWidgets.QHBoxLayout()
+        b_sesi = QtWidgets.QPushButton("SESSION NAME…")
+        b_sesi.setObjectName("BtnTiny")
+        b_sesi.setToolTip("rename this session — the folder (video, photos, tlog) "
+                          "moves together")
+        b_sesi.clicked.connect(self._ganti_nama_sesi_dialog)
+        row_sesi.addWidget(b_sesi)
+        row_sesi.addStretch(1)
+        p.body_layout.addLayout(row_sesi)
         self.lbl_save = QtWidgets.QLabel("save: compressed/ (video+photo) · raw/ (transfer)")
         self.lbl_save.setObjectName("Faint")
         self.lbl_save.setWordWrap(True)
@@ -1404,6 +1441,62 @@ class RovConsole(QtWidgets.QMainWindow):
         else:
             p.stop_record()
 
+    def _ganti_nama_sesi_dialog(self):
+        nama, ok = QtWidgets.QInputDialog.getText(
+            self, "Session name", "Name this session:",
+            text=self.nama_sesi or "dive")
+        if ok:
+            self._ganti_nama_sesi(nama)
+
+    def _ganti_nama_sesi(self, nama):
+        """Ganti nama FOLDER sesi berjalan (compressed/raw/tlog ikut karena satu folder)."""
+        slug = _slug(nama) or "dive"
+        lama = self.sesi
+        base = os.path.basename(lama)
+        bagian = base.split("_")
+        prefix = "_".join(bagian[:2]) if len(bagian) >= 2 else base
+        baru = os.path.join(os.path.dirname(lama), "%s_%s" % (prefix, slug))
+        if baru == lama:
+            self.nama_sesi = nama.strip()
+            return
+        n = 2
+        while os.path.exists(baru):
+            baru = os.path.join(os.path.dirname(lama),
+                                "%s_%s-%d" % (prefix, slug, n))
+            n += 1
+        try:
+            os.rename(lama, baru)                      # fd tlog tetap valid (inode)
+            self.sesi = baru
+            self.nama_sesi = nama.strip()
+            try:
+                self.bridge.tlog_path = os.path.join(baru, "mavlink.tlog")
+            except Exception:                          # noqa: BLE001
+                pass
+            try:
+                self.rawpanel.outdir = os.path.join(baru, "raw")
+            except Exception:                          # noqa: BLE001
+                pass
+            nm = os.path.basename(baru)
+            for _lbl in (getattr(self, "lbl_sesi", None),):
+                if _lbl is not None:
+                    _lbl.setText("session: " + nm)
+                    _lbl.setToolTip(baru)
+            try:
+                self.lbl_save.setToolTip(
+                    "Everything for this dive goes into\n%s\n"
+                    "  compressed/ ← .mkv + .png from the live streams\n"
+                    "  raw/        ← uncompressed chunks transferred from the Pi"
+                    % baru)
+            except Exception:                          # noqa: BLE001
+                pass
+            try:
+                self.sb_sesi.setText("session: " + nm)
+            except Exception:                          # noqa: BLE001
+                pass
+            self._catat("session renamed: " + nm)
+        except OSError as exc:
+            self._catat("session rename failed: %r" % exc)
+
     def _aksi_pad(self, aksi):
         """Tombol fisik REC/PHOTO di gamepad → jalur SAMA dengan tombol GUI."""
         try:
@@ -1764,6 +1857,11 @@ def main():
     ap.add_argument("--right-port", type=int, default=5602)
     ap.add_argument("--raw-agent", default="http://127.0.0.1:8765")
     ap.add_argument("--outdir", default=os.path.expanduser("~/DeepVertex-ROV-Captures"))
+    ap.add_argument("--nama-sesi", default=None,
+                    help="session folder name (e.g. 'Coral Survey A'); "
+                         "blank string = use 'dive'")
+    ap.add_argument("--no-prompt", action="store_true",
+                    help="never ask for a session name (automation)")
     ap.add_argument("--preset", default="pilot-focus",
                     choices=("pilot-focus", "mapping", "setup", "capture"))
     ap.add_argument("--tlog", default="auto",

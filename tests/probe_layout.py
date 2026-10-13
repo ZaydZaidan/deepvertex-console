@@ -34,6 +34,7 @@ def main():
     rc._terapkan_tema(app, "abyss", 1.2)   # WAJIB: QSS+font tema, skala teks operasional
 
     args = SimpleNamespace(
+        nama_sesi=None, no_prompt=True,
         mavlink="udpin:0.0.0.0:14580",
         front_port=5630, left_port=5631, right_port=5632,
         port_front=5630, port_stereo_L=5631, port_stereo_R=5632,

@@ -53,6 +53,7 @@ fakeb = subprocess.Popen([sys.executable, os.path.join(HERE, "fake_vehicle.py"),
                           "--stats", STATS])
 time.sleep(1.0)
 args = SimpleNamespace(
+        nama_sesi=None, no_prompt=True,
     mavlink="udpin:0.0.0.0:14592",
     front_port=5640, left_port=5641, right_port=5642,
     port_front=5640, port_stereo_L=5641, port_stereo_R=5642,

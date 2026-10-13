@@ -28,6 +28,7 @@ def main():
     rc._terapkan_tema(app, "abyss", 1.2)
 
     args = SimpleNamespace(
+        nama_sesi=None, no_prompt=True,
         mavlink="udpin:0.0.0.0:14584",
         front_port=5636, left_port=5637, right_port=5638,
         port_front=5636, port_stereo_L=5637, port_stereo_R=5638,
