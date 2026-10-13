@@ -91,7 +91,7 @@ class PadMapDialog(QtWidgets.QDialog):
             l1.setToolTip(tip)
             l2 = QtWidgets.QLabel("—")
             l2.setObjectName("RowValue")
-            b = QtWidgets.QPushButton("UBAH")
+            b = QtWidgets.QPushButton("CHANGE")
             b.setObjectName("BtnTiny")
             b.setToolTip("klik, lalu tekan tombol / gerakkan sumbu yang baru")
             b.clicked.connect(lambda _=False, k=key: self._mulai_tangkap(k))
@@ -114,10 +114,10 @@ class PadMapDialog(QtWidgets.QDialog):
         lab_p.setObjectName("MicroLabel")
         self.cb_preset = QtWidgets.QComboBox()
         self.cb_preset.setToolTip("preset pad tersimpan (termasuk buatan Anda)")
-        b_apply = QtWidgets.QPushButton("TERAPKAN")
+        b_apply = QtWidgets.QPushButton("APPLY")
         b_apply.setObjectName("BtnTiny")
         b_apply.clicked.connect(self._terapkan)
-        b_save = QtWidgets.QPushButton("SIMPAN SEBAGAI…")
+        b_save = QtWidgets.QPushButton("SAVE AS…")
         b_save.setObjectName("BtnTiny")
         b_save.setToolTip("simpan mapping sekarang sebagai preset dengan nama bebas")
         b_save.clicked.connect(self._simpan)
@@ -126,10 +126,10 @@ class PadMapDialog(QtWidgets.QDialog):
         row.addWidget(b_apply)
         row.addWidget(b_save)
         v.addLayout(row)
-        b_close = QtWidgets.QPushButton("TUTUP")
+        b_close = QtWidgets.QPushButton("CLOSE")
         b_close.setObjectName("BtnTiny")
         b_close.clicked.connect(self.close)
-        v.addWidget(b_close, 0, QtWidgets.QHBoxLayout and 0 or 0)
+        v.addWidget(b_close)
 
         self._tangkap = None
         self._prev_btn = set()
@@ -160,7 +160,7 @@ class PadMapDialog(QtWidgets.QDialog):
     def _muat_presets(self):
         data = self._baca_file()
         self.cb_preset.clear()
-        self.cb_preset.addItem("Default (bawaan)", "Default")
+        self.cb_preset.addItem("Default (built-in)", "Default")
         for nama in sorted(data["presets"]):
             if nama != "Default":
                 self.cb_preset.addItem(nama, nama)
@@ -183,20 +183,20 @@ class PadMapDialog(QtWidgets.QDialog):
                 json.dump(data, f, indent=2)
         except Exception:                                  # noqa: BLE001
             pass
-        self.lbl_status.setText("preset aktif: %s" % nama)
+        self.lbl_status.setText("active preset: %s" % nama)
         self._segarkan()
 
     def _simpan(self):
         nama, ok = QtWidgets.QInputDialog.getText(
-            self, "Simpan preset pad", "Nama preset (bebas, mis. “Custom A”):")
+            self, "Save pad preset", "Preset name (free, e.g. “Custom A”):")
         if not ok or not nama.strip():
             return
         nama = nama.strip()[:24]
         if self.gamepad.simpan_preset(nama):
-            self.lbl_status.setText("disimpan sebagai preset “%s” (jadi aktif)" % nama)
+            self.lbl_status.setText("saved as preset “%s” (now active)" % nama)
             self._muat_presets()
         else:
-            self.lbl_status.setText("GAGAL menyimpan preset")
+            self.lbl_status.setText("could not save the preset")
 
     # ------------------------------------------------------------------ remap
     def _mulai_tangkap(self, key):
@@ -205,8 +205,8 @@ class PadMapDialog(QtWidgets.QDialog):
         for k, l in self.lbl.items():
             l.setStyleSheet("")
         self.lbl[key].setStyleSheet("color:%s; font-weight:800" % theme.warna("accent"))
-        self.lbl_status.setText("MENUNGGU INPUT — tekan tombol / gerakkan sumbu "
-                                "untuk “%s”…" % key)
+        self.lbl_status.setText("WAITING FOR INPUT — press a button / move an axis "
+                                "for “%s”…" % key)
         try:
             self.gamepad.sig_live.connect(self._live)
         except Exception:                                  # noqa: BLE001
@@ -214,7 +214,7 @@ class PadMapDialog(QtWidgets.QDialog):
 
     def _selesai_tangkap(self, teks):
         self._tangkap = None
-        self.lbl_status.setText("diubah: " + teks)
+        self.lbl_status.setText("changed: " + teks)
         self._segarkan()
 
     def _live(self, live):
@@ -259,7 +259,7 @@ class PadMapDialog(QtWidgets.QDialog):
                 if tipe == "axis":
                     teks = _nama_sumbu(val)
                 elif key == "deadman_buttons":
-                    teks = " atau ".join(_nama_tombol(x) for x in (val or []))
+                    teks = " or ".join(_nama_tombol(x) for x in (val or []))
                     if not teks:
                         teks = "—"
                 else:

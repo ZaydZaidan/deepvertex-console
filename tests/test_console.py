@@ -246,6 +246,21 @@ def main():
     print("[22] preset pad bernama simpan/muat:", ok_p22)
     lulus &= bool(ok_p22)
 
+    # [23] halaman gamepad mapping: dialog HARUS bisa dikonstruksi (bug 13 Okt:
+    #     addWidget(b, 0, int) -> TypeError, tombol PAD MAPPING terlihat "ngebug")
+    try:
+        import padmap as _pm
+        d23 = _pm.PadMapDialog(w.gamepad, w)
+        d23.show()
+        ok23 = (d23.lbl["axis_fwd"].text() not in ("", "—")) and \
+            (d23.lbl["deadman_buttons"].text() != "")
+        d23.close()
+        print("[23] dialog pad mapping konstruksi:", ok23)
+        lulus &= bool(ok23)
+    except Exception as exc:                               # noqa: BLE001
+        print("[23] dialog pad mapping GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
