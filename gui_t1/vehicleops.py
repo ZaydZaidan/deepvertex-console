@@ -15,6 +15,7 @@ Catatan MAV_CMD (VERIFY = konfirmasi dokumen/uji hardware):
 """
 import json
 import os
+import time
 
 from PySide6 import QtCore, QtWidgets
 
@@ -48,6 +49,11 @@ ACCEL_POSISI = (
 
 def _judul_dialog(d, judul):
     d.setWindowTitle(judul)
+
+
+# Folder khusus APLIKASI untuk berkas simpanan (profil failsafe, dump parameter).
+PASTA_SIMPAN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saved")
+os.makedirs(PASTA_SIMPAN, exist_ok=True)
 
 
 class SimpleCalDialog(QtWidgets.QDialog):
@@ -390,9 +396,19 @@ class ParamBrowser(QtWidgets.QWidget):
         b_set = QtWidgets.QPushButton("SET…")
         b_set.setObjectName("BtnTiny")
         b_set.clicked.connect(self._set)
+        b_save_p = QtWidgets.QPushButton("SAVE…")
+        b_save_p.setObjectName("BtnTiny")
+        b_save_p.setToolTip("write ALL loaded parameters to saved/params_<time>.json")
+        b_save_p.clicked.connect(lambda: self.simpan())
+        b_load_p = QtWidgets.QPushButton("LOAD…")
+        b_load_p.setObjectName("BtnTiny")
+        b_load_p.setToolTip("read a parameter file from saved/ and send as PARAM_SET")
+        b_load_p.clicked.connect(lambda: self.muat())
         row.addWidget(self.filter, 1)
         row.addWidget(b_unduh)
         row.addWidget(b_set)
+        row.addWidget(b_save_p)
+        row.addWidget(b_load_p)
         v.addLayout(row)
         self.tabel = QtWidgets.QTableWidget(0, 2)
         self.tabel.setHorizontalHeaderLabels(["PARAMETER", "VALUE"])
@@ -402,6 +418,10 @@ class ParamBrowser(QtWidgets.QWidget):
         self.tabel.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tabel.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         v.addWidget(self.tabel, 1)
+        _hp = QtWidgets.QLabel("save/load → saved/  (inside the app folder)")
+        _hp.setObjectName("Faint")
+        _hp.setToolTip(PASTA_SIMPAN)
+        v.addWidget(_hp)
         self.lbl = QtWidgets.QLabel("click RELOAD to load parameters —")
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
@@ -409,6 +429,52 @@ class ParamBrowser(QtWidgets.QWidget):
         bridge.sig_param.connect(self._param)
         bridge.sig_params_done.connect(
             lambda n: self.lbl.setText("done — %d parameters loaded" % n))
+
+    def simpan(self, path=None):
+        """Dump EVERY row shown in the table to JSON (default: saved/params_<time>.json)."""
+        d = {}
+        for i in range(self.tabel.rowCount()):
+            it0 = self.tabel.item(i, 0)
+            it1 = self.tabel.item(i, 1)
+            if it0 is None or it1 is None:
+                continue
+            try:
+                d[it0.text()] = float(it1.text())
+            except (TypeError, ValueError):
+                continue
+        if path is None:
+            nama = "params_%s.json" % time.strftime("%Y%m%d_%H%M%S")
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save parameters", os.path.join(PASTA_SIMPAN, nama), "JSON (*.json)")
+        if not path:
+            return 0
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(d, f, indent=2, sort_keys=True)
+        self.lbl.setText("saved %d parameters: %s" % (len(d), path))
+        return len(d)
+
+    def muat(self, path=None):
+        """Read a parameter file (default: from saved/) and send every entry as PARAM_SET."""
+        if path is None:
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Load parameters", PASTA_SIMPAN, "JSON (*.json)")
+        if not path:
+            return 0
+        try:
+            with open(path, encoding="utf-8") as f:
+                d = json.load(f)
+        except Exception as exc:                           # noqa: BLE001
+            self.lbl.setText("failed to load file: %r" % exc)
+            return 0
+        n = 0
+        for nama, val in d.items():
+            try:
+                self.bridge.queue_param_set(str(nama), float(val))
+                n += 1
+            except (TypeError, ValueError):
+                continue
+        self.lbl.setText("loaded %d parameters from %s — sent as PARAM_SET" % (n, path))
+        return n
 
     def _baris(self, nama):
         for i in range(self.tabel.rowCount()):
@@ -529,9 +595,12 @@ class FailsafePanel(QtWidgets.QWidget):
         b_terap.setToolTip("send every value shown to the autopilot")
         b_terap.clicked.connect(self.terapkan)
         b_sim = QtWidgets.QPushButton("SAVE FILE")
+        b_sim.setToolTip("write the current values to saved/failsafe.json "
+                         "(inside the app folder)")
         b_sim.setObjectName("BtnTiny")
         b_sim.clicked.connect(self.simpan)
         b_ld = QtWidgets.QPushButton("LOAD FILE")
+        b_ld.setToolTip("read a profile from saved/ (inside the app folder)")
         b_ld.setObjectName("BtnTiny")
         b_ld.clicked.connect(self.muat_file)
         row.addStretch(1)
@@ -542,6 +611,11 @@ class FailsafePanel(QtWidgets.QWidget):
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         v.addWidget(self.lbl)
+        _hint = QtWidgets.QLabel("save/load → saved/  (inside the app folder)")
+        _hint.setObjectName("Faint")
+        _hint.setWordWrap(True)
+        _hint.setToolTip("Files are written to and read from:\n%s" % PASTA_SIMPAN)
+        v.addWidget(_hint)
         bridge.sig_param.connect(self._param)
 
     def _param(self, nama, nilai):
@@ -570,22 +644,27 @@ class FailsafePanel(QtWidgets.QWidget):
             n += 1
         self.lbl.setText("%d parameter dikirim (PARAM_SET) — cek ACK/notifikasi" % n)
 
-    def simpan(self):
+    def simpan(self, path=None):
+        """Save the failsafe profile (default: app folder saved/failsafe.json)."""
         d = {}
         for nama, w in self.wdg.items():
             d[nama] = w.currentData() if isinstance(w, QtWidgets.QComboBox) else w.value()
-        p, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save failsafe", "failsafe.json",
-                                                     "JSON (*.json)")
-        if p:
-            with open(p, "w", encoding="utf-8") as f:
+        if path is None:
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save failsafe", os.path.join(PASTA_SIMPAN, "failsafe.json"),
+                "JSON (*.json)")
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(d, f, indent=2)
-            self.lbl.setText("disimpan: %s" % p)
+            self.lbl.setText("saved: %s" % path)
 
-    def muat_file(self):
-        p, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Load failsafe", "",
-                                                     "JSON (*.json)")
-        if not p:
+    def muat_file(self, path=None):
+        if path is None:
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Load failsafe", PASTA_SIMPAN, "JSON (*.json)")
+        if not path:
             return
+        p = path
         try:
             with open(p, encoding="utf-8") as f:
                 d = json.load(f)

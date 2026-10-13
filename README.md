@@ -35,6 +35,13 @@ them into this session's `raw/`). Cameras: **front = Blue Robotics Low-Light HD 
 shutter, native YUY2; recommended 1280×720@30 for streaming). SNAPSHOT is always a
 quick .png into `compressed/`.
 
+## Saved settings (inside the app)
+
+The console keeps your saved settings in its own `gui_t1/saved/` folder:
+`failsafe.json` (FAILSAFE & BATTERY panel → SAVE FILE) and
+`params_<timestamp>.json` full dumps (PARAMETERS panel → SAVE… / LOAD…).
+Both panels show the folder in-line and the file dialogs open there by default.
+
 ## Status (13 Oct 2026)
 
 Console **v2.3** — all tests PASS without hardware. Key capabilities:

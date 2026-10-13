@@ -303,6 +303,38 @@ def main():
         print("[25] alur file GAGAL:", repr(exc))
         lulus = False
 
+    # [26] save/load parameter & failsafe → folder APLIKASI saved/ (roundtrip)
+    try:
+        ok26 = os.path.isdir(VO.PASTA_SIMPAN)
+        fp = VO.FailsafePanel(w.bridge)
+        pa = os.path.join(VO.PASTA_SIMPAN, "_uji_failsafe.json")
+        fp.simpan(path=pa)
+        ok26 = ok26 and os.path.exists(pa)
+        fp.muat_file(path=pa)
+        ok26 = ok26 and os.path.exists(pa)
+        try:
+            os.remove(pa)
+        except OSError:
+            pass
+        pb = w.P["params"].findChild(VO.ParamBrowser)
+        ok26 = ok26 and (pb is not None)
+        if pb is not None:
+            pj = os.path.join(VO.PASTA_SIMPAN, "_uji_params.json")
+            n_save = pb.simpan(path=pj)
+            n_ps = len(baca_stats().get("param_set", []))
+            n_load = pb.muat(path=pj)
+            tunggu(lambda: len(baca_stats().get("param_set", [])) > n_ps, 6)
+            ok26 = ok26 and (n_save >= 10) and (n_load == n_save)
+            try:
+                os.remove(pj)
+            except OSError:
+                pass
+        print("[26] save/load parameter -> saved/:", ok26)
+        lulus &= bool(ok26)
+    except Exception as exc:                               # noqa: BLE001
+        print("[26] save/load GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
