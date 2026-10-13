@@ -346,7 +346,7 @@ QMenuBar {
     border-bottom: 1px solid $line;
     padding: 1px 4px;
 }
-QMenuBar::item { background: transparent; padding: 4px 10px; border-radius: 3px; }
+QMenuBar::item { background: transparent; padding: 4px 10px; border-radius: 8px; }
 QMenuBar::item:selected { background: $head; color: $ink; }
 QMenuBar::item:pressed { background: $line; }
 QMenu {
@@ -355,7 +355,7 @@ QMenu {
     border: 1px solid $line;
     padding: 4px;
 }
-QMenu::item { padding: 5px 22px 5px 14px; border-radius: 3px; }
+QMenu::item { padding: 5px 22px 5px 14px; border-radius: 8px; }
 QMenu::item:selected { background: $line_hi; }
 QMenu::item:disabled { color: $ink_faint; }
 QMenu::separator { height: 1px; background: $line; margin: 4px 6px; }
@@ -365,12 +365,15 @@ QPushButton {
     background: $raise_;
     color: $ink;
     border: 1px solid $line_hi;
-    border-radius: 2px;
-    padding: 3px 9px;
+    border-radius: 8px;
+    padding: 3px 10px;
+    min-height: 22px;
     font-size: 10px;
     letter-spacing: 0.8px;
 }
 QPushButton:hover   { border-color: $accent; color: $accent_text; }
+QPushButton:pressed { background: $head; border-color: $accent; }
+QPushButton:focus   { border-color: $accent; }
 QPushButton:disabled { color: $ink_faint; border-color: $line; }
 QPushButton:checked { background: $accent_tint; border-color: $accent; color: $ink; }
 QPushButton#BtnPrimary {
@@ -392,30 +395,32 @@ QPushButton#BtnTiny { min-height: 18px; padding: 0 6px; font-size: 10px; }
    pan/tilt and log-fold buttons deliberately KEEP the larger BtnTiny size. */
 QPushButton#BtnRow { min-height: 13px; padding: 0 4px; font-size: 10px; }
 QPushButton#SegBtn {
-    background: transparent; border: 1px solid $line; border-radius: 2px;
+    background: transparent; border: 1px solid $line; border-radius: 8px;
     padding: 1px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
     color: $ink_dim;
 }
 QPushButton#SegBtn:checked { background: $accent_tint; color: $accent_text;
                              border-color: $accent; }
 QPushButton#SegBtn:hover:!checked { background: $raise_; color: $ink; }
+QPushButton#SegBtn:pressed { background: $head; }
 
 /* --- number fields: must READ as editable --- */
 QDoubleSpinBox, QSpinBox, QLineEdit {
     background: $raise_; color: $ink; border: 1px solid $line_hi;
-    border-radius: 2px; padding: 2px 6px; font-size: 12px; font-weight: 500;
+    border-radius: 8px; padding: 2px 6px; font-size: 12px; font-weight: 500;
     selection-background-color: $accent; selection-color: $on_accent;
 }
 QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus { border-color: $accent; }
 QComboBox {
     background: $raise_; color: $ink; border: 1px solid $line_hi;
-    border-radius: 2px; padding: 2px 6px; font-size: 11px;
+    border-radius: 8px; padding: 2px 6px; font-size: 11px;
 }
+QComboBox:focus { border-color: $accent; }
 QComboBox QAbstractItemView { background: $panel; color: $ink;
                               border: 1px solid $line; selection-background-color: $line_hi; }
 QCheckBox { color: $ink; font-size: 11px; }
 QCheckBox::indicator { width: 12px; height: 12px; border: 1px solid $line_hi;
-                       background: $raise_; border-radius: 2px; }
+                       background: $raise_; border-radius: 8px; }
 QCheckBox::indicator:checked { background: $accent; border-color: $accent; }
 
 QTabWidget::pane { border: 1px solid $line; background: $panel; }
@@ -466,9 +471,10 @@ def qss(nama=None):
     t["font"] = keluarga()
     out = _QSS.substitute(t) + "\n" + Template(_aturan_peran()).substitute(t)
     if SKALA != 1.0:
-        # semua font-size QSS diskalakan sekaligus (satu tempat, tak ada yang terlewat)
-        out = re.sub(r"font-size:\s*([0-9.]+)px",
-                     lambda m: "font-size: %dpx" % px(float(m.group(1))), out)
+        # SEMUA ukuran px di QSS ikut SKALA (font, padding, radius, min-height, lebar
+        # scrollbar) — proporsi tetap utuh di 100/120/140% (audit grid 13 Okt).
+        out = re.sub(r"([0-9]+(?:\.[0-9]+)?)px",
+                     lambda m: "%dpx" % px(float(m.group(1))), out)
     return out
 
 

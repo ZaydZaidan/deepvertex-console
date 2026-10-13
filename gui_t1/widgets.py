@@ -239,7 +239,7 @@ class Chip(QtWidgets.QWidget):
         # TOKEN, bukan hex: chip selalu diwarnai ulang dari palet aktif saat menggambar.
         self._token = "ink_faint"
         self._detail = ""
-        self.setMinimumHeight(18)
+        self.setMinimumHeight(theme.px(20))
         self.setMinimumWidth(70)
 
     def lebar_teks(self):
@@ -247,7 +247,7 @@ class Chip(QtWidgets.QWidget):
         f = QtGui.QFont(theme.KELUARGA if hasattr(theme, "KELUARGA") else theme.FONT_UI)
         f.setPixelSize(theme.px(9))
         f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0.9)
-        lebar = 16 + QtGui.QFontMetricsF(f).horizontalAdvance(self._text.upper())
+        lebar = theme.px(16) + QtGui.QFontMetricsF(f).horizontalAdvance(self._text.upper())
         if self._detail:
             fv = QtGui.QFont(f)
             fv.setPixelSize(theme.px(10))
@@ -256,10 +256,10 @@ class Chip(QtWidgets.QWidget):
         return int(lebar) + 8
 
     def sizeHint(self):
-        return QtCore.QSize(max(70, self.lebar_teks()), 18)
+        return QtCore.QSize(max(70, self.lebar_teks()), theme.px(20))
 
     def minimumSizeHint(self):
-        return QtCore.QSize(max(70, self.lebar_teks()), 18)
+        return QtCore.QSize(max(70, self.lebar_teks()), theme.px(20))
 
     def set_state(self, color, detail=""):
         self._token, self._detail = theme.token_dari(color), detail
@@ -273,10 +273,11 @@ class Chip(QtWidgets.QWidget):
         w, h = self.width(), self.height()
         p.setPen(QtGui.QColor(theme.HAIRLINE_HI))
         p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 2, 2)
+        r = theme.px(6)
+        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), r, r)
         p.setPen(Qt.NoPen)
         p.setBrush(QtGui.QColor(theme.hexa(self._token)))
-        p.drawEllipse(QPointF(8, h / 2), 3, 3)
+        p.drawEllipse(QPointF(theme.px(8), h / 2), 3, 3)
         f = p.font()
         f.setFamily(theme.FONT_UI)
         f.setPixelSize(theme.px(9))
@@ -290,15 +291,17 @@ class Chip(QtWidgets.QWidget):
         kunci = self._text.upper()
         p.setFont(fk)
         p.setPen(QtGui.QColor(theme.TEXT_FAINT))
-        p.drawText(QRectF(16, 0, w - 20, h), Qt.AlignLeft | Qt.AlignVCenter, kunci)
+        p.drawText(QRectF(theme.px(16), 0, w - theme.px(20), h),
+                   Qt.AlignLeft | Qt.AlignVCenter, kunci)
         if self._detail:
-            lebar_kunci = QtGui.QFontMetricsF(fk).horizontalAdvance(kunci) + 5
+            lebar_kunci = QtGui.QFontMetricsF(fk).horizontalAdvance(kunci) + theme.px(5)
             fv = p.font()
             fv.setPixelSize(theme.px(10))
             fv.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0)
             p.setFont(fv)
             p.setPen(QtGui.QColor(theme.TEXT))
-            p.drawText(QRectF(16 + lebar_kunci, 0, max(4.0, w - 20 - lebar_kunci), h),
+            p.drawText(QRectF(theme.px(16) + lebar_kunci, 0,
+                              max(4.0, w - theme.px(20) - lebar_kunci), h),
                        Qt.AlignLeft | Qt.AlignVCenter, str(self._detail))
         p.end()
 

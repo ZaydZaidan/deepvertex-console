@@ -56,11 +56,14 @@ class RovConsole(QtWidgets.QMainWindow):
     SPESIFIKASI = {
         "pilot-focus": {
             "lebar_kiri": 350,
-            "left": ["flight", "instruments", "power", "vehicle", "preflight"],
+            # urutan PRIORITAS (audit 13 Okt): kontrol & baterai di atas; checklist
+            # (sekunder) di bawah — rel bisa discroll.
+            "left": ["flight", "vehicle", "power", "instruments", "preflight"],
             # kamera TANPA stretch: panel mengunci pas rasio frame (gambar penuh)
             "mid": [("cam_front", 0), ("peta", 1)],
-            "right": ["notif", "cam_left", "cam_right", "teleop", "capture",
-                      "raw", "soon"],
+            # sekunder turun: notifikasi BUKAN di atas; capture & teleop yang penting
+            "right": ["capture", "teleop", "cam_left", "cam_right", "raw",
+                      "notif", "soon"],
         },
         "mapping": {
             "lebar_kiri": 350,
@@ -78,7 +81,8 @@ class RovConsole(QtWidgets.QMainWindow):
             "lebar_kiri": 350,
             "left": ["flight", "power", "preflight"],
             "mid": [("cam_front", 0), ("peta", 1)],
-            "right": ["notif", "cam_left", "cam_right", "capture", "raw", "teleop"],
+            "right": ["capture", "teleop", "cam_left", "cam_right", "raw",
+                      "notif"],
         },
     }
 
@@ -195,8 +199,9 @@ class RovConsole(QtWidgets.QMainWindow):
         h.setObjectName("Header")
         h.setAttribute(Qt.WA_StyledBackground, True)
         baris = QtWidgets.QHBoxLayout(h)
-        baris.setContentsMargins(12, 6, 12, 6)
-        baris.setSpacing(12)
+        baris.setContentsMargins(theme.px(12), theme.px(6),
+                                 theme.px(12), theme.px(6))
+        baris.setSpacing(theme.px(12))
         # LOGO MONO resmi (lockup, GAMBAR — bukan teks), sama seperti navbar web.
         # Brand guide: lockup horizontal minimal 240 px lebar -> tinggi ≈ 65 px.
         self.brand_mark = QtWidgets.QLabel()
@@ -395,13 +400,38 @@ class RovConsole(QtWidgets.QMainWindow):
                    (isinstance(item, str) and item in ("cam_front", "params"))
                    for item in mid):
             self._lay_mid.addStretch(1)
+        self._fade_masuk()
+
+    def _fade_masuk(self):
+        """Apple-feel: konten muncul dengan fade 160 ms ease-out saat preset berganti
+        (bukan 'jeglek'). Efek dihapus setelah selesai — tidak permanen (hemat render)."""
+        try:
+            eff = QtWidgets.QGraphicsOpacityEffect(self)
+            self.setGraphicsEffect(eff)
+            ani = QtCore.QPropertyAnimation(eff, b"opacity", self)
+            ani.setDuration(160)
+            ani.setStartValue(0.55)
+            ani.setEndValue(1.0)
+            ani.setEasingCurve(QtCore.QEasingCurve.OutCubic)
+
+            def _selesai():
+                try:
+                    self.setGraphicsEffect(None)
+                except Exception:                          # noqa: BLE001
+                    pass
+
+            ani.finished.connect(_selesai)
+            self._anim_fade = ani                          # cegah GC
+            ani.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+        except Exception:                                  # noqa: BLE001
+            pass
 
     def _baris_bawah(self, keys):
         if self._baris_row is None:
             self._baris_row = QtWidgets.QWidget(self.col_mid)
             rl = QtWidgets.QHBoxLayout(self._baris_row)
             rl.setContentsMargins(0, 0, 0, 0)
-            rl.setSpacing(6)
+            rl.setSpacing(theme.px(6))
             self._baris_lay = rl
         U.kosongkan(self._baris_lay)
         self._baris_row.setMinimumHeight(150)
