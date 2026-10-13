@@ -389,15 +389,15 @@ QPushButton#BtnGhost:hover { border-color: $accent; color: $accent_text; }
 QPushButton#BtnBig {
     min-height: 30px; font-size: 12px; font-weight: 600; letter-spacing: 2px;
 }
-QPushButton#BtnTiny { min-height: 18px; padding: 0 6px; font-size: 10px; }
+QPushButton#BtnTiny { min-height: 20px; padding: 0 8px; font-size: 10px; }
 /* STACK-row buttons (2 Oct 2026): the component list must stay compact so the owner's
    right rail fits WITHOUT a scrollbar at 1620x978 (test R9_kanan_1620x978). The pilot's
    pan/tilt and log-fold buttons deliberately KEEP the larger BtnTiny size. */
-QPushButton#BtnRow { min-height: 13px; padding: 0 4px; font-size: 10px; }
+QPushButton#BtnRow { min-height: 16px; padding: 0 6px; font-size: 10px; }
 QPushButton#SegBtn {
     background: transparent; border: 1px solid $line; border-radius: 8px;
-    padding: 1px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
-    color: $ink_dim;
+    padding: 0 10px; min-height: 20px; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.8px; color: $ink_dim;
 }
 QPushButton#SegBtn:checked { background: $accent_tint; color: $accent_text;
                              border-color: $accent; }
@@ -407,20 +407,20 @@ QPushButton#SegBtn:pressed { background: $head; }
 /* --- number fields: must READ as editable --- */
 QDoubleSpinBox, QSpinBox, QLineEdit {
     background: $raise_; color: $ink; border: 1px solid $line_hi;
-    border-radius: 8px; padding: 2px 6px; font-size: 12px; font-weight: 500;
+    border-radius: 8px; padding: 0 8px; min-height: 20px; font-size: 12px; font-weight: 500;
     selection-background-color: $accent; selection-color: $on_accent;
 }
 QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus { border-color: $accent; }
 QComboBox {
     background: $raise_; color: $ink; border: 1px solid $line_hi;
-    border-radius: 8px; padding: 2px 6px; font-size: 11px;
+    border-radius: 8px; padding: 0 8px 0 10px; min-height: 20px; font-size: 11px;
 }
 QComboBox:focus { border-color: $accent; }
 QComboBox QAbstractItemView { background: $panel; color: $ink;
                               border: 1px solid $line; selection-background-color: $line_hi; }
 QCheckBox { color: $ink; font-size: 11px; }
 QCheckBox::indicator { width: 12px; height: 12px; border: 1px solid $line_hi;
-                       background: $raise_; border-radius: 8px; }
+                       background: $raise_; border-radius: 4px; }
 QCheckBox::indicator:checked { background: $accent; border-color: $accent; }
 
 QTabWidget::pane { border: 1px solid $line; background: $panel; }

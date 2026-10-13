@@ -170,6 +170,19 @@ def main():
     print("[15] RC override tilt dipertahankan (keep-alive):", ok_keep)
     lulus &= bool(ok_keep)
 
+    # [18] UI tilt responsif berulang (regresi crash paint 13 Okt)
+    for v in (1900, 1100, 1850, 1150, 1700):
+        w.sl_tilt.setValue(v)
+        jalan(0.05)
+    w.sl_tilt.setValue(1600)
+    jalan(0.1)
+    w.sp_tilt.setValue(30)          # ketik di kotak persen -> slider harus ikut
+    jalan(0.1)
+    ok_tilt = (w.sl_tilt.value() == 1340) and (int(w._tilt) == 1340)
+    print("[18] UI tilt responsif (slider & spin):", ok_tilt,
+          "(slider=%d spin=%d)" % (w.sl_tilt.value(), w.sp_tilt.value()))
+    lulus &= bool(ok_tilt)
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

@@ -258,9 +258,14 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_pad_big = QtWidgets.QLabel("PAD · NOT FOUND")
         for lb in (self.lbl_mode_big, self.lbl_arm_big, self.lbl_pad_big):
             lb.setAlignment(Qt.AlignCenter)
-        baris.addWidget(self.lbl_mode_big)
-        baris.addWidget(self.lbl_arm_big)
-        baris.addWidget(self.lbl_pad_big)
+            lb.setTextFormat(Qt.RichText)
+        klaster = QtWidgets.QWidget()
+        kl = QtWidgets.QHBoxLayout(klaster)
+        kl.setContentsMargins(0, 0, 0, 0)
+        kl.setSpacing(theme.px(6))
+        for lb in (self.lbl_mode_big, self.lbl_arm_big, self.lbl_pad_big):
+            kl.addWidget(lb)
+        baris.addWidget(klaster)
         self._gaya_banner(None, None)
         self._gaya_pad(False)
         baris.addWidget(self.chip_bar)
@@ -499,14 +504,15 @@ class RovConsole(QtWidgets.QMainWindow):
         p = W.Panel("INSTRUMENTS · SUB (QGC)", "cam tilt · lights · gain · tether", domain="field")
         grid2 = QtWidgets.QGridLayout()
         grid2.setSpacing(6)
+        # AUDIT FUNGSI (13 Okt): hanya yang BENAR-BENAR punya data dari robot ini.
+        # RANGEFINDER dibuang (0 pesan DISTANCE_SENSOR — tidak ada sensor);
+        # TETHER dibuang (TetherTrn konstan 0 — tidak ada mesin tether pada ROV ini).
         self.ro_camtilt = W.Readout("Cam Tilt", "%", size=14)
         self.ro_lights = W.Readout("Lights1", "%", size=14)
         self.ro_gain = W.Readout("Pilot Gain", "%", size=14)
-        self.ro_tether = W.Readout("Tether", "x", size=14)
         self.ro_water = W.Readout("Water", "°C", size=14)
-        self.ro_range = W.Readout("Rangefinder", "m", size=14)
         for i, r in enumerate((self.ro_camtilt, self.ro_lights, self.ro_gain,
-                               self.ro_tether, self.ro_water, self.ro_range)):
+                               self.ro_water)):
             grid2.addWidget(r, i // 2, i % 2)
         p.body_layout.addLayout(grid2)
         P["instruments"] = p
@@ -579,12 +585,31 @@ class RovConsole(QtWidgets.QMainWindow):
         self.sl_tilt.setValue(1500)
         self.sl_tilt.setToolTip("tilt kamera depan (kanal RC8 — VERIFY kolam)")
         self.sl_tilt.valueChanged.connect(self._set_tilt)
+        self.sp_lights = QtWidgets.QSpinBox()
+        self.sp_lights.setRange(0, 100)
+        self.sp_lights.setSuffix("%")
+        self.sp_lights.setFixedWidth(theme.px(64))
+        self.sp_lights.setToolTip("ketik 0-100 lalu Enter (sama dengan slider)")
+        self.sp_lights.valueChanged.connect(self._spin_lights)
         row2.addWidget(lab)
         row2.addWidget(self.sl_lights, 1)
-        row2.addWidget(lab2)
-        row2.addWidget(self.sl_tilt, 1)
-        row2.addWidget(b_tc)
+        row2.addWidget(self.sp_lights)
         p.body_layout.addLayout(row2)
+        row3x = QtWidgets.QHBoxLayout()
+        row3x.setSpacing(theme.px(4))
+        row3x.addWidget(lab2)
+        row3x.addWidget(self.sl_tilt, 1)
+        self.sp_tilt = QtWidgets.QSpinBox()
+        self.sp_tilt.setRange(0, 100)
+        self.sp_tilt.setSuffix("%")
+        self.sp_tilt.setFixedWidth(theme.px(64))
+        self.sp_tilt.setValue(50)
+        self.sp_tilt.setToolTip("ketik 0-100 lalu Enter. 50 = berhenti; "
+                                ">50 tilt turun, <50 tilt naik (RC8 = komando laju)")
+        self.sp_tilt.valueChanged.connect(self._spin_tilt)
+        row3x.addWidget(self.sp_tilt)
+        row3x.addWidget(b_tc)
+        p.body_layout.addLayout(row3x)
         row3 = QtWidgets.QHBoxLayout()
         row3.setSpacing(6)
         lab3 = QtWidgets.QLabel("GAIN")
@@ -718,12 +743,21 @@ class RovConsole(QtWidgets.QMainWindow):
         # ---- teleop
         p = W.Panel("TELEOP (GAMEPAD)", "deadman wajib · MANUAL_CONTROL", domain="mission")
         self._teleop_bars = {}
-        for kode in ("fwd", "lat", "depth", "yaw", "dpx", "dpy"):
+        # label per bar (audit 13 Okt: pilot tidak bisa tahu bar itu apa tanpa teks)
+        for kode, nama in (("fwd", "FWD"), ("lat", "LAT"), ("depth", "DEPTH"),
+                           ("yaw", "YAW"), ("dpx", "PAD-X"), ("dpy", "PAD-Y")):
+            baris_bar = QtWidgets.QHBoxLayout()
+            baris_bar.setSpacing(theme.px(6))
+            lab = QtWidgets.QLabel(nama)
+            lab.setObjectName("MicroLabel")
+            lab.setFixedWidth(theme.px(44))
             bar = QtWidgets.QProgressBar()
             bar.setRange(-100, 100)
             bar.setTextVisible(False)
-            bar.setFixedHeight(8)
-            p.body_layout.addWidget(bar)
+            bar.setFixedHeight(theme.px(8))
+            baris_bar.addWidget(lab)
+            baris_bar.addWidget(bar, 1)
+            p.body_layout.addLayout(baris_bar)
             self._teleop_bars[kode] = bar
         self.lbl_pad = QtWidgets.QLabel("pad: —")
         self.lbl_pad.setObjectName("MicroLabel")
@@ -882,50 +916,57 @@ class RovConsole(QtWidgets.QMainWindow):
         if w is not None:
             w.setVisible(on)
 
-    def _gaya_banner(self, mode, armed):
-        """Banner besar: MODE + ARMED/DISARMED (warna mengikuti status, ala QGC).
+    def _pill(self, lb, dot, label, value, warna_value, bg="raise_", border="line_hi",
+              semua_terang=False):
+        """Pill status: titik + LABEL kecil + NILAI — satu bahasa dengan chip."""
+        try:
+            c_dot = theme.warna(dot) if isinstance(dot, str) else dot
+            c_lab = theme.warna("on_accent") if semua_terang else theme.warna("ink_faint")
+            c_val = theme.warna(value if semua_terang else warna_value)
+            lb.setText(
+                '<span style="color:%s">●</span>&nbsp;'
+                '<span style="color:%s">%s</span>&nbsp;'
+                '<b><span style="color:%s">%s</span></b>'
+                % (c_dot, c_lab, label, c_val, value))
+            lb.setFixedHeight(theme.px(28))
+            lb.setStyleSheet(
+                "background:%s; border:1px solid %s; border-radius:%dpx;"
+                " padding:0 %dpx; font-size:%dpx; font-weight:600;"
+                % (theme.warna(bg), theme.warna(border), theme.px(8),
+                   theme.px(12), theme.px(11)))
+        except Exception:                                  # noqa: BLE001
+            pass
 
-        DI-CACHE: QSS hanya ditulis ulang bila status berubah — menulis stylesheet
-        yang sama tiap tick pernah membuat banner tampak berkedip.
+    def _gaya_banner(self, mode, armed):
+        """Pill besar: MODE + ARMED/DISARMED — sistem sama dengan chip (dot+label+nilai).
+
+        DI-CACHE: hanya ditulis ulang bila status berubah (anti-kedip).
         """
         try:
             if getattr(self, "_banner_kini", None) == (mode, armed):
                 return
             self._banner_kini = (mode, armed)
+            self._pill(self.lbl_mode_big, "accent", "MODE", str(mode or "—"), "ink")
             if armed is None:
-                fg, bg = theme.warna("ink_dim"), theme.warna("raise_")
-                self.lbl_arm_big.setText("—")
+                self._pill(self.lbl_arm_big, "ink_faint", "ARM", "—", "ink_dim")
             elif armed:
-                fg, bg = theme.warna("on_accent"), theme.warna("err")
-                self.lbl_arm_big.setText("ARMED")
+                self._pill(self.lbl_arm_big, "on_accent", "ARM", "ARMED", "on_accent",
+                           bg="err", border="err", semua_terang=True)
             else:
-                fg, bg = theme.warna("ok"), theme.warna("raise_")
-                self.lbl_arm_big.setText("DISARMED")
-            self.lbl_arm_big.setStyleSheet(
-                "background:%s; color:%s; font-size:%dpx; font-weight:800;"
-                " letter-spacing:2px; padding:3px 12px; border:1px solid %s;"
-                % (bg, fg, theme.px(13), theme.warna("line_hi")))
-            self.lbl_mode_big.setText("MODE · %s" % (mode or "—"))
-            self.lbl_mode_big.setStyleSheet(
-                "color:%s; font-size:%dpx; font-weight:700; letter-spacing:1.5px;"
-                " padding:3px 10px; border:1px solid %s; background:%s;"
-                % (theme.warna("ink"), theme.px(13), theme.warna("line_hi"),
-                   theme.warna("head")))
+                self._pill(self.lbl_arm_big, "ok", "ARM", "DISARMED", "ink_dim")
         except Exception:                                  # noqa: BLE001
             pass
 
     def _gaya_pad(self, konek):
-        """Label besar status GAMEPAD — pilot harus tahu pad tersambung atau tidak."""
+        """Pill status GAMEPAD — pilot harus tahu pad tersambung atau tidak."""
         try:
             if getattr(self, "_pad_kini", None) == bool(konek):
                 return
             self._pad_kini = bool(konek)
-            on = theme.warna("ok") if konek else theme.warna("ink_faint")
-            self.lbl_pad_big.setText("PAD · %s" % ("READY" if konek else "NOT FOUND"))
-            self.lbl_pad_big.setStyleSheet(
-                "color:%s; font-size:%dpx; font-weight:700; letter-spacing:1.2px;"
-                " padding:3px 10px; border:1px solid %s;"
-                % (on, theme.px(12), theme.warna("line_hi")))
+            if konek:
+                self._pill(self.lbl_pad_big, "ok", "PAD", "READY", "ink")
+            else:
+                self._pill(self.lbl_pad_big, "ink_faint", "PAD", "NOT FOUND", "ink_dim")
         except Exception:                                  # noqa: BLE001
             pass
 
@@ -999,8 +1040,32 @@ class RovConsole(QtWidgets.QMainWindow):
         self.bridge.queue_mode(angka)
         self._catat("perintah mode %s (%d) dikirim" % (nama, angka))
 
+    def _spin_lights(self, v):
+        """Ketik persen -> gerakkan slider (satu jalur logika dengan slider)."""
+        try:
+            if self.sl_lights.value() != int(v):
+                self.sl_lights.setValue(int(v))
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _spin_tilt(self, v):
+        """Ketik persen (0-100) -> PWM 1100-1900; 50% = 1500 (berhenti)."""
+        try:
+            pwm = int(1100 + max(0, min(100, int(v))) * 8)
+            if self.sl_tilt.value() != pwm:
+                self.sl_tilt.setValue(pwm)
+        except Exception:                                  # noqa: BLE001
+            pass
+
     def _set_lights(self, val):
         self.lab_lights.setText("LIGHTS %d%%" % int(val))
+        try:
+            if self.sp_lights.value() != int(val):
+                self.sp_lights.blockSignals(True)
+                self.sp_lights.setValue(int(val))
+                self.sp_lights.blockSignals(False)
+        except Exception:                                  # noqa: BLE001
+            pass
         if getattr(self.gamepad, "aktif", False):
             self.gamepad.set_lights(val)
         else:
@@ -1011,6 +1076,14 @@ class RovConsole(QtWidgets.QMainWindow):
     def _set_tilt(self, val):
         self._tilt = int(val)
         self.lab_tilt.setText("TILT %d%%" % int(round((self._tilt - 1100) / 8.0)))
+        try:
+            persen = int(round((self._tilt - 1100) / 8.0))
+            if self.sp_tilt.value() != persen:
+                self.sp_tilt.blockSignals(True)
+                self.sp_tilt.setValue(persen)
+                self.sp_tilt.blockSignals(False)
+        except Exception:                                  # noqa: BLE001
+            pass
         if getattr(self.gamepad, "aktif", False):
             self.gamepad.tilt = self._tilt
         else:
@@ -1120,9 +1193,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.ro_lights.set_value(None if l1 is None else l1 * 100.0, "{:.0f}")
             g = nvf.get("PilotGain")
             self.ro_gain.set_value(None if g is None else g * 100.0, "{:.0f}")
-            self.ro_tether.set_value(nvf.get("TetherTrn"), "{:.0f}")
             self.ro_water.set_value(s.get("temp"), "{:.2f}")
-            self.ro_range.set_value(s.get("rangefinder"), "{:.2f}")
             _g = self.bridge.params.get("JS_GAIN_DEFAULT")
             if _g is not None:
                 self.lbl_gain.setText("pilot gain: %.2f (JS_GAIN_DEFAULT)" % float(_g))
@@ -1214,11 +1285,16 @@ class RovConsole(QtWidgets.QMainWindow):
         dt = max(0.02, min(0.5, now - self._peta_t))
         self._peta_t = now
         out = getattr(self.gamepad, "last_out", (0, 0, 500, 0))
-        vx = out[0] / 1000.0 * 0.5          # m/s (VERIFY kolam)
-        vy = out[1] / 1000.0 * 0.35
-        hdg = math.radians(self.bridge.state.get("heading") or 0.0)
-        vn = vx * math.cos(hdg) - vy * math.sin(hdg)
-        ve = vx * math.sin(hdg) + vy * math.cos(hdg)
+        if self.bridge.state.get("armed"):
+            vx = out[0] / 1000.0 * 0.5      # m/s (VERIFY kolam)
+            vy = out[1] / 1000.0 * 0.35
+            hdg = math.radians(self.bridge.state.get("heading") or 0.0)
+            vn = vx * math.cos(hdg) - vy * math.sin(hdg)
+            ve = vx * math.sin(hdg) + vy * math.cos(hdg)
+        else:
+            # BELUM ARMED: thruster tidak berputar -> estimasi posisi DIAM
+            # (audit 13 Okt: "kenapa robotnya bergerak padahal belum arm").
+            vn = ve = 0.0
         n = self.plot_misi.pos[0] + vn * dt
         e = self.plot_misi.pos[1] + ve * dt
         hdg0 = self.bridge.state.get("heading") or 0.0

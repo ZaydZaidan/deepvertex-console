@@ -752,26 +752,21 @@ class PetaPanel(QtWidgets.QWidget):
 
         n, e, yaw = self.pose
         x, y = ke_layar(n, e)
-        # PENANDA ROBOT: ikon ROV diperbesar + DIPUTAR mengikuti arah hadap, supaya arah
-        # pergerakan terlihat jelas (permintaan pemilik). Bila gambar ikon belum ada,
-        # dipakai segitiga seperti sebelumnya.
-        if getattr(self, "_ikon_robot", None) is None and not hasattr(self, "_ikon_robot"):
-            self._ikon_robot = None
-            dasar = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ikon")
-            for nama in ("rov2_pilihan.png", "rov2_asli.png", "rov2_atas.png"):
-                calon = QtGui.QImage(os.path.join(dasar, nama))
-                if not calon.isNull():
-                    self._ikon_robot = calon
-                    break
-        sisi_r = 56
-        if self._ikon_robot is not None:
+        # PENANDA ROBOT: PANAH SEDERHANA (permintaan pemilik 13 Okt: "tanda anchor dan
+        # penanda robotnya kayak arrow biasa aja, gausa pakai desain kayak sekarang").
+        # Segitiga polos yang diputar mengikuti arah hadap — tanpa ikon/gambar.
+        try:
             p.save()
             p.translate(x, y)
-            p.rotate(math.degrees(yaw))          # yaw 0 = menghadap utara (atas peta)
-            p.drawImage(QtCore.QRectF(-sisi_r / 2, -sisi_r / 2, sisi_r, sisi_r), self._ikon_robot)
+            p.rotate(math.degrees(yaw))      # yaw 0 = menghadap utara (atas peta)
+            p.setPen(QtGui.QPen(QtGui.QColor(20, 23, 26), 1.4))
+            p.setBrush(QtGui.QColor(241, 237, 230))
+            p.drawPolygon(QtGui.QPolygonF([
+                QtCore.QPointF(0, -9), QtCore.QPointF(-6, 7),
+                QtCore.QPointF(0, 3.5), QtCore.QPointF(6, 7)]))
             p.restore()
-        # segitiga kuning DIHAPUS (permintaan pemilik: "robotnya aja") — arah hadap sudah
-        # terlihat dari ikon ROV yang diputar; tanpa segitiga tampilan lebih bersih.
+        except Exception:                          # noqa: BLE001  (jangan pernah bunuh proses)
+            pass
 
         # GRID SKALA: DEFAULT MATI (permintaan pemilik: "Esri pecah-pecah gridnya saya gasuka").
         # Dinyalakan lewat menu bila memang ingin mengukur jarak di peta.
@@ -845,34 +840,25 @@ class PetaPanel(QtWidgets.QWidget):
                               "reported immediately)")
             p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT)))
         if self.pin is not None:
-            # IKON ANCHOR = model BlueROV (permintaan pemilik: "ikon anchor pakai BlueROV
-            # seperti QGC"). Gambarnya hasil render mesh BlueROV2 proyek sendiri
-            # (tools/buat_ikon_rov.py) -> gui/ikon/rov2_atas.png, depan menghadap atas.
-            if not hasattr(self, "_ikon_rov"):
-                # IKON ANCHOR: utamakan gambar top-view ASLI milik pemilik
-                # (Downloads/top-view.jpg -> dijadikan PNG transparan oleh
-                # scripts/tools/jadikan_ikon.py). Cadangan: render mesh proyek sendiri.
-                # IKON ANCHOR = bentuk JANGKAR (permintaan pemilik, anchor.png) dengan
-                # cadangan gambar ROV bila berkasnya tidak ada.
-                dasar = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ikon")
-                for nama in ("anchor.png", "rov2_pilihan.png", "rov2_atas.png"):
-                    calon = QtGui.QImage(os.path.join(dasar, nama))
-                    if not calon.isNull():
-                        self._ikon_rov = calon
-                        break
-                else:
-                    self._ikon_rov = None
+            # PENANDA ANCHOR sederhana (permintaan pemilik 13 Okt): target kecil —
+            # cincin + crosshair + titik, tanpa ikon gambar.
             gxp, gyp = G.lonlat_ke_piksel_global(self.pin[0], self.pin[1],
                                                  getattr(self, "_posisi", (0, 0, 12))[2])
             px, py = (gxp - self._posisi[0]) * fb, (gyp - self._posisi[1]) * fb
-            if self._ikon_rov is not None:
-                sisi = 52
-                p.drawImage(QtCore.QRectF(px - sisi / 2, py - sisi / 2, sisi, sisi),
-                            self._ikon_rov)
-            # cross-hair DIHAPUS (permintaan pemilik: "gamau di tengah-tengahnya ada kursor +,
-            # robotnya aja") — hanya ikon + label kecil nama titik.
-            p.setPen(QtGui.QPen(QtGui.QColor(0, 220, 255)))
-            p.drawText(int(px) + 14, int(py) - 16, "ANCHOR %.5f, %.5f" % self.pin)
+            try:
+                p.setPen(QtGui.QPen(QtGui.QColor(0, 229, 255), 1.6))
+                p.setBrush(QtCore.Qt.NoBrush)
+                p.drawEllipse(QtCore.QPointF(px, py), 7.0, 7.0)
+                p.drawLine(QtCore.QPointF(px - 11, py), QtCore.QPointF(px - 3, py))
+                p.drawLine(QtCore.QPointF(px + 3, py), QtCore.QPointF(px + 11, py))
+                p.drawLine(QtCore.QPointF(px, py - 11), QtCore.QPointF(px, py - 3))
+                p.drawLine(QtCore.QPointF(px, py + 3), QtCore.QPointF(px, py + 11))
+                p.setBrush(QtGui.QColor(0, 229, 255))
+                p.drawEllipse(QtCore.QPointF(px, py), 1.6, 1.6)
+                p.setPen(QtGui.QPen(QtGui.QColor(0, 220, 255)))
+                p.drawText(int(px) + 14, int(py) - 12, "ANCHOR %.5f, %.5f" % self.pin)
+            except Exception:                      # noqa: BLE001
+                pass
         p.drawText(self.width() - 260, self.height() - 6, self._info()["attr"])
         p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT), 2))
         panjang = 50
