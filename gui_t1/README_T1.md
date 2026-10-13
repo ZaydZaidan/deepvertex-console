@@ -18,6 +18,11 @@ Stage 2/VIO), compressed capture + snapshot (topside), and **onboard RAW capture
 
     ./run_console_real.sh [--mavlink udpin:0.0.0.0:14550] [--outdir ~/DeepVertex-ROV-Captures]
 
+Desktop launcher & icon: `~/.local/share/applications/deepvertex-console.desktop` and a
+shortcut `~/Desktop/DeepVertex Marine Technology Console.desktop` (icon =
+`ikon/deepvertex-app-icon.png`, the DeepVertex mono mark). The window title /
+WM_CLASS is "DeepVertex Marine Technology Console".
+
 Or just type the launcher installed on this machine (shell function in `~/.bashrc`):
 
     deepvertexrov                              # ink theme, 120% text, RAW agent 192.168.2.2:8765

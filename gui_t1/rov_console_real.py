@@ -119,7 +119,14 @@ class RovConsole(QtWidgets.QMainWindow):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.setWindowTitle("DeepVertex \u00b7 Marine Technology")
+        self.setWindowTitle("DeepVertex Marine Technology Console")
+        try:
+            _ikon = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "ikon", "deepvertex-app-icon.png")
+            if os.path.exists(_ikon):
+                self.setWindowIcon(QtGui.QIcon(_ikon))     # ikon taskbar/dock
+        except Exception:                                  # noqa: BLE001
+            pass
         self.resize(1620, 1000)
         # NAMA SESI (permintaan pemilik 13 Okt): bisa lewat --nama-sesi, atau
         # ditanya sekali saat start. Otomasi memakai --no-prompt / --nama-sesi "".
@@ -1951,6 +1958,18 @@ def main():
     args.port_stereo_R = args.right_port
 
     app = QtWidgets.QApplication(sys.argv)
+    # Identitas aplikasi (taskbar/dock): nama & app-id harus sama dgn
+    # deepvertex-console.desktop supaya ikon & nama konsisten di GNOME.
+    app.setApplicationName("DeepVertex Marine Technology Console")
+    app.setApplicationDisplayName("DeepVertex Marine Technology Console")
+    app.setDesktopFileName("deepvertex-console")
+    try:
+        _ikon_app = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "ikon", "deepvertex-app-icon.png")
+        if os.path.exists(_ikon_app):
+            app.setWindowIcon(QtGui.QIcon(_ikon_app))
+    except Exception:                                      # noqa: BLE001
+        pass
     _terapkan_tema(app, getattr(args, "tema", None), getattr(args, "teks", None))
     w = RovConsole(args)
     w.show()
