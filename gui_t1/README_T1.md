@@ -18,6 +18,12 @@ Stage 2/VIO), compressed capture + snapshot (topside), and **onboard RAW capture
 
     ./run_console_real.sh [--mavlink udpin:0.0.0.0:14550] [--outdir ~/DeepVertex-ROV-Captures]
 
+Or just type the launcher installed on this machine (shell function in `~/.bashrc`):
+
+    deepvertexrov                              # ink theme, 120% text, RAW agent 192.168.2.2:8765
+    deepvertexrov --tema ivory --teks 1.4      # extra arguments are forwarded
+    deepvertexrov --raw-agent http://127.0.0.1:8791   # e.g. local test agent
+
 Options: `--front-port/--left-port/--right-port` (default 5600/5601/5602 — UDP stream
 ports from the BlueOS camera manager), `--raw-agent http://127.0.0.1:8765`,
 `--preset pilot-focus|mapping|setup|capture`, `--tlog auto|off|PATH` (per-session
