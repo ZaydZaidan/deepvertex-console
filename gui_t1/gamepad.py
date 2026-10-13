@@ -139,6 +139,19 @@ class Gamepad(QtCore.QObject):
         self.aktif = True
         self.sig_status.emit("gamepad terhubung: %s (%s)" % (dev.name, dev.path))
 
+    def coba_hotplug(self):
+        """Coba sambungkan pad yang dicolok BELAKANGAN, tanpa restart konsol."""
+        if self.aktif:
+            return
+        dev, _err = self.cari_device()
+        if dev is None:
+            return
+        try:
+            dev.close()          # start() akan membuka sendiri
+        except Exception:        # noqa: BLE001
+            pass
+        self.start()
+
     def stop(self, keluar=False):
         self.aktif = False
         self._stop.set()

@@ -26,7 +26,7 @@ class PlotMisi(QtWidgets.QWidget):
         self.heading = 0.0
         self.trail = []
         self.markers = []
-        self.setMinimumSize(280, 210)
+        self.setMinimumSize(240, 120)
 
     # ------------------------------------------------------------- data
     def ancor(self):

@@ -58,10 +58,9 @@ class RovConsole(QtWidgets.QMainWindow):
             "lebar_kiri": 350,
             "left": ["flight", "instruments", "power", "vehicle", "preflight"],
             # kamera TANPA stretch: panel mengunci pas rasio frame (gambar penuh)
-            "mid": [("cam_front", 0)],
-            "mid_row": ["cam_left", "cam_right"],
-            "row_di": 1,
-            "right": ["notif", "teleop", "capture", "raw", "soon"],
+            "mid": [("cam_front", 0), ("peta", 1)],
+            "right": ["notif", "cam_left", "cam_right", "teleop", "capture",
+                      "raw", "soon"],
         },
         "mapping": {
             "lebar_kiri": 350,
@@ -78,10 +77,8 @@ class RovConsole(QtWidgets.QMainWindow):
         "capture": {
             "lebar_kiri": 350,
             "left": ["flight", "power", "preflight"],
-            "mid": [("cam_front", 0)],
-            "mid_row": ["cam_left", "cam_right"],
-            "row_di": 1,
-            "right": ["notif", "capture", "raw", "teleop"],
+            "mid": [("cam_front", 0), ("peta", 1)],
+            "right": ["notif", "cam_left", "cam_right", "capture", "raw", "teleop"],
         },
     }
 
@@ -89,7 +86,7 @@ class RovConsole(QtWidgets.QMainWindow):
         super().__init__()
         self.args = args
         self.setWindowTitle("DeepVertex · ROV Mission Console — TAHAP 1 (mode ROV)")
-        self.resize(1560, 940)
+        self.resize(1620, 1000)
         self.sesi = _buat_dir_sesi(os.path.expanduser(args.outdir))
         self.last = {}
         self._preset = args.preset if args.preset in self.SPESIFIKASI else self.PRESET_BAWAAN
@@ -143,6 +140,9 @@ class RovConsole(QtWidgets.QMainWindow):
         self._rc_timer = QtCore.QTimer(self)
         self._rc_timer.timeout.connect(self._rc_tick)
         self._rc_timer.start(1500)
+        self._pad_timer = QtCore.QTimer(self)     # hotplug: pad dicolok belakangan
+        self._pad_timer.timeout.connect(self._pad_coba)
+        self._pad_timer.start(3000)
         self.gamepad.sig_status.connect(self._catat)
         self.gamepad.sig_live.connect(self._teleop_update)
 
@@ -242,10 +242,25 @@ class RovConsole(QtWidgets.QMainWindow):
         self.chip_arm = W.Chip("arm")
         self.chip_pad = W.Chip("pad")
         self.chip_rec = W.Chip("rec")
+        self.chip_fs = W.Chip("fs")          # failsafe sedang aktif?
+        self.chip_ekf = W.Chip("ekf")        # kesehatan EKF
         for c, teks in ((self.chip_link, "menunggu"), (self.chip_mode, "—"),
-                        (self.chip_arm, "—"), (self.chip_pad, "off"), (self.chip_rec, "—")):
+                        (self.chip_arm, "—"), (self.chip_pad, "off"), (self.chip_rec, "—"),
+                        (self.chip_fs, "—"), (self.chip_ekf, "—")):
             self._chip(c, "ink_faint", teks)
             self.chip_bar.tambah(c)
+        # BANNER STATUS BESAR (permintaan pemilik 13 Okt): MODE & ARMED/DISARMED
+        # harus langsung terbaca — pilot TIDAK boleh "buta" soal status kendaraan.
+        self.lbl_mode_big = QtWidgets.QLabel("MODE · —")
+        self.lbl_arm_big = QtWidgets.QLabel("—")
+        self.lbl_pad_big = QtWidgets.QLabel("PAD · tidak ada")
+        for lb in (self.lbl_mode_big, self.lbl_arm_big, self.lbl_pad_big):
+            lb.setAlignment(Qt.AlignCenter)
+        baris.addWidget(self.lbl_mode_big)
+        baris.addWidget(self.lbl_arm_big)
+        baris.addWidget(self.lbl_pad_big)
+        self._gaya_banner(None, None)
+        self._gaya_pad(False)
         baris.addWidget(self.chip_bar)
         self._set_mark_merek()
         return h
@@ -828,6 +843,53 @@ class RovConsole(QtWidgets.QMainWindow):
         if w is not None:
             w.setVisible(on)
 
+    def _gaya_banner(self, mode, armed):
+        """Banner besar: MODE + ARMED/DISARMED (warna mengikuti status, ala QGC).
+
+        DI-CACHE: QSS hanya ditulis ulang bila status berubah — menulis stylesheet
+        yang sama tiap tick pernah membuat banner tampak berkedip.
+        """
+        try:
+            if getattr(self, "_banner_kini", None) == (mode, armed):
+                return
+            self._banner_kini = (mode, armed)
+            if armed is None:
+                fg, bg = theme.warna("ink_dim"), theme.warna("raise_")
+                self.lbl_arm_big.setText("—")
+            elif armed:
+                fg, bg = theme.warna("on_accent"), theme.warna("err")
+                self.lbl_arm_big.setText("ARMED")
+            else:
+                fg, bg = theme.warna("ok"), theme.warna("raise_")
+                self.lbl_arm_big.setText("DISARMED")
+            self.lbl_arm_big.setStyleSheet(
+                "background:%s; color:%s; font-size:%dpx; font-weight:800;"
+                " letter-spacing:2px; padding:3px 12px; border:1px solid %s;"
+                % (bg, fg, theme.px(13), theme.warna("line_hi")))
+            self.lbl_mode_big.setText("MODE · %s" % (mode or "—"))
+            self.lbl_mode_big.setStyleSheet(
+                "color:%s; font-size:%dpx; font-weight:700; letter-spacing:1.5px;"
+                " padding:3px 10px; border:1px solid %s; background:%s;"
+                % (theme.warna("ink"), theme.px(13), theme.warna("line_hi"),
+                   theme.warna("head")))
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _gaya_pad(self, konek):
+        """Label besar status GAMEPAD — pilot harus tahu pad tersambung atau tidak."""
+        try:
+            if getattr(self, "_pad_kini", None) == bool(konek):
+                return
+            self._pad_kini = bool(konek)
+            on = theme.warna("ok") if konek else theme.warna("ink_faint")
+            self.lbl_pad_big.setText("PAD · %s" % ("SIAP" if konek else "tidak ada"))
+            self.lbl_pad_big.setStyleSheet(
+                "color:%s; font-size:%dpx; font-weight:700; letter-spacing:1.2px;"
+                " padding:3px 10px; border:1px solid %s;"
+                % (on, theme.px(12), theme.warna("line_hi")))
+        except Exception:                                  # noqa: BLE001
+            pass
+
     def _ganti_tema(self, nama):
         theme.apply(nama, QtWidgets.QApplication.instance())
         self._set_mark_merek()
@@ -978,6 +1040,7 @@ class RovConsole(QtWidgets.QMainWindow):
             btns or "—", live.get("tilt", 1500)))
         self._chip(self.chip_pad, "ok" if live.get("konek") else "warn",
                    "siap" if live.get("konek") else "tidak ada")
+        self._gaya_pad(bool(live.get("konek")))
 
     # ================================================================ MAVLink
     def _vehicle(self, s):
@@ -988,6 +1051,20 @@ class RovConsole(QtWidgets.QMainWindow):
             self._chip(self.chip_mode, "ink_faint", str(s.get("mode") or "—"))
             self._chip(self.chip_arm, "warn" if s.get("armed") else "ok",
                        "ARMED" if s.get("armed") else "disarm")
+            self._gaya_banner(s.get("mode"), s.get("armed"))
+            txt_fs = (s.get("last_text") or "").lower()
+            if "failsafe" in txt_fs or "e-stop" in txt_fs or "estop" in txt_fs:
+                self._chip(self.chip_fs,
+                           "err" if s.get("last_text_sev", 6) <= 3 else "warn", "AKTIF")
+            else:
+                self._chip(self.chip_fs, "ok", "—")
+            ekf = s.get("ekf_ok")
+            if ekf is True:
+                self._chip(self.chip_ekf, "ok", "ok")
+            elif ekf is False:
+                self._chip(self.chip_ekf, "err", "cek")
+            else:
+                self._chip(self.chip_ekf, "ink_faint", "—")
             self.ro_depth.set_value(s.get("depth"), "{:.2f}")
             self.ro_head.set_value(s.get("heading"), "{:.0f}")
             self.ro_temp.set_value(s.get("temp"), "{:.1f}")
@@ -1030,6 +1107,13 @@ class RovConsole(QtWidgets.QMainWindow):
             pass
 
     # ================================================================ tutup
+    def _pad_coba(self):
+        try:
+            if not getattr(self.gamepad, "aktif", False):
+                self.gamepad.coba_hotplug()
+        except Exception:                                  # noqa: BLE001
+            pass
+
     def _rc_tick(self):
         """Pertahankan RC override tilt/lights saat TANPA gamepad — override
         ArduSub timeout ~3 dtk, jadi nilai slider harus dikirim ulang."""

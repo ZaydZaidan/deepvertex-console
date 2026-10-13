@@ -41,7 +41,7 @@ def main():
         outdir=os.path.join(SCRATCH, "probe"),
         preset="pilot-focus", no_pad=True)
     w = rc.RovConsole(args)
-    w.resize(1560, 940)
+    w.resize(1620, 1000)
     w.show()
 
     def jalan(sec):
@@ -59,6 +59,9 @@ def main():
                                             w.col_right.width()))
     p = w.P["flight"]
     print("flight panel %dx%d" % (p.width(), p.height()))
+    t_f = w.P["cam_front"].tile
+    print("front tile %dx%d ratio=%.3f (ideal 1.778)" %
+          (t_f.width(), t_f.height(), t_f.width() / max(1, t_f.height())))
     print("horizon %dx%d   kompas %dx%d" % (w.horizon.width(), w.horizon.height(),
                                             w.kompas.width(), w.kompas.height()))
     for nm, ro_ in (("depth", w.ro_depth), ("hdg", w.ro_head), ("temp", w.ro_temp),

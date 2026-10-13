@@ -376,9 +376,18 @@ class MavBridge(QtCore.QObject):
             t = msg.get_type()
             now = time.monotonic()
 
-            if t == "HEARTBEAT" and msg.get_srcSystem() == self.mav.target_system:
-                self.state["mode"] = mavutil.mode_string_v10(msg)
-                self.state["armed"] = bool(msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+            if (t == "HEARTBEAT"
+                    and msg.get_srcSystem() == self.mav.target_system
+                    and int(msg.get_srcComponent()) == 1
+                    and int(msg.autopilot) != mavutil.mavlink.MAV_AUTOPILOT_INVALID):
+                # HANYA heartbeat AUTOPILOT (comp 1): heartbeat companion BlueOS (sys 1
+                # comp 194, autopilot INVALID) pernah lolos filter -> mode '0x000000'
+                # dan ARM kedip-kedip di layar.
+                _nama = str(mavutil.mode_string_v10(msg))
+                if not _nama.startswith("Mode(0x"):
+                    self.state["mode"] = _nama
+                self.state["armed"] = bool(
+                    int(msg.base_mode) & int(mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED))
 
             elif t == "ATTITUDE":
                 if now - t_att > 0.05:
@@ -464,7 +473,13 @@ class MavBridge(QtCore.QObject):
                     d = (msg.press_abs - 1013.25) * 100.0 / rho_g
                 else:
                     d = None
-                self.state["depth"] = d if (d is not None and 0.0 < d < 200.0) else None
+                if d is not None and -0.5 < d < 200.0:
+                    # anti-kedip: near-zero dijadikan 0 utk nilai +/- derau, lalu dihaluskan
+                    # (EMA) supaya digit tidak bergetar; di luar rentang -> pertahankan
+                    # nilai terakhir (jangan berkedip ke '—').
+                    d = 0.0 if abs(d) < 0.05 else d
+                    lama = self.state.get("depth")
+                    self.state["depth"] = d if lama is None else 0.7 * lama + 0.3 * d
 
             elif t == "VFR_HUD":
                 self.state["heading"] = msg.heading
@@ -489,8 +504,8 @@ class MavBridge(QtCore.QObject):
 
             elif t == "EKF_STATUS_REPORT":
                 flags = msg.flags
-                need = (mavutil.mavlink.EKF_ATTITUDE | mavutil.mavlink.EKF_VELOCITY_HORIZ |
-                        mavutil.mavlink.EKF_POS_HORIZ_ABS)
+                # bawah air tidak punya posisi horizontal absolut -> cukup ATTITUDE
+                need = mavutil.mavlink.EKF_ATTITUDE
                 self.state["ekf_ok"] = bool(flags & need == need)
 
             elif t == "STATUSTEXT":
