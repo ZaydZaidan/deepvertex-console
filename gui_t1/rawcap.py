@@ -223,7 +223,8 @@ class RawPanel(QtWidgets.QWidget):
                 self.lbl_disk.setText(f"disk Pi bebas: {d.get('disk_free_mb', '?')} MB "
                                       f"(ambang {d.get('min_free_mb', '?')} MB) — dir {d.get('dir', '?')}")
             else:
-                self.lbl.setText(f"RAW · agen TIDAK terjangkau: {d.get('error', '')[:90]}")
+                self.lbl.setText("RAW agent unreachable")
+                self.lbl.setToolTip(str(d.get("error", "")))
         elif tag == "files":
             if d.get("ok"):
                 self.files_info = {f["path"]: f["size"] for f in d.get("files", [])}

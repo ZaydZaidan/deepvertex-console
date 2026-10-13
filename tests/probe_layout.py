@@ -50,7 +50,7 @@ def main():
             app.processEvents()
             time.sleep(0.02)
 
-    jalan(4.0)
+    jalan(10.0)          # tunggu frame kamera mengalir (aspect 16:9 baru terpasang)
 
     fm = QtGui.QFontMetrics(w.font())
     print("dpr=%.2f  font=%s pixelSize=%d" % (w.devicePixelRatioF(), w.font().family(),
@@ -85,12 +85,51 @@ def main():
             bad += 1
     print("TRUNC TOTAL:", bad)
 
-    w.grab().save(os.path.join(SCRATCH, "probe_pilot.png"))
-    w._apply_preset("mapping")
-    w.peta.zoom(-3)          # zoom-out supaya konteks pulau/laut terlihat di bukti screenshot
-    jalan(8.5)
-    w.grab().save(os.path.join(SCRATCH, "probe_mapping.png"))
-    print("screenshot: probe_pilot.png + probe_mapping.png")
+    # AUDIT 13 Okt (permintaan pemilik): potret + ukur SEMUA preset, bukan 2 saja.
+    for nama in ("pilot-focus", "mapping", "setup", "capture"):
+        w._apply_preset(nama)
+        if nama == "mapping":
+            w.peta.zoom(-3)
+            jalan(6.0)
+        else:
+            jalan(2.2)
+        w.grab().save(os.path.join(SCRATCH, "probe_%s.png" % nama))
+        print("preset %-12s railL=%d mid=%d railR=%d" %
+              (nama, w.col_left.width(), w.col_mid.width(), w.col_right.width()))
+        bad2 = 0
+        for b in w.findChildren(QtWidgets.QPushButton):
+            if b.isVisible() and b.text():
+                perlu = fm.horizontalAdvance(b.text()) + 12
+                if b.width() < perlu:
+                    print("   TRUNC-BTN [%s] %r w=%d perlu=%d" % (nama, b.text(),
+                                                                  b.width(), perlu))
+                    bad2 += 1
+        for k, cb_ in w.pf.cb.items():
+            perlu = fm.horizontalAdvance(cb_.text()) + 32
+            if cb_.width() < perlu:
+                print("   TRUNC-CB [%s] w=%d perlu=%d %r" % (nama, cb_.width(), perlu,
+                                                             cb_.text()))
+                bad2 += 1
+        for lb2 in w.findChildren(QtWidgets.QLabel):
+            try:
+                if (not lb2.isVisible()) or lb2.wordWrap() or not lb2.text():
+                    continue
+                txt2 = lb2.text()
+                if len(txt2) > 70 or lb2.width() < 30:
+                    continue
+                perlu2 = fm.horizontalAdvance(txt2) + 4
+                if lb2.width() < perlu2:
+                    print("   CUT-LABEL [%s] %r w=%d perlu=%d"
+                          % (nama, txt2[:42], lb2.width(), perlu2))
+                    bad2 += 1
+            except Exception:                              # noqa: BLE001
+                pass
+        print("   TRUNC %s: %d" % (nama, bad2))
+    for k2 in ("cam_front", "cam_left", "cam_right"):
+        t2 = w.P[k2].tile
+        print("tile akhir %-10s %dx%d ratio=%.3f" %
+              (k2, t2.width(), t2.height(), t2.width() / max(1, t2.height())))
+    print("screenshot: probe_<preset>.png x4")
 
     w.close()
     jalan(0.3)

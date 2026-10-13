@@ -382,12 +382,12 @@ class ParamBrowser(QtWidgets.QWidget):
         v.setSpacing(4)
         row = QtWidgets.QHBoxLayout()
         self.filter = QtWidgets.QLineEdit()
-        self.filter.setPlaceholderText("filter nama (mis. FS_ / BATT_ / RC)")
+        self.filter.setPlaceholderText("filter (FS_ / BATT_ / RC)")
         self.filter.textChanged.connect(self._refilter)
-        b_unduh = QtWidgets.QPushButton("UNDUH ULANG")
+        b_unduh = QtWidgets.QPushButton("RELOAD")
         b_unduh.setObjectName("BtnTiny")
         b_unduh.clicked.connect(self.bridge.queue_param_list)
-        b_set = QtWidgets.QPushButton("SET NILAI …")
+        b_set = QtWidgets.QPushButton("SET…")
         b_set.setObjectName("BtnTiny")
         b_set.clicked.connect(self._set)
         row.addWidget(self.filter, 1)
@@ -402,7 +402,7 @@ class ParamBrowser(QtWidgets.QWidget):
         self.tabel.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tabel.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         v.addWidget(self.tabel, 1)
-        self.lbl = QtWidgets.QLabel("klik UNDUH ULANG untuk memuat daftar parameter …")
+        self.lbl = QtWidgets.QLabel("click RELOAD to load parameters —")
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         v.addWidget(self.lbl)
@@ -743,7 +743,7 @@ class PreflightPanel(QtWidgets.QWidget):
         pad = self.sumber.get("gamepad")
         if pad is not None:
             self._set("pad", "ok" if pad._konek else "warn",
-                      "siap" if pad._konek else "tidak ada")
+                      "ready" if pad._konek else "none")
         # kamera
         players = self.sumber.get("players") or {}
         hidup = sum(1 for p in players.values() if p._qimg is not None)
@@ -756,7 +756,7 @@ class PreflightPanel(QtWidgets.QWidget):
         elif s.get("prearm_ok") is False:
             self._set("prearm", "warn", "belum siap")
         elif s.get("prearm_ok"):
-            self._set("prearm", "ok", "siap")
+            self._set("prearm", "ok", "ready")
         else:
             self._set("prearm", "ink_faint", "—")
 

@@ -339,6 +339,7 @@ class CameraTile(QtWidgets.QWidget):
         # WAJIB sticky: kalau tidak, frame berikutnya langsung menghapus status ini.
         self._muted = None
         self.tinggi_maks = None       # batas tinggi opsional (mockup: kotak kamera 124-150 px)
+        self._h_natural = None        # tinggi ideal terkini (fixed-height: layout stabil)
         self.status = None            # teks pengganti "NO SIGNAL"
         self.setMinimumSize(240, 135)
         pol = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding,
@@ -350,15 +351,28 @@ class CameraTile(QtWidgets.QWidget):
         t.start(500)
 
     def resizeEvent(self, ev):
-        """Paksa tinggi panel = rasio gambar (bukan vertikal/melar)."""
         super().resizeEvent(ev)
-        if self.width() <= 1:              # sedang ditata: jangan menghitung dari lebar nol
-            return
-        h = self.heightForWidth(self.width())
-        if self.tinggi_maks:
-            h = min(h, int(self.tinggi_maks))
-        if h != self.maximumHeight():
-            self.setMaximumHeight(h)
+        self._sync_tinggi()
+
+    def _sync_tinggi(self):
+        """Kunci tinggi panel = rasio frame (FIXED, bukan max) + minta layout ulang.
+
+        FIXED-height (13 Okt): maximumHeight TIDAK cukup — susunan kolom memberi tinggi
+        ekstra ke panel kamera (terukur rasio 1.55, bukan 1.78). Dengan setFixedHeight,
+        panel kamera = tile + chrome PERSIS; sisa kolom jatuh ke peta (Expanding).
+        """
+        try:
+            if self.width() <= 1:
+                return
+            h = self.heightForWidth(self.width())
+            if self.tinggi_maks:
+                h = min(h, int(self.tinggi_maks))
+            if h != self._h_natural:
+                self._h_natural = h
+                self.setFixedHeight(h)
+                self.updateGeometry()
+        except Exception:                  # noqa: BLE001
+            pass
 
     # ---------------------------------------------------------------- status
     def set_off(self, reason, title="CAMERA OFF"):
@@ -408,26 +422,16 @@ class CameraTile(QtWidgets.QWidget):
     def hasHeightForWidth(self):
         return True
 
-    def sizeHint(self):
-        """Tinggi natural = lebar / rasio frame -> panel mengunci pas rasio kamera
-        (tanpa bilah samping, tanpa potong)."""
-        w = max(240, self.width())
-        return QtCore.QSize(w, self.heightForWidth(w))
-
     def heightForWidth(self, w):
         """Tinggi ideal = lebar / rasio gambar (+ header). Panel jadi pas, tidak vertikal."""
         return int(w / max(0.2, self._aspect)) + 18
 
     def sizeHint(self):
-        """LEBAR TETAP — jangan pernah bergantung pada lebar induk.
+        """LEBAR TETAP 320 (pelajaran 28 Sep: hint ber-lebar-dinamis -> panel berayun).
 
-        Pelajaran 28 Sep 2026 (bug dinamis, terukur di jalur nyata): kalau sizeHint() memakai
-        `parentWidget().width()`, setiap kali layout menata ulang ukurannya berubah lagi
-        sehingga panel tumbuh terus dan berayun (terukur 410<->418 px setelah frame kamera
-        pertama datang) — panelnya lalu terpotong viewport rel (326 px). Tinggi tetap
-        mengikuti rasio lewat `heightForWidth`, bukan lewat sizeHint.
+        Tinggi = `_h_natural` (hasil _sync_tinggi terakhir) supaya panel selalu pas rasio.
         """
-        return QtCore.QSize(320, self.heightForWidth(320))
+        return QtCore.QSize(320, self._h_natural or self.heightForWidth(320))
 
     def minimumSizeHint(self):
         """Minimum kecil: tile TIDAK boleh memaksa panel/rel menjadi lebih lebar."""

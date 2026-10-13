@@ -104,6 +104,7 @@ class RovConsole(QtWidgets.QMainWindow):
         v.setContentsMargins(8, 6, 8, 6)
         v.setSpacing(6)
         v.addWidget(self._build_header())
+        v.addWidget(self._buat_strip_alert())
         body = QtWidgets.QHBoxLayout()
         body.setSpacing(6)
         v.addLayout(body, 1)
@@ -141,12 +142,17 @@ class RovConsole(QtWidgets.QMainWindow):
 
         self.gamepad = Gamepad(self.bridge)
         self._rc_keep = {}          # kanal RC override yang harus dipertahankan (tanpa pad)
+        self._center_aktif = False  # routine RESET tilt (kembali ke 50%) berjalan?
+        self._perlu_center_awal = True   # auto-reset tilt di awal sesi (permintaan pemilik)
         self._rc_timer = QtCore.QTimer(self)
         self._rc_timer.timeout.connect(self._rc_tick)
         self._rc_timer.start(1500)
         self._pad_timer = QtCore.QTimer(self)     # hotplug: pad dicolok belakangan
         self._pad_timer.timeout.connect(self._pad_coba)
         self._pad_timer.start(3000)
+        self._tiles_timer = QtCore.QTimer(self)   # jaga rasio tile kamera selalu pas
+        self._tiles_timer.timeout.connect(self._sync_tiles)
+        self._tiles_timer.start(600)
         self.gamepad.sig_status.connect(self._catat)
         self.gamepad.sig_live.connect(self._teleop_update)
 
@@ -235,6 +241,10 @@ class RovConsole(QtWidgets.QMainWindow):
         self.seg_layout.set_dipilih(self._preset)
         self.seg_layout.dipilih.connect(self._apply_preset)
         baris.addWidget(self.seg_layout)
+        _sep1 = QtWidgets.QFrame()
+        _sep1.setObjectName("StatusSep")
+        _sep1.setFixedSize(1, theme.px(26))
+        baris.addWidget(_sep1)
         self.chip_bar = U.FlowBox(spacing=4)
         self.chip_link = W.Chip("link")
         self.chip_mode = W.Chip("mode")
@@ -268,9 +278,87 @@ class RovConsole(QtWidgets.QMainWindow):
         baris.addWidget(klaster)
         self._gaya_banner(None, None)
         self._gaya_pad(False)
+        _sep2 = QtWidgets.QFrame()
+        _sep2.setObjectName("StatusSep")
+        _sep2.setFixedSize(1, theme.px(26))
+        baris.addWidget(_sep2)
         baris.addWidget(self.chip_bar)
         self._set_mark_merek()
         return h
+
+    def _buat_strip_alert(self):
+        """Strip ALERT KESELAMATAN (permintaan pemilik 13 Okt): leak / baterai /
+        failsafe / link. Teks pendek & langsung; detail penuh masuk log notifikasi."""
+        self.lbl_alert = QtWidgets.QLabel("")
+        self.lbl_alert.setAlignment(Qt.AlignCenter)
+        self.lbl_alert.setVisible(False)
+        self._alert_kini = None
+        self._leak_latch = False
+        return self.lbl_alert
+
+    def _alert_show(self, sev, teks):
+        key = (sev, teks)
+        if self._alert_kini == key:
+            return
+        self._alert_kini = key
+        latar = theme.warna("err") if sev == "krit" else theme.warna("warn")
+        self.lbl_alert.setText(("⛔ " if sev == "krit" else "⚠ ") + teks)
+        self.lbl_alert.setStyleSheet(
+            "background:%s; color:%s; font-size:%dpx; font-weight:800;"
+            " letter-spacing:1.2px; padding:%dpx;"
+            % (latar, theme.warna("on_accent"), theme.px(12), theme.px(5)))
+        self.lbl_alert.setVisible(True)
+        try:
+            if sev == "krit":
+                QtWidgets.QApplication.beep()
+        except Exception:                                  # noqa: BLE001
+            pass
+        self._catat("[ALERT] " + teks)
+
+    def _alert_clear(self):
+        if self._alert_kini is None:
+            return
+        self._alert_kini = None
+        self.lbl_alert.setVisible(False)
+
+    def _safety_check(self, s):
+        """Monitor keselamatan berjalan (leak latch · baterai · failsafe · link)."""
+        try:
+            txt = (s.get("last_text") or "").lower()
+            if ("leak" in txt or "bocor" in txt) and s.get("last_text_sev", 6) <= 4:
+                self._leak_latch = True
+            issues = []
+            if self._leak_latch:
+                issues.append(("krit", "LEAK DETECTED — surface the ROV"))
+            v = s.get("volt")
+            rem = s.get("remaining")
+            low_v = float(self.bridge.params.get("BATT_LOW_VOLT") or 14.0)
+            crt_v = float(self.bridge.params.get("BATT_CRT_VOLT") or 13.2)
+            if v is not None and v <= crt_v:
+                issues.append(("krit", "Battery CRITICAL %.1f V" % v))
+            elif rem is not None and rem <= 12:
+                issues.append(("krit", "Battery CRITICAL %d%%" % int(rem)))
+            elif (v is not None and v <= low_v) or (rem is not None and rem <= 25):
+                issues.append(("warn", "Battery low %s" %
+                               (("%.1f V" % v) if (v is not None and v <= low_v)
+                                else ("%d%%" % int(rem)))))
+            if ("failsafe" in txt or "e-stop" in txt or "estop" in txt) \
+                    and s.get("last_text_sev", 6) <= 4:
+                issues.append(("krit" if s.get("last_text_sev", 6) <= 3 else "warn",
+                               "FAILSAFE — check vehicle"))
+            if not s.get("link", True):
+                issues.append(("warn", "MAVLink lost — reconnecting"))
+            if issues:
+                krit = [t for k, t in issues if k == "krit"]
+                teks = krit[0] if krit else issues[0][1]
+                sev = "krit" if krit else "warn"
+                if len(issues) > 1:
+                    teks = "%s  (+%d)" % (teks, len(issues) - 1)
+                self._alert_show(sev, teks)
+            else:
+                self._alert_clear()
+        except Exception:                                  # noqa: BLE001
+            pass
 
     def _chip(self, chip, warna, teks):
         try:
@@ -338,7 +426,7 @@ class RovConsole(QtWidgets.QMainWindow):
         rem = s.get("remaining")
         self.sb_batt.setText("BATT: %s%s" % ("%.2f V" % v if v else "—",
                                              (" / %d%%" % rem) if rem is not None else ""))
-        self.sb_pad.setText("PAD: %s" % ("siap" if self.gamepad._konek else "tidak ada"))
+        self.sb_pad.setText("PAD: %s" % ("ready" if self.gamepad._konek else "none"))
         try:
             d = self.rawpanel.files_info
             total = sum(d.values()) / 1e6
@@ -454,7 +542,7 @@ class RovConsole(QtWidgets.QMainWindow):
         tile.mode_gambar = "contain"     # T1 nyata: frame kamera ditampilkan UTUH
         tile.tinggi_maks = tinggi
         tile.set_status("waiting for stream …")
-        p.body_layout.addWidget(tile, 1)
+        p.body_layout.addWidget(tile)      # hug: tinggi = rasio frame (tanpa stretch)
         p.tile = tile
         return p
 
@@ -476,6 +564,7 @@ class RovConsole(QtWidgets.QMainWindow):
         lab_a = QtWidgets.QLabel("ATTITUDE")
         lab_a.setObjectName("MicroLabel")
         lab_a.setAlignment(Qt.AlignHCenter)
+        lab_a.setMinimumWidth(theme.px(86))
         cell_a.addWidget(self.horizon, 0, Qt.AlignHCenter)
         cell_a.addWidget(lab_a, 0, Qt.AlignHCenter)
         cell_b = QtWidgets.QVBoxLayout()
@@ -485,6 +574,7 @@ class RovConsole(QtWidgets.QMainWindow):
         lab_b = QtWidgets.QLabel("COMPASS")
         lab_b.setObjectName("MicroLabel")
         lab_b.setAlignment(Qt.AlignHCenter)
+        lab_b.setMinimumWidth(theme.px(86))
         cell_b.addWidget(self.kompas, 0, Qt.AlignHCenter)
         cell_b.addWidget(lab_b, 0, Qt.AlignHCenter)
         dial.addLayout(cell_a, 1)
@@ -501,7 +591,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["flight"] = p
 
         # ---- instruments ala QGC (NAMED_VALUE_FLOAT / SERVO_OUTPUT_RAW)
-        p = W.Panel("INSTRUMENTS · SUB (QGC)", "cam tilt · lights · gain · water", domain="field")
+        p = W.Panel("INSTRUMENTS · SUB (QGC)", "sub values", domain="field")
         grid2 = QtWidgets.QGridLayout()
         grid2.setSpacing(6)
         # AUDIT FUNGSI (13 Okt): hanya yang BENAR-BENAR punya data dari robot ini.
@@ -518,7 +608,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["instruments"] = p
 
         # ---- power
-        p = W.Panel("POWER & SYSTEM", "baterai · link", domain="field")
+        p = W.Panel("POWER & SYSTEM", "battery · link", domain="field")
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(10)
         self.ro_volt = W.Readout("Volt", "V", size=16)
@@ -530,7 +620,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["power"] = p
 
         # ---- vehicle (pilot)
-        p = W.Panel("VEHICLE (PILOT)", "mode · arm — bench-check first", domain="mission")
+        p = W.Panel("VEHICLE (PILOT)", "arm · lights · tilt", domain="mission")
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(4)
         self.cb_mode = QtWidgets.QComboBox()
@@ -576,10 +666,10 @@ class RovConsole(QtWidgets.QMainWindow):
         lab2.setObjectName("MicroLabel")
         lab2.setFixedWidth(theme.px(68))
         self.lab_tilt = lab2
-        b_tc = QtWidgets.QPushButton("50%")
+        b_tc = QtWidgets.QPushButton("RESET")
         b_tc.setObjectName("BtnTiny")
-        b_tc.setToolTip("kembalikan tilt ke 50% (tengah = berhenti; RC8 itu komando laju)")
-        b_tc.clicked.connect(lambda: self.sl_tilt.setValue(1500))
+        b_tc.setToolTip("kembalikan kamera tilt ke posisi 50% — otomatis (baca balik CamTilt)")
+        b_tc.clicked.connect(self._reset_tilt)
         self.sl_tilt = QtWidgets.QSlider(Qt.Horizontal)
         self.sl_tilt.setRange(1100, 1900)
         self.sl_tilt.setValue(1500)
@@ -612,9 +702,8 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addLayout(row3x)
         row3 = QtWidgets.QHBoxLayout()
         row3.setSpacing(6)
-        lab3 = QtWidgets.QLabel("GAIN")
-        lab3.setObjectName("MicroLabel")
-        self.lbl_gain = QtWidgets.QLabel("pilot gain: — (JS_GAIN_DEFAULT)")
+        self.lbl_gain = QtWidgets.QLabel("gain: —")
+        self.lbl_gain.setToolTip("pilot gain (param JS_GAIN_DEFAULT) — 100% = penuh")
         self.lbl_gain.setObjectName("Faint")
         b_gm = QtWidgets.QPushButton("GAIN −")
         b_gm.setObjectName("BtnTiny")
@@ -624,7 +713,6 @@ class RovConsole(QtWidgets.QMainWindow):
         b_gp.setObjectName("BtnTiny")
         b_gp.setToolTip("tambah pilot gain (JS_GAIN_DEFAULT) 0.05")
         b_gp.clicked.connect(lambda: self._gain_step(0.05))
-        row3.addWidget(lab3)
         row3.addWidget(b_gm)
         row3.addWidget(b_gp)
         row3.addWidget(self.lbl_gain, 1)
@@ -649,12 +737,12 @@ class RovConsole(QtWidgets.QMainWindow):
         p = W.Panel("SETUP · KALIBRASI", "ala QGC/BlueOS Vehicle Setup", domain="mission")
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(4)
-        tombol = (("GYROSCOPE", lambda: self._cal("gyro")),
-                  ("ACCELEROMETER…", self._cal_accel),
+        tombol = (("GYRO", lambda: self._cal("gyro")),
+                  ("ACCEL (6-POS)…", self._cal_accel),
                   ("COMPASS", lambda: self._cal("mag")),
-                  ("LEVEL HORIZON", lambda: self._cal("level")),
-                  ("BAROMETER", lambda: self._cal("baro")),
-                  ("UNDUH PARAMETER", lambda: self.bridge.queue_param_list()))
+                  ("LEVEL", lambda: self._cal("level")),
+                  ("BARO", lambda: self._cal("baro")),
+                  ("PARAMS", lambda: self.bridge.queue_param_list()))
         for i, (nama, fn) in enumerate(tombol):
             b = QtWidgets.QPushButton(nama)
             b.setObjectName("BtnTiny")
@@ -670,7 +758,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
         # ---- motors
         p = W.Panel("MOTOR TEST", "per-thruster · MOTOR DETECT", domain="mission")
-        b = QtWidgets.QPushButton("BUKA MOTOR TEST…")
+        b = QtWidgets.QPushButton("MOTOR TEST…")
         b.setObjectName("BtnTiny")
         b.clicked.connect(self._motor_dialog)
         p.body_layout.addWidget(b)
@@ -696,7 +784,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["params"] = p
 
         # ---- notifikasi
-        p = W.Panel("NOTIFICATIONS", "STATUSTEXT + status", domain="neutral")
+        p = W.Panel("NOTIFICATIONS", "messages", domain="neutral")
         self.log = QtWidgets.QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(600)
@@ -704,7 +792,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["notif"] = p
 
         # ---- capture
-        p = W.Panel("CAPTURE", "record compressed · snapshot", domain="mission")
+        p = W.Panel("CAPTURE", "record · snapshot", domain="mission")
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(4)
         self.btn_rec = {}
@@ -741,7 +829,7 @@ class RovConsole(QtWidgets.QMainWindow):
         td.start(5000)
 
         # ---- teleop
-        p = W.Panel("TELEOP (GAMEPAD)", "deadman wajib · MANUAL_CONTROL", domain="mission")
+        p = W.Panel("TELEOP (GAMEPAD)", "deadman hold", domain="mission")
         self._teleop_bars = {}
         # label per bar (audit 13 Okt: pilot tidak bisa tahu bar itu apa tanpa teks)
         for kode, nama in (("fwd", "FWD"), ("lat", "LAT"), ("depth", "DEPTH"),
@@ -766,14 +854,14 @@ class RovConsole(QtWidgets.QMainWindow):
         P["teleop"] = p
 
         # ---- raw
-        p = W.Panel("RAW (ONBOARD)", "YUYV chunks · transfer + verify", domain="mission")
+        p = W.Panel("RAW (ONBOARD)", "onboard · transfer", domain="mission")
         rp = RawPanel(self.args.raw_agent, outdir=self.sesi)
         p.body_layout.addWidget(rp)
         p.panel_raw = rp
         P["raw"] = p
 
         # ---- peta misi: peta OSM (ala rovgui asli) + plot NED + estimasi
-        p = W.Panel("PETA MISI", "OSM map + estimated track (T2: VIO)", domain="mission")
+        p = W.Panel("PETA MISI", "OSM · estimate (T2)", domain="mission")
         self.peta = PetaPanel()
         # default T1: perairan Kepulauan Seribu (dekat dermaga Pulau Pramuka).
         # Operator mengganti titik anchor kapan saja lewat "TARUH ANCHOR" (klik peta).
@@ -783,6 +871,14 @@ class RovConsole(QtWidgets.QMainWindow):
         self.peta.pin_dipilih.connect(self._anchor_dipilih)
         self.plot_misi = PlotMisi()
         self.stack_peta = QtWidgets.QStackedWidget()
+        # peta/peta-plot mampu MENYERAP sisa tinggi kolom (jangan dibiarkan kamera
+        # melebar mengambil ruang — akar rasio 1.55).
+        self.stack_peta.setSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                                      QtWidgets.QSizePolicy.Expanding)
+        self.peta.setSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                                QtWidgets.QSizePolicy.Expanding)
+        self.plot_misi.setSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                                     QtWidgets.QSizePolicy.Expanding)
         self.stack_peta.addWidget(self.peta)
         self.stack_peta.addWidget(self.plot_misi)
         p.body_layout.addWidget(self.stack_peta, 1)
@@ -827,7 +923,7 @@ class RovConsole(QtWidgets.QMainWindow):
         P["peta"] = p
 
         # ---- preflight
-        p = W.Panel("PRE-FLIGHT CHECK", "status hidup + checklist pre-dive", domain="mission")
+        p = W.Panel("PRE-FLIGHT CHECK", "pre-flight checklist", domain="mission")
         pf = VO.PreflightPanel(self.bridge)
         p.body_layout.addWidget(pf)
         p.panel_preflight = pf
@@ -1073,7 +1169,77 @@ class RovConsole(QtWidgets.QMainWindow):
             self._rc_keep[9] = pwm
             self.bridge.rc_override({9: pwm})
 
+    def _kirim_tilt_pwm(self, pwm):
+        """Kirim perintah LAJU ch8 langsung (dipakai routine RESET/tengah)."""
+        pwm = int(max(1100, min(1900, pwm)))
+        if getattr(self.gamepad, "aktif", False):
+            self.gamepad.tilt = pwm
+        else:
+            self._rc_keep[8] = pwm
+            self.bridge.rc_override({8: pwm})
+
+    def _reset_tilt(self):
+        """RESET tilt: bawa kamera KEMBALI ke posisi 50% (bukan sekadar berhenti).
+
+        RC8 = komando LAJU: menaruh 1500 hanya menghentikan sapuan, posisi kamera
+        tetap di tempat terakhir. Routine ini membaca balik CamTilt
+        (NAMED_VALUE_FLOAT) dan menyapu perlahan sampai mendekati 50%.
+        """
+        try:
+            self._center_aktif = True
+            self._center_t0 = time.monotonic()
+            if not hasattr(self, "_center_timer"):
+                self._center_timer = QtCore.QTimer(self)
+                self._center_timer.timeout.connect(self._tick_center)
+            self._center_timer.start(150)
+            self._catat("RESET tilt: menyapu kembali ke 50% …")
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _tick_center(self):
+        try:
+            if not getattr(self, "_center_aktif", False):
+                self._center_timer.stop()
+                return
+            if time.monotonic() - self._center_t0 > 8.0:
+                self._center_aktif = False
+                self._center_timer.stop()
+                self._kirim_tilt_pwm(1500)
+                self._catat("RESET tilt: timeout — sapuan dihentikan (1500)")
+                return
+            x = (self.bridge.state.get("nvf") or {}).get("CamTilt")
+            if x is None:
+                return
+            x = float(x)
+            if abs(x - 0.5) <= 0.03:
+                self._center_aktif = False
+                self._center_timer.stop()
+                self._kirim_tilt_pwm(1500)
+                try:
+                    self.sl_tilt.blockSignals(True)
+                    self.sl_tilt.setValue(1500)
+                    self.sl_tilt.blockSignals(False)
+                    self.lab_tilt.setText("TILT 50%")
+                    if self.sp_tilt.value() != 50:
+                        self.sp_tilt.blockSignals(True)
+                        self.sp_tilt.setValue(50)
+                        self.sp_tilt.blockSignals(False)
+                except Exception:                          # noqa: BLE001
+                    pass
+                self._catat("tilt kembali ke 50%% (terbaca %.0f%%)" % (x * 100))
+                return
+            self._kirim_tilt_pwm(1700 if x > 0.5 else 1300)
+        except Exception:                                  # noqa: BLE001
+            pass
+
     def _set_tilt(self, val):
+        if getattr(self, "_center_aktif", False):
+            self._center_aktif = False
+            try:
+                self._center_timer.stop()
+            except Exception:                              # noqa: BLE001
+                pass
+            self._catat("RESET tilt dibatalkan (input manual)")
         self._tilt = int(val)
         self.lab_tilt.setText("TILT %d%%" % int(round((self._tilt - 1100) / 8.0)))
         try:
@@ -1147,11 +1313,15 @@ class RovConsole(QtWidgets.QMainWindow):
         except Exception:                                  # noqa: BLE001
             pass
         btns = [i for i, b in enumerate(live.get("buttons") or []) if b]
-        self.lbl_pad.setText("pad: %s | deadman %s | btn %s | tilt %d µs" % (
-            live.get("nama") or "—", "HELD" if live.get("deadman") else "RELEASED",
-            btns or "—", live.get("tilt", 1500)))
+        _nama = live.get("nama") or "—"
+        _pendek = "DS4" if "sony" in _nama.lower() else _nama[:18]
+        _seg = (" | btn %s" % btns) if btns else ""
+        self.lbl_pad.setText("pad: %s | deadman %s%s | tilt %d µs" % (
+            _pendek, "HELD" if live.get("deadman") else "RELEASED", _seg,
+            live.get("tilt", 1500)))
+        self.lbl_pad.setToolTip("pad: %s" % _nama)      # info penuh = tooltip (popup)
         self._chip(self.chip_pad, "ok" if live.get("konek") else "warn",
-                   "siap" if live.get("konek") else "tidak ada")
+                   "ready" if live.get("konek") else "none")
         self._gaya_pad(bool(live.get("konek")))
 
     # ================================================================ MAVLink
@@ -1187,6 +1357,19 @@ class RovConsole(QtWidgets.QMainWindow):
             if camt is None and servo.get(16):
                 camt = max(0.0, min(1.0, (servo[16] - 1100) / 800.0))
             self.ro_camtilt.set_value(None if camt is None else camt * 100.0, "{:.0f}")
+            if (getattr(self, "_perlu_center_awal", False) and camt is not None
+                    and not s.get("armed")):
+                # permintaan pemilik 13 Okt: baca posisi tilt saat GUI mulai, lalu
+                # kembalikan ke 50% SEKALI di setiap awal sesi.
+                self._perlu_center_awal = False
+                if abs(float(camt) - 0.5) > 0.05:
+                    self._catat("camera tilt saat start: %.0f%% — RESET ke 50%%"
+                                % (camt * 100))
+                    self._reset_tilt()
+                else:
+                    self._catat("camera tilt saat start: %.0f%% (sudah ~50%%)"
+                                % (camt * 100))
+            self._safety_check(s)
             l1 = nvf.get("Lights1")
             if l1 is None and servo.get(13):
                 l1 = max(0.0, min(1.0, (servo[13] - 1100) / 800.0))
@@ -1196,7 +1379,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.ro_water.set_value(s.get("temp"), "{:.2f}")
             _g = self.bridge.params.get("JS_GAIN_DEFAULT")
             if _g is not None:
-                self.lbl_gain.setText("pilot gain: %.2f (JS_GAIN_DEFAULT)" % float(_g))
+                self.lbl_gain.setText("gain: %.2f" % float(_g))
             self.ro_volt.set_value(s.get("volt"), "{:.2f}")
             self.ro_curr.set_value(s.get("curr"), "{:.2f}")
             self.ro_batt.set_value(s.get("remaining"), "{:.0f}")
@@ -1217,6 +1400,13 @@ class RovConsole(QtWidgets.QMainWindow):
             pass
 
     # ================================================================ tutup
+    def _sync_tiles(self):
+        try:
+            for k in ("cam_front", "cam_left", "cam_right"):
+                self.P[k].tile._sync_tinggi()
+        except Exception:                                  # noqa: BLE001
+            pass
+
     def _pad_coba(self):
         try:
             if not getattr(self.gamepad, "aktif", False):
@@ -1255,7 +1445,7 @@ class RovConsole(QtWidgets.QMainWindow):
         baru = max(0.1, min(1.0, round(kini + delta, 2)))
         self.bridge.queue_param_set("JS_GAIN_DEFAULT", baru)
         self._catat("pilot gain → %.2f (JS_GAIN_DEFAULT)" % baru)
-        self.lbl_gain.setText("pilot gain: %.2f (JS_GAIN_DEFAULT)" % baru)
+        self.lbl_gain.setText("gain: %.2f" % baru)
 
     def _pilih_peta(self, ke):
         self.stack_peta.setCurrentIndex(int(ke))

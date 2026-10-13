@@ -755,18 +755,8 @@ class PetaPanel(QtWidgets.QWidget):
         # PENANDA ROBOT: PANAH SEDERHANA (permintaan pemilik 13 Okt: "tanda anchor dan
         # penanda robotnya kayak arrow biasa aja, gausa pakai desain kayak sekarang").
         # Segitiga polos yang diputar mengikuti arah hadap — tanpa ikon/gambar.
-        try:
-            p.save()
-            p.translate(x, y)
-            p.rotate(math.degrees(yaw))      # yaw 0 = menghadap utara (atas peta)
-            p.setPen(QtGui.QPen(QtGui.QColor(20, 23, 26), 1.4))
-            p.setBrush(QtGui.QColor(241, 237, 230))
-            p.drawPolygon(QtGui.QPolygonF([
-                QtCore.QPointF(0, -9), QtCore.QPointF(-6, 7),
-                QtCore.QPointF(0, 3.5), QtCore.QPointF(6, 7)]))
-            p.restore()
-        except Exception:                          # noqa: BLE001  (jangan pernah bunuh proses)
-            pass
+        # (panah robot digambar SETELAH anchor — lihat di bawah — supaya saat robot
+        #  berada tepat di titik anchor keduanya tetap terlihat, panah di atas dot)
 
         # GRID SKALA: DEFAULT MATI (permintaan pemilik: "Esri pecah-pecah gridnya saya gasuka").
         # Dinyalakan lewat menu bila memang ingin mengukur jarak di peta.
@@ -797,28 +787,15 @@ class PetaPanel(QtWidgets.QWidget):
         # keterangan: anchor, skala, atribusi OSM
         p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT)))
         f = p.font(); f.setPointSize(theme.px(8)); p.setFont(f)
-        p.drawText(8, 14, "anchor %.5f, %.5f (%s) · zoom %d · %.2f m/px"
-                   % (self.anchor["lat"], self.anchor["lon"],
-                      self.anchor.get("sumber", "manual"), z, mpx))
-        luas = ""
-        if len(self.gt) > 1:
-            luas = " · span %.1f x %.1f m" % (max(p2[0] for p2 in self.gt) - min(p2[0] for p2 in self.gt),
-                                                 max(p2[1] for p2 in self.gt) - min(p2[1] for p2 in self.gt))
-        penunjuk = ""
-        _r = getattr(self, "rencana", None)
-        if _r:
-            penunjuk = " · guide dashed cyan = planned path, orange = survey area"
-            if _r.get("agl"):
-                penunjuk += " · target AGL %.1f m" % _r["agl"]
-            if _r.get("sp"):
-                penunjuk += " · line spacing %.2f m" % _r["sp"]
-        p.drawText(8, 28, "GT black · VIO red · yellow = ROV · grid %g m%s%s"
-                   % (langkah, luas, penunjuk))
-        p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT_FAINT)))
-        p.drawText(8, self.height() - 6, "tiles: %d loaded · %d queued · %d empty%s"
-                   % (len(self._ubin) + sum(len(v) for v in self._lapisan.values()),
-                      self.unduh.q.qsize(), len(self._kosong),
-                      " · DOWNLOADS PAUSED (mission running)" if self.jeda else ""))
+        # teks pendek & langsung (permintaan pemilik); detail di tooltip
+        p.drawText(8, 14, "z%d · %.2f m/px" % (z, mpx))
+        try:
+            self.setToolTip("anchor %.5f, %.5f (%s) · zoom %d · %.2f m/px"
+                            % (self.anchor["lat"], self.anchor["lon"],
+                               self.anchor.get("sumber", "manual"), z, mpx))
+        except Exception:                          # noqa: BLE001
+            pass
+        # (legenda panjang & status tiles DIHAPUS — info sekunder; lihat tooltip peta)
         p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT)))
         # koordinat di bawah kursor + jarak (permintaan pemilik: "kalau saya pin di map
         # interaktif juga beri tahu saya informasi lokasinya koordinatnya")
@@ -831,13 +808,12 @@ class PetaPanel(QtWidgets.QWidget):
             latk, lonk = self.kursor
             nk, ek = G.latlon_ke_ned(latk, lonk, self.anchor)
             p.setPen(QtGui.QPen(QtGui.QColor(theme.ACCENT)))
-            p.drawText(8, 42, "cursor %.6f, %.6f · %.1f m from ROV · %.1f m from anchor"
+            p.drawText(8, 28, "cur %.5f, %.5f · %.0f/%.0f m"
                        % (latk, lonk, math.hypot(nk - n, ek - e), math.hypot(nk, ek)))
             p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT)))
         if self.mode_pin:
             p.setPen(QtGui.QPen(QtGui.QColor(255, 196, 0)))
-            p.drawText(8, 56, "PIN MODE: click the map to place the anchor (coordinates "
-                              "reported immediately)")
+            p.drawText(8, 42, "PIN MODE — click map to place anchor")
             p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT)))
         if self.pin is not None:
             # PENANDA ANCHOR sederhana (permintaan pemilik 13 Okt): target kecil —
@@ -846,19 +822,30 @@ class PetaPanel(QtWidgets.QWidget):
                                                  getattr(self, "_posisi", (0, 0, 12))[2])
             px, py = (gxp - self._posisi[0]) * fb, (gyp - self._posisi[1]) * fb
             try:
+                # ANCHOR = dot sederhana (permintaan pemilik 13 Okt): cincin + titik.
                 p.setPen(QtGui.QPen(QtGui.QColor(0, 229, 255), 1.6))
                 p.setBrush(QtCore.Qt.NoBrush)
-                p.drawEllipse(QtCore.QPointF(px, py), 7.0, 7.0)
-                p.drawLine(QtCore.QPointF(px - 11, py), QtCore.QPointF(px - 3, py))
-                p.drawLine(QtCore.QPointF(px + 3, py), QtCore.QPointF(px + 11, py))
-                p.drawLine(QtCore.QPointF(px, py - 11), QtCore.QPointF(px, py - 3))
-                p.drawLine(QtCore.QPointF(px, py + 3), QtCore.QPointF(px, py + 11))
+                p.drawEllipse(QtCore.QPointF(px, py), 8.0, 8.0)
+                p.setPen(QtCore.Qt.NoPen)
                 p.setBrush(QtGui.QColor(0, 229, 255))
-                p.drawEllipse(QtCore.QPointF(px, py), 1.6, 1.6)
+                p.drawEllipse(QtCore.QPointF(px, py), 4.0, 4.0)
                 p.setPen(QtGui.QPen(QtGui.QColor(0, 220, 255)))
-                p.drawText(int(px) + 14, int(py) - 12, "ANCHOR %.5f, %.5f" % self.pin)
+                p.drawText(int(px) + 14, int(py) - 12, "%.5f, %.5f" % self.pin)
             except Exception:                      # noqa: BLE001
                 pass
+        # PENANDA ROBOT: panah polos, DIGAMBAR TERAKHIR (di atas anchor dot).
+        try:
+            p.save()
+            p.translate(x, y)
+            p.rotate(math.degrees(yaw))          # yaw 0 = menghadap utara (atas peta)
+            p.setPen(QtGui.QPen(QtGui.QColor(20, 23, 26), 1.4))
+            p.setBrush(QtGui.QColor(241, 237, 230))
+            p.drawPolygon(QtGui.QPolygonF([
+                QtCore.QPointF(0, -9), QtCore.QPointF(-6, 7),
+                QtCore.QPointF(0, 3.5), QtCore.QPointF(6, 7)]))
+            p.restore()
+        except Exception:                          # noqa: BLE001
+            pass
         p.drawText(self.width() - 260, self.height() - 6, self._info()["attr"])
         p.setPen(QtGui.QPen(QtGui.QColor(theme.TEXT), 2))
         panjang = 50
