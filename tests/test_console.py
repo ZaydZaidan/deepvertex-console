@@ -414,12 +414,15 @@ def main():
         pf = w.P["preflight"].panel_preflight
         st = w.bridge.state
         allbits = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 15) | (1 << 24)
-        w.bridge.params["COMPASS_DEV_ID"] = 71146
         st["sys_present"] = allbits
         st["sys_healthy"] = allbits
+        w.bridge.params.pop("COMPASS_DEV_ID", None)   # param belum terunduh
         pf._perbarui()
         ok30 = (pf.sensor_txt.get("s_gyro") == "ok") and \
-            ("ok" in pf.sensor_txt.get("s_mag", ""))
+            (pf.sensor_txt.get("s_mag") == "ok")      # cukup "ok" — bukan FAULT palsu
+        w.bridge.params["COMPASS_DEV_ID"] = 71146     # setelah param terunduh
+        pf._perbarui()
+        ok30 = ok30 and ("1 compass" in pf.sensor_txt.get("s_mag", ""))
         st["sys_healthy"] = allbits & ~(1 << 2)          # MAG rusak
         pf._perbarui()
         ok30 = ok30 and (pf.sensor_txt.get("s_mag") == "FAULT")

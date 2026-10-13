@@ -735,7 +735,8 @@ class PreflightPanel(QtWidgets.QWidget):
                                    "run gyro calibration"),
                 ("s_accel", "ACCEL", "3D accelerometer health — FAULT = recalibrate "
                                      "(ACCEL 6-POS) / check IMU"),
-                ("s_mag", "MAG", "Compass health + detected compass count (COMPASS_DEV_ID*) — "
+                ("s_mag", "MAG", "Compass health + detected compass count (COMPASS_DEV_ID*, "
+                                 "appears after the parameter list is downloaded) — "
                                  "FAULT = recalibrate compass / check wiring"),
                 ("s_baro", "BARO", "Barometer (absolute pressure) health — FAULT = depth "
                                    "reading will be wrong"),
@@ -901,7 +902,10 @@ class PreflightPanel(QtWidgets.QWidget):
             return ("err", "FAULT")
 
         n_mag = 0
+        params_ada = False
         for prm in ("COMPASS_DEV_ID", "COMPASS_DEV_ID2", "COMPASS_DEV_ID3"):
+            if prm in self.bridge.params:
+                params_ada = True
             try:
                 if int(float(self.bridge.params.get(prm) or 0)) > 0:
                     n_mag += 1
@@ -916,8 +920,10 @@ class PreflightPanel(QtWidgets.QWidget):
             if key == "s_mag" and warna == "ok":
                 if n_mag:
                     teks = "ok (%d compass)" % n_mag
-                else:
+                elif params_ada:
                     warna, teks = "err", "FAULT (0 compass)"
+                else:
+                    teks = "ok"      # daftar param belum diunduh — jangan menuduh FAULT
             self._set_sensor(key, warna, teks)
 
         # ringkasan

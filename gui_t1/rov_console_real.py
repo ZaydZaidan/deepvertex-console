@@ -222,6 +222,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self._disk_rate_mbpm = 0.0        # laju tulis EMA (MB/menit)
         self._disk_blok = False
         self._rec_aktif = set()           # nama kamera yang sedang REC (compressed)
+        self._param_diminta = False       # param list diminta sekali per koneksi
         self.pf = self.P["preflight"].panel_preflight
         self.pf.sumber = {"players": self.players, "gamepad": self.gamepad,
                           "rawpanel": self.rawpanel, "sesi": self.sesi}
@@ -1651,6 +1652,16 @@ class RovConsole(QtWidgets.QMainWindow):
     # ================================================================ MAVLink
     def _vehicle(self, s):
         self.last = dict(s)
+        # Unduh daftar parameter OTOMATIS sekali per koneksi (audit 14 Okt: chip MAG
+        # sempat "FAULT (0 compass)" karena COMPASS_DEV_ID belum pernah diunduh).
+        try:
+            if s.get("link") and not self._param_diminta:
+                self._param_diminta = True
+                self.bridge.queue_param_list()
+        except Exception:                                  # noqa: BLE001
+            pass
+        if not s.get("link"):
+            self._param_diminta = False        # siap minta lagi saat tersambung ulang
         try:
             self._chip(self.chip_link, "ok" if s.get("link") else "warn",
                        "ok" if s.get("link") else "wait")
