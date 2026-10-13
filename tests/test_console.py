@@ -411,6 +411,7 @@ def main():
 
     # [30] preflight memeriksa SETIAP sensor & menyebut sensor yang error
     try:
+        w.bridge.pause_sys = True        # hentikan aliran SYS_STATUS (anti-race CI)
         pf = w.P["preflight"].panel_preflight
         st = w.bridge.state
         allbits = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 15) | (1 << 24)
@@ -432,9 +433,11 @@ def main():
         st["sys_present"] = 0
         st["sys_healthy"] = 0
         pf._perbarui()
-        ok30 = ok30 and (pf.sensor_txt.get("s_gyro") == "NOT FOUND")
+        # semua bit 0 = belum ada data -> chip jujur "--", bukan menuduh
+        ok30 = ok30 and (pf.sensor_txt.get("s_gyro") == "—")
         st.pop("sys_present", None)
         st.pop("sys_healthy", None)
+        w.bridge.pause_sys = False
         print("[30] preflight per-sensor:", ok30)
         lulus &= bool(ok30)
     except Exception as exc:                               # noqa: BLE001

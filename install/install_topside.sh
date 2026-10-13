@@ -10,7 +10,8 @@ if [ ! -d "$GUI/.venv" ]; then
   /usr/bin/python3 -m venv --system-site-packages "$GUI/.venv"
   echo "   venv dibuat: $GUI/.venv"
 fi
-"$GUI/.venv/bin/python" -m pip install --quiet PySide6 && echo "   PySide6 OK"
+"$GUI/.venv/bin/python" -m pip install --quiet PySide6 evdev pymavlink numpy \
+  && echo "   PySide6 + evdev + pymavlink + numpy OK"   # evdev = pembaca gamepad
 
 echo "== 2) cek elemen GStreamer wajib =="
 miss=0

@@ -395,6 +395,8 @@ class MavBridge(QtCore.QObject):
                     self.sig_attitude.emit(*[x * 57.29578 for x in (msg.roll, msg.pitch, msg.yaw)])
 
             elif t == "SYS_STATUS":
+                if getattr(self, "pause_sys", False):
+                    continue          # hook uji deterministik (default: tidak aktif)
                 v = msg.voltage_battery / 1000.0
                 self.state["volt"] = v if v > 1.0 else None      # sim sering kirim 0
                 try:
