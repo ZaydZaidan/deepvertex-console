@@ -73,9 +73,12 @@ class DragOverlay(QtWidgets.QWidget):
 
     def set_zones(self, zones):
         self._zones = zones
+        if not zones:
+            self.hide()
+            return
         self.setGeometry(self._console_rect_local())
-        self.setVisible(bool(zones))
-
+        self.show()
+        self.raise_()
         self.update()
 
     def _console_rect_local(self):

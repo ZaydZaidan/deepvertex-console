@@ -18,6 +18,9 @@ QEvent = QtCore.QEvent
 from laysnap import (_RATIO_SPLIT_BOTTOM, _RATIO_SPLIT_TOP, DRAG_OFFSET_PX,
                      DragOverlay, _truncate, custom_path, theme_px)
 
+DBG_ENABLE = os.environ.get("DV_LAYDBG") == "1"
+_DBG = DBG_ENABLE
+
 # zone kinds handed to the console model editor:
 #   ("rail", "left"/"right")  -> append to that rail
 #   ("above", key)/("below", key) -> insert next to that visible panel
@@ -114,6 +117,21 @@ class SnapController(QtCore.QObject):
 
     # --------------------------------------------------------------- events
     def eventFilter(self, obj, ev):  # noqa: A003
+        """App-level router. NEVER raises into Qt: an exception here would
+        kill the console (seen live 15 Okt when the engine raced a real
+        mouse drag against a preset change)."""
+        try:
+            return self._event_router(obj, ev)
+        except Exception:                                  # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            try:
+                self._cleanup()
+            except Exception:                              # noqa: BLE001
+                pass
+            return False
+
+    def _event_router(self, obj, ev):  # noqa: A003
         t = ev.type()
 
         # ---- active drag: route everything through us, consume
@@ -135,7 +153,11 @@ class SnapController(QtCore.QObject):
         # ---- idle: arm a drag from any panel HEAD press
         if t == QEvent.MouseButtonPress and ev.button() == Qt.LeftButton:
             key = self._head_key_of(obj)
+            if _DBG and key is None:
+                print("[laydbg] press di luar head:", obj, flush=True)
             if key is not None and not self._over_control(obj, ev.position()):
+                if _DBG:
+                    print("[laydbg] ARM", key, flush=True)
                 panel = self.console.P.get(key)
                 gpos = ev.globalPosition().toPoint()
                 grab = gpos - panel.mapToGlobal(QtCore.QPoint(0, 0))
@@ -157,13 +179,16 @@ class SnapController(QtCore.QObject):
         return False
 
     def _head_key_of(self, obj):
-        """Map an event object to a panel key when it lives inside a HEAD."""
+        """Map an event object to a panel key when it lives inside a HEAD.
+        Note: QWindow (native top-level event carriers) has no parentWidget —
+        guard it (crash seen live 15 Okt)."""
         w = obj
         while w is not None:
             for head, key in self._key_by_head.items():
                 if head is w:
                     return key
-            w = w.parentWidget()
+            pw = getattr(w, "parentWidget", None)
+            w = pw() if callable(pw) else None
         return None
 
     @staticmethod
@@ -202,7 +227,7 @@ class SnapController(QtCore.QObject):
 
     def _refresh_hook(self, gpos=None):
         if gpos is None:
-            gpos = QtCore.QCursor.pos()
+            gpos = QtGui.QCursor.pos()   # Qt.QCursor TIDAK ADA di PySide6
         self._pending = self._kind_at(gpos)
         zones = self._paint_zones(self._pending)
         self.overlay.set_zones(zones if self._pending is not None else [])
