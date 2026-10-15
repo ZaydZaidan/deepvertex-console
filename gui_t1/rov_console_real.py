@@ -125,7 +125,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.5"    # versi aplikasi (session.json + update checker)
+__version__ = "1.0.6"    # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -141,8 +141,10 @@ class RovConsole(QtWidgets.QMainWindow):
             # kamera TANPA stretch: panel mengunci pas rasio frame (gambar penuh)
             "mid": [("cam_front", 0), ("peta", 1)],
             # sekunder turun: notifikasi BUKAN di atas; capture & teleop yang penting
-            "right": ["capture", "teleop", "cam_left", "cam_right", "raw",
-                      "notif", "soon"],
+            # (penyesuaian pemilik 15 Okt: stereo L/R PALING ATAS; teleop tepat
+            #  di bawah notifikasi, di atas Autonomous)
+            "right": ["cam_left", "cam_right", "capture", "raw", "notif", "teleop",
+                      "soon"],
         },
         "mapping": {
             "lebar_kiri": 350,
@@ -161,8 +163,8 @@ class RovConsole(QtWidgets.QMainWindow):
             "lebar_kiri": 350,
             "left": ["flight", "power", "preflight"],
             "mid": [("cam_front", 0), ("peta", 1)],
-            "right": ["capture", "teleop", "cam_left", "cam_right", "raw",
-                      "notif"],
+            # stereo L/R paling atas; teleop di bawah notifikasi (15 Okt)
+            "right": ["cam_left", "cam_right", "capture", "raw", "notif", "teleop"],
         },
     }
 
@@ -1551,9 +1553,20 @@ class RovConsole(QtWidgets.QMainWindow):
         veh.addAction("Unduh parameter", lambda: self.bridge.queue_param_list())
         veh.addSeparator()
         veh.addAction("Gamepad mapping…", self._padmap_dialog)
+        konek = mb.addMenu("&Connection")
+        konek.addAction("Connection settings (BlueOS / Ethernet)…",
+                        self._menu_koneksi)
         hlp = mb.addMenu("&Help")
         hlp.addAction("Pre-dive checklist (Blue Robotics)", self._menu_checklist)
         hlp.addAction("About", self._menu_about)
+
+    def _menu_koneksi(self):
+        """Buka dialog pengaturan koneksi (BlueOS / ethernet / custom)."""
+        try:
+            import koneksi as _kon
+            _kon.buat_dialog(self)
+        except Exception as exc:                           # noqa: BLE001
+            self._catat("koneksi: dialog gagal: %s" % exc)
 
     def _toggle_panel(self, key, on):
         # FLOATING panel (window): plain visibility; docked: show/hide in
@@ -2399,7 +2412,7 @@ def main():
                          "layout, else Pilot Focus)")
     ap.add_argument("--tlog", default="auto",
                     help="'off' disabled; path to a tlog file; 'auto' = <session>/mavlink.tlog")
-    ap.add_argument("--tema", default="abyss", choices=tuple(theme.tampil()),
+    ap.add_argument("--tema", default="ink", choices=tuple(theme.tampil()),
                     help="color palette (ink = dark) — switchable live in View > Appearance")
     ap.add_argument("--teks", type=float, default=1.2, metavar="SKALA",
                     help="skala ukuran teks (1.0/1.2/1.4) utk keterbacaan di lapangan")
@@ -2409,6 +2422,22 @@ def main():
     ap.add_argument("--shot", default=None, help="save a window screenshot to PATH (UI testing)")
     ap.add_argument("--shot-after", type=float, default=6.0, help="seconds before the screenshot")
     args = ap.parse_args()
+    # Koneksi tersimpan (koneksi.json) = DEFAULT; argumen CLI tetap menang.
+    try:
+        import koneksi as _kon
+        _kk = _kon.load()
+        if _kk:
+            _ada = lambda f: any(a == f or a.startswith(f + "=")
+                                 for a in sys.argv[1:])
+            for _o, _f, _cast in (("mavlink", "--mavlink", str),
+                                  ("front_port", "--front-port", int),
+                                  ("left_port", "--left-port", int),
+                                  ("right_port", "--right-port", int),
+                                  ("raw_agent", "--raw-agent", str)):
+                if _kk.get(_o) is not None and not _ada(_f):
+                    setattr(args, _o, _cast(_kk[_o]))
+    except Exception:                                      # noqa: BLE001
+        pass
     args.port_front = args.front_port
     args.port_stereo_L = args.left_port
     args.port_stereo_R = args.right_port

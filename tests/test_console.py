@@ -766,6 +766,86 @@ def main():
         print("[47] update-checker GAGAL:", repr(exc))
         lulus = False
 
+    # [48] koneksi: preset BlueOS/SITL, args_terapan, perintah ethernet per-OS,
+    # simpan/muat koneksi.json.
+    try:
+        import koneksi as _K
+        ok48 = (_K.preset("blueos")["mavlink"] == "udpin:0.0.0.0:14550" and
+                _K.preset("blueos")["raw_agent"] == "http://192.168.2.2:8765" and
+                _K.preset("sitl")["host"] == "127.0.0.1")
+        argv0 = ["app.py", "--mavlink", "udpin:0.0.0.0:9999", "--no-pad",
+                 "--raw-agent=http://lama:1"]
+        a2 = _K.args_terapan({"mavlink": "udpin:0.0.0.0:14550",
+                              "front_port": 5600, "left_port": 5601,
+                              "right_port": 5602,
+                              "raw_agent": "http://192.168.2.2:8765"}, argv0)
+        ok48 = ok48 and ("udpin:0.0.0.0:14550" in a2) and \
+            ("udpin:0.0.0.0:9999" not in a2) and \
+            (not any(x.startswith("--raw-agent=") and "lama" in x
+                     for x in a2)) and ("--no-pad" in a2) and \
+            (a2.count("--mavlink") == 1)
+        p_win = _K.perintah_ethernet("nt", "Ethernet", dhcp=True)
+        p_lin = _K.perintah_ethernet("posix", "enp3s0", dhcp=False)
+        ok48 = ok48 and any("netsh" in x for x in p_win["cepat"]) and \
+            any("ip addr add" in x for x in p_lin["cepat"])
+        c_save = {"preset": "custom", "host": "10.0.0.5",
+                  "mavlink": "udpin:0.0.0.0:14550", "front_port": 5600,
+                  "left_port": 5601, "right_port": 5602,
+                  "raw_agent": "http://10.0.0.5:8765"}
+        ok48 = ok48 and _K.save(c_save) and \
+            ((_K.load() or {}).get("host") == "10.0.0.5")
+        print("[48] koneksi (preset/args/ethernet/simpan):", ok48)
+        lulus &= bool(ok48)
+    except Exception as exc:                               # noqa: BLE001
+        print("[48] koneksi GAGAL:", repr(exc))
+        lulus = False
+
+    # [49] gamepad Windows: terjemahan SDL -> kode evdev (joystick palsu).
+    try:
+        import gamepad as _GP
+        class _FakeJ:
+            def __init__(self):
+                self.ax = {0: 0.5, 1: -0.25, 3: 1.0, 4: 0.0, 5: 1.0}
+                self.btn = {0: 1, 4: 1}
+                self.hat = (0, -1)
+            def get_name(self):
+                return "Fake Pad"
+            def get_axis(self, i):
+                return self.ax.get(i, 0.0)
+            def get_button(self, i):
+                return self.btn.get(i, 0)
+            def get_numhats(self):
+                return 1
+            def get_hat(self, i):
+                return self.hat
+            def quit(self):
+                pass
+        g49 = _GP.Gamepad(None)
+        g49.device = _GP._SdlPad(_FakeJ())
+        g49._konek = True
+        g49._sdl_baca()
+        ec = _GP.ecodes
+        ok49 = (abs(g49.axes.get(ec.ABS_X, 0) - int(0.5 * 32767)) <= 2 and
+                abs(g49.axes.get(ec.ABS_RY, 0) - 32767) <= 2 and
+                g49.axes.get(ec.ABS_HAT0Y, 0) == -32767 and
+                g49.buttons.get(ec.BTN_SOUTH, 0) == 1 and
+                g49.buttons.get(ec.BTN_TL, 0) == 1 and
+                g49.buttons.get(ec.BTN_TL2, 0) == 0 and      # axis4=0 -> belum tekan
+                g49.buttons.get(ec.BTN_TR2, 0) == 1)         # axis5=1.0 -> tekan
+        nx0 = g49._norm_axis(0)
+        nx1 = g49._norm_axis(1)
+        ok49 = ok49 and abs(nx0 - 0.5) < 0.01 and abs(nx1 + 0.25) < 0.01
+        if not ok49:
+            print("[49] DETAIL axes=%r buttons=%r nx=%.3f,%.3f"
+                  % ({k: g49.axes.get(k) for k in (0, 1, 3, 5, 16, 17)},
+                     {k: g49.buttons.get(k) for k in (304, 305, 312, 313, 310)},
+                     nx0, nx1))
+        print("[49] gamepad SDL->evdev (translate + norm):", ok49)
+        lulus &= bool(ok49)
+    except Exception as exc:                               # noqa: BLE001
+        print("[49] gamepad SDL GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

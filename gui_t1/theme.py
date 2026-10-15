@@ -91,7 +91,7 @@ IVORY = dict(
 PALET = {"legacy": LEGACY, "abyss": ABYSS, "ink": INK, "ivory": IVORY}
 LABEL = {"legacy": "Legacy · amber (as-is)", "abyss": "Dark · abyss",
          "ink": "Ink · black", "ivory": "Light · ivory"}
-BAWAAN = "abyss"                     # field bawaan (keputusan pemilik 28 Sep 2026)
+BAWAAN = "ink"                      # bawaan konsol (permintaan pemilik 15 Okt: ink black)
 GELAP = ("legacy", "abyss", "ink")   # dipakai uji kecerahan piksel per mode
 
 # ------------------------------------------------- skala teks (keterbacaan field)

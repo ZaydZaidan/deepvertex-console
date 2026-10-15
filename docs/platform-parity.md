@@ -1,6 +1,6 @@
 # Platform parity — Windows (.EXE) vs Linux (source)
 
-Version: v1.0.5 · 2026-10-15
+Version: v1.0.6 · 2026-10-15
 
 Audit scope: the ROV-mode console as shipped in this repository. The console
 is the same application, same layout engine and the same automated test suite
@@ -24,8 +24,9 @@ cross-platform equivalent yet. Verified against the real Windows laptop
 | Storage guard + LiPo estimate + LiPo guard | yes | yes | tests [29], [43]–[44] |
 | Session folders, `mavlink.tlog`, `preflight.json` | yes | yes | identical layout on both |
 | Update checker + one-click auto-update | yes | yes | GitHub Releases API; optional per user |
+| Connection settings (BlueOS + custom network) | yes | yes | menu **Connection** — BlueOS/SITL/custom preset, robot host + MAVLink + ports + RAW URL, per-OS ethernet commands (nmcli/netsh, DHCP or static), connection test lights; apply = save + restart |
 | Installer | tar.gz + `install_topside.sh` (ToS gate + folder choice) | Setup .exe (Inno: license page + folder page, per-user default) | |
-| Gamepad teleop (DualShock 4) | yes | **no** | Linux reads `/dev/input` (evdev); the EXE shows an explicit “not available on this platform” |
+| Gamepad teleop (DualShock 4 / Xbox) | yes | yes | Linux: evdev · Windows: SDL via pygame — DS4 **and** Xbox pads, hotplug re-detect, same mapping/preset engine |
 | Live video PREVIEW (front + stereo) | yes | **no** | Linux decodes in-process (PyGObject); the EXE can *record* via `gst-launch` but cannot draw frames yet |
 
 ## Design parity
@@ -42,6 +43,5 @@ cross-platform equivalent yet. Verified against the real Windows laptop
 
 ## Known platform limits (deliberate)
 
-- Gamepad: no Windows reader yet (scope note in the README).
 - Live preview on Windows: recording works with the GStreamer runtime;
   preview needs a native decode path (future work).

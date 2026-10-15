@@ -24,6 +24,56 @@ except Exception:                                          # noqa: BLE001
     evdev = None
     ecodes = None
 
+# Windows: dukungan gamepad lewat SDL (pygame) — DS4 DAN Xbox. Nilai dibaca
+# dari SDL lalu DITERJEMAHKAN ke kode evdev yang sama sehingga seluruh logika
+# pemetaan/preset/deadman di kelas Gamepad bekerja tanpa perubahan.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+try:
+    import pygame
+except Exception:                                          # noqa: BLE001
+    pygame = None
+
+NT = os.name == "nt"
+
+if ecodes is None:              # Windows: konstanta evdev minimal (nilai ABI tetap)
+    class _Ecodes:              # noqa: N801 - pengganti modul ecodes
+        EV_ABS, EV_KEY = 3, 1
+        ABS_X, ABS_Y, ABS_Z = 0, 1, 2
+        ABS_RX, ABS_RY, ABS_RZ = 3, 4, 5
+        ABS_HAT0X, ABS_HAT0Y = 0x10, 0x11
+        BTN_SOUTH, BTN_EAST, BTN_NORTH, BTN_WEST = 0x130, 0x131, 0x133, 0x134
+        BTN_TL, BTN_TR, BTN_TL2, BTN_TR2 = 0x136, 0x137, 0x138, 0x139
+        BTN_SELECT, BTN_START, BTN_MODE = 0x13a, 0x13b, 0x13c
+        BTN_THUMBL, BTN_THUMBR = 0x13d, 0x13e
+
+    ecodes = _Ecodes
+
+# SDL (Windows/XInput-style) -> kode evdev
+_SDL_BTN = {0: "BTN_SOUTH", 1: "BTN_EAST", 2: "BTN_WEST", 3: "BTN_NORTH",
+            4: "BTN_TL", 5: "BTN_TR", 6: "BTN_SELECT", 7: "BTN_START",
+            8: "BTN_MODE", 9: "BTN_THUMBL", 10: "BTN_THUMBR"}
+_SDL_AX = {0: "ABS_X", 1: "ABS_Y", 2: "ABS_RX", 3: "ABS_RY"}
+_SDL_TRIG = {4: "ABS_Z", 5: "ABS_RZ"}          # LT/RT axis; digital diturunkan
+_TRIG_BTN = {"ABS_Z": "BTN_TL2", "ABS_RZ": "BTN_TR2"}
+
+
+class _SdlPad:
+    """Shim perangkat pygame -> antarmuka minim Gamepad (name/path/close/j)."""
+
+    def __init__(self, joy):
+        self.j = joy
+        try:
+            self.name = joy.get_name() or "gamepad (SDL)"
+        except Exception:                                  # noqa: BLE001
+            self.name = "gamepad (SDL)"
+        self.path = "SDL joystick 0"
+
+    def close(self):
+        try:
+            self.j.quit()
+        except Exception:                                  # noqa: BLE001
+            pass
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 CFG_DEFAULT = {
@@ -112,6 +162,8 @@ class Gamepad(QtCore.QObject):
 
     # ------------------------------------------------------------------ hidup
     def cari_device(self):
+        if NT:
+            return self._cari_device_sdl()
         if evdev is None:
             return None, "evdev module is not installed"
         kandidat = []
@@ -230,7 +282,84 @@ class Gamepad(QtCore.QObject):
         self.lights = max(0.0, min(100.0, float(pct)))
 
     # ------------------------------------------------------------ pembacaan
+    def _cari_device_sdl(self):
+        """Cari gamepad di Windows lewat SDL (pygame): DS4 maupun Xbox."""
+        if pygame is None:
+            return None, "pygame module is not installed"
+        try:
+            pygame.joystick.quit()
+        except Exception:                                  # noqa: BLE001
+            pass
+        try:
+            pygame.init()
+            pygame.joystick.init()
+        except Exception as exc:                           # noqa: BLE001
+            return None, "pygame init gagal: %s" % exc
+        try:
+            jumlah = pygame.joystick.get_count()
+        except Exception:                                  # noqa: BLE001
+            jumlah = 0
+        if jumlah <= 0:
+            return None, "no gamepad device found"
+        try:
+            j = pygame.joystick.Joystick(0)
+            j.init()
+        except Exception as exc:                           # noqa: BLE001
+            return None, "gamepad terdeteksi tapi gagal dibuka: %s" % exc
+        return _SdlPad(j), None
+
+    def _sdl_baca(self):
+        """Satu putaran baca SDL -> self.axes/self.buttons (kode evdev).
+
+        Dipisah supaya bisa diuji deterministik dengan joystick palsu [49].
+        """
+        j = self.device.j
+        try:
+            pygame.event.pump()
+        except Exception:                                  # noqa: BLE001
+            pass
+        for si, nm in _SDL_AX.items():
+            try:
+                v = float(j.get_axis(si))
+            except Exception:                              # noqa: BLE001
+                v = 0.0
+            self.axes[getattr(ecodes, nm)] = int(max(-1.0, min(1.0, v)) * 32767)
+        try:
+            if j.get_numhats() and j.get_numhats() > 0:
+                hx, hy = j.get_hat(0)
+                self.axes[ecodes.ABS_HAT0X] = int(hx) * 32767
+                self.axes[ecodes.ABS_HAT0Y] = int(hy) * 32767
+        except Exception:                                  # noqa: BLE001
+            pass
+        for si, nm in _SDL_TRIG.items():
+            try:
+                v = float(j.get_axis(si))
+            except Exception:                              # noqa: BLE001
+                v = 0.0
+            # normalisasi lintas rentang: rest (-1 atau 0) -> -1; tekan -> +1
+            u = v if v < 0 else (2.0 * v - 1.0)
+            self.axes[getattr(ecodes, nm)] = int(max(-1.0, min(1.0, u)) * 32767)
+            self.buttons[getattr(ecodes, _TRIG_BTN[nm])] = 1 if u > 0.0 else 0
+        for si, nm in _SDL_BTN.items():
+            try:
+                tekan = 1 if j.get_button(si) else 0
+            except Exception:                              # noqa: BLE001
+                tekan = 0
+            self.buttons[getattr(ecodes, nm)] = tekan
+
+    def _read_loop_sdl(self):
+        jeda = 1.0 / max(10.0, float(self.cfg.get("rate_hz", 20.0)) * 2.0)
+        while not self._stop.is_set():
+            try:
+                self._sdl_baca()
+            except Exception:                              # noqa: BLE001
+                self._konek = False
+                return
+            time.sleep(jeda)
+
     def _read_loop(self):
+        if NT:
+            return self._read_loop_sdl()
         try:
             for event in self.device.read_loop():
                 if self._stop.is_set():

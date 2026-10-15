@@ -80,24 +80,23 @@ console is built around that.
 | Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
 | Controller | Sony DualShock 4 (USB) |
 
-## Downloads (v1.0.5)
+## Downloads (v1.0.6)
 
 Available on the release page:
-<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.5>
+<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.6>
 
 | Platform | Artifact | For |
 |---|---|---|
-| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.5-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
-| **Windows — installer (recommended)** | `DeepVertexMarineConsole-Setup-1.0.5.exe` | Shows the End-User Terms (“I accept”), lets you choose the install folder, creates Start Menu entry + uninstaller |
-| **Windows — portable** | `DeepVertexMarineConsole.exe` | One-file portable build, same app without shortcuts/uninstaller |
+| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.6-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
+| **Windows (installer)** | `DeepVertexMarineConsole-Setup-1.0.6.exe` | Shows the End-User Terms (“I accept”), lets you choose the install folder, creates Start Menu entry + uninstaller; in-app updates are delivered through this package |
 
 ### A. Install on Ubuntu / other Linux (terminal)
 
 ```bash
 # 1) Download & extract
-wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.5/deepvertex-console-v1.0.5-linux.tar.gz
-tar xzf deepvertex-console-v1.0.5-linux.tar.gz
-cd deepvertex-console-1.0.5
+wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.6/deepvertex-console-v1.0.6-linux.tar.gz
+tar xzf deepvertex-console-v1.0.6-linux.tar.gz
+cd deepvertex-console-1.0.6
 
 # 2) One-time install: shows the End-User Terms (type "agree"), then asks
 #    WHERE to install (default: ~/DeepVertexMarineConsole) and builds the
@@ -128,10 +127,7 @@ default is pre-filled — change it if you like), installs per-user (no admin
 required) and creates a Start Menu entry, an optional desktop shortcut and an
 uninstaller.
 
-**Portable alternative:** `DeepVertexMarineConsole.exe` — the same app as a
-single file: double-click and go (no shortcuts/uninstaller).
-
-Both builds:
+All editions:
 
 1. The console connects to the MAVLink feed (`udpin:0.0.0.0:14550` by default)
    and opens the console window.

@@ -51,8 +51,16 @@ def is_newer(tag_baru, versi_lokal):
 
 
 def aset_url_untuk_platform(assets):
-    """Pilih URL aset rilis utk platform ini dari daftar {name: url}."""
+    """Pilih URL aset rilis utk platform ini dari daftar {name: url}.
+
+    Windows: utamakan installer SETUP (update diterapkan lewat installer
+    senyap); fallback ke EXE portable — kompatibilitas dengan updater versi
+    lama yang hanya mengenal nama EXE."""
     if os.name == "nt":
+        for nama, url in sorted(assets.items()):
+            if nama.startswith("DeepVertexMarineConsole-Setup") and \
+                    nama.endswith(".exe"):
+                return url
         return assets.get(ASET_WIN)
     for nama, url in sorted(assets.items()):
         if nama.startswith(ASET_LINUX_PREFIX) and nama.endswith("-linux.tar.gz"):
@@ -123,33 +131,52 @@ def _dir_update():
     return d
 
 
-def apply_update_windows(exe_url, exe_lokal, progress_cb=None):
-    """Unduh EXE baru + spawn skrip .bat penukar (setelah app keluar).
+def apply_update_windows(url_aset, exe_lokal, progress_cb=None):
+    """Unduh aset update + spawn skrip .bat penerap (setelah app keluar).
 
-    Return path skrip .bat (sudah dijalankan lepas)."""
+    Dua mode:
+    * URL = installer Setup  → dipasang SENYAP (lisensi otomatis diterima di
+      mode senyap; folder instalasi ter-ingat oleh installer), lalu aplikasi
+      dibuka ulang. Ini mode utama v1.0.6+.
+    * URL = EXE portable (updater lama) → tukar file langsung (kompatibilitas).
+    Return path skrip .bat (sudah dijalankan lepas).
+    """
     d = _dir_update()
-    baru = os.path.join(d, "baru.exe")
-    download(exe_url, baru, progress_cb)
+    nama = os.path.basename(str(url_aset or "")).lower()
+    setup = "setup" in nama
+    baru = os.path.join(d, "setup-baru.exe" if setup else "baru.exe")
+    download(url_aset, baru, progress_cb)
     bat = os.path.join(d, "terapkan_update.bat")
+    kepala = (
+        "@echo off\r\n"
+        ":tunggu\r\n"
+        "tasklist /fi \"imagename eq DeepVertexMarineConsole.exe\" | find /i "
+        "\"DeepVertexMarineConsole.exe\" >nul && (\r\n"
+        "  ping -n 2 127.0.0.1 >nul\r\n"
+        "  goto tunggu\r\n"
+        ")\r\n")
+    if setup:
+        isi = (kepala +
+               "rem DeepVertex auto-update: pasang installer senyap, buka ulang.\r\n"
+               "start /wait \"\" \"%~dp0setup-baru.exe\" /SILENT /SUPPRESSMSGBOXES "
+               "/NORESTART /CLOSEAPPLICATIONS /NOCANCEL\r\n"
+               "start \"\" \"%s\"\r\n"
+               "del /q \"%~dp0setup-baru.exe\" >nul 2>nul\r\n"
+               "del /q \"%~f0\" >nul 2>nul\r\n" % exe_lokal)
+    else:
+        isi = (kepala +
+               "rem DeepVertex auto-update: tukar EXE portable, buka ulang.\r\n"
+               ":salin\r\n"
+               "copy /y \"%~dp0baru.exe\" \"%s\" >nul 2>nul\r\n"
+               "if errorlevel 1 (\r\n"
+               "  ping -n 2 127.0.0.1 >nul\r\n"
+               "  goto salin\r\n"
+               ")\r\n"
+               "start \"\" \"%s\"\r\n"
+               "del /q \"%~dp0baru.exe\" >nul 2>nul\r\n"
+               "del /q \"%~f0\" >nul 2>nul\r\n" % (exe_lokal, exe_lokal))
     with open(bat, "w", encoding="utf-8") as f:
-        f.write(
-            "@echo off\r\n"
-            "rem DeepVertex auto-update: tunggu app keluar, tukar EXE, buka lagi.\r\n"
-            ":tunggu\r\n"
-            "tasklist /fi \"imagename eq DeepVertexMarineConsole.exe\" | find /i "
-            "\"DeepVertexMarineConsole.exe\" >nul && (\r\n"
-            "  ping -n 2 127.0.0.1 >nul\r\n"
-            "  goto tunggu\r\n"
-            ")\r\n"
-            ":salin\r\n"
-            "copy /y \"%~dp0baru.exe\" \"%s\" >nul 2>nul\r\n"
-            "if errorlevel 1 (\r\n"
-            "  ping -n 2 127.0.0.1 >nul\r\n"
-            "  goto salin\r\n"
-            ")\r\n"
-            "start \"\" \"%s\"\r\n"
-            "del /q \"%~dp0baru.exe\" >nul 2>nul\r\n"
-            "del /q \"%~f0\" >nul 2>nul\r\n" % (exe_lokal, exe_lokal))
+        f.write(isi)
     subprocess.Popen(["cmd", "/c", bat], close_fds=True,
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return bat

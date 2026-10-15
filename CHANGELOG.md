@@ -4,6 +4,35 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.6] — 2026-10-15
+
+### Added
+- **Connection settings dialog** (menu **Connection**, both platforms):
+  BlueOS preset (192.168.2.x) / SITL preset / fully custom endpoints — robot
+  host, MAVLink endpoint, video ports and RAW agent URL. Shows your network
+  interfaces, generates the exact per-OS ethernet setup commands (DHCP or
+  static IP; `nmcli`/`ip` on Linux, `netsh` on Windows with a one-click UAC
+  "Apply"), runs a live connection test (SSH/BlueOS, video port, RAW agent)
+  and offers **Save & Restart** to relaunch the console on the new endpoints.
+  Saved to the user data folder (`koneksi.json`) and used as defaults at
+  every start (CLI flags still win).
+- **Windows gamepad support** — DualShock 4 **and** Xbox pads (hotplug):
+  the console reads pads through SDL (pygame) and translates them to the
+  same internal mapping as the Linux evdev path, so mapping presets, deadman
+  rules and the PAD MAPPING page work identically.
+- Right-rail order in the Pilot Focus / Capture presets reworked (owner
+  request): stereo L/R on top, capture below them, teleop just under
+  notifications and above Autonomous.
+- New regression checks: [48] connection presets/args/ethernet commands /
+  persistence; [49] SDL→evdev gamepad translation with a fake pad.
+
+### Changed
+- **Default theme is now Ink · black** (was Dark · abyss); still switchable
+  live in View ▸ Appearance.
+- Windows auto-update now applies through the official Setup silently
+  (portable-EXE swap kept as fallback for older updaters); new releases list
+  the Setup + the Linux package only.
+
 ## [1.0.5] — 2026-10-15
 
 ### Added
