@@ -70,11 +70,14 @@ class SimpleCalDialog(QtWidgets.QDialog):
         v = QtWidgets.QVBoxLayout(self)
         info = {
             "gyro": ("GYROSCOPE",
-                     "The ROV must be STILL and undisturbed during calibration (± 10 s)."),
-            "baro": ("BAROMETER (GROUND PRESSURE)",
-                     "Recommended at the START OF EVERY DIVE, at the surface (stable air pressure)."),
+                     "The ROV must be STILL and undisturbed during calibration (± 10 s). "
+                     "Runs automatically before the 6-pos accel calibration too."),
+            "depth": ("DEPTH SENSOR (BARO \u00b7 GROUND PRESSURE)",
+                      "QGC 'Calibrate Pressure'. Do it AT THE SURFACE before EVERY "
+                      "dive so the zero-depth reference stays honest."),
             "level": ("LEVEL HORIZON (trim)",
-                      "Place the ROV FLAT on a truly level surface, then start."),
+                      "Place the ROV FLAT on a truly level surface, then start. Only "
+                      "corrects pitch/roll up to \u2248 10\u00b0 \u2014 not yaw."),
             "mag": ("KOMPAS (ONBOARD)",
                     "Lift the ROV and rotate it around ALL axes (pitch, roll, yaw) until "
                     "progress reaches 100%. Keep away from metal / buildings."),
@@ -110,10 +113,14 @@ class SimpleCalDialog(QtWidgets.QDialog):
         bridge.sig_mag_report.connect(self._mag_report)
 
     def _mulai(self):
-        if self.jenis == "gyro":
-            self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION, p1=1, tag="gyro-cal")
-        elif self.jenis == "baro":
-            self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION, p3=1, tag="baro-cal")
+        if self.jenis in ("gyro", "baro", "depth"):
+            if self.jenis == "gyro":
+                self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION, p1=1,
+                                          tag="gyro-cal")
+            else:
+                # baro/depth per official MAVLink spec: param3=1
+                self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION, p3=1,
+                                          tag="depth-cal")
         elif self.jenis == "level":
             self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION, p5=2, tag="level-cal")
         elif self.jenis == "mag":
@@ -126,16 +133,19 @@ class SimpleCalDialog(QtWidgets.QDialog):
         self.b_start.setEnabled(False)
 
     def _ack(self, cmd, hasil, tag):
-        if tag in ("gyro-cal", "baro-cal", "level-cal", "mag-cal"):
-            nama = {0: "DITERIMA", 1: "DITOLAK SEMENTARA", 2: "DITOLAK",
-                    3: "NOT SUPPORTED", 4: "FAILED", 5: "RUNNING"}.get(hasil, str(hasil))
-            self.lbl.setText("balasan autopilot: %s" % nama)
+        if tag in ("gyro-cal", "baro-cal", "level-cal", "mag-cal",
+                   "depth-cal", "accel-start"):
+            nama = {0: "accepted", 1: "accepted (calibrating)", 2: "REJECTED",
+                    3: "not supported", 4: "failed", 5: "running"}.get(
+                        hasil, str(hasil))
+            self.lbl.setText("autopilot reply: %s" % nama)
             if hasil != 0:
                 self.b_start.setEnabled(True)
 
     def _text(self, teks, sev):
         t = teks.lower()
-        if any(k in t for k in ("calibration", "calibrat", "gyro", "baro", "level", "mag")):
+        if any(k in t for k in ("calibration", "calibrat", "gyro", "baro",
+                                "level", "mag", "depth")):
             self.lbl.setText(teks[:120])
             if "success" in t or "complete" in t or "done" in t:
                 self.lbl.setText("DONE: " + teks[:100])
@@ -150,7 +160,7 @@ class SimpleCalDialog(QtWidgets.QDialog):
         # 4 FAILED · 5 BAD_ORIENTATION · 6 BAD_RADIUS · 7 BAD_FIT
         status = {0: "not started", 1: "running (1)", 2: "running (2)", 3: "SUCCESS",
                   4: "FAILED", 5: "BAD ORIENTATION", 6: "BAD RADIUS",
-                  7: "FIT BURUK"}.get(d.get("cal_status"), "?")
+                  7: "BAD FIT"}.get(d.get("cal_status"), "?")
         try:
             self.bar.setValue(100 if d.get("cal_status") == 3 else self.bar.value())
         except Exception:                                  # noqa: BLE001
@@ -220,6 +230,11 @@ class AccelCalDialog(QtWidgets.QDialog):
     def _mulai(self):
         self._idx = 0
         self._tampilkan()
+        # OFFICIAL: full 6-pos accel cal is ENTERED with MAV_CMD_
+        # PREFLIGHT_CALIBRATION (param5 = 1) first, then ArduPilot drives the
+        # wizard with MAV_CMD_ACCELCAL_VEHICLE_POS per position.
+        self.bridge.queue_command(CMD_PREFLIGHT_CALIBRATION,
+                                  p1=0, p3=0, p5=1, tag="accel-start")
         self._kirim()
         self.b_start.setEnabled(False)
 

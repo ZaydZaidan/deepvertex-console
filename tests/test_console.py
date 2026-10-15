@@ -587,6 +587,49 @@ def main():
         w.snap.simulate_cancel()
         w._tata_forget()
 
+    # [41] DEPTH (baro/ground-pressure) dialog: START -> 241 dengan param3=1
+    try:
+        d41 = VO.SimpleCalDialog(w.bridge, "depth", w)
+        d41._mulai()
+        ok41 = tunggu(lambda: any(c[0] == 241 and c[3] == 1
+                                  for c in baca_stats().get("cmd", [])), 8)
+        d41.close()
+        print("[41] kalibrasi DEPTH (241 p3=1):", ok41)
+        lulus &= bool(ok41)
+    except Exception as exc:                               # noqa: BLE001
+        print("[41] depth cal GAGAL:", repr(exc))
+        lulus = False
+
+    # [42] accel 6-pos wizard START: kirim enter-command 241 (param5=1) dulu
+    try:
+        d42 = VO.AccelCalDialog(w.bridge, w)
+        d42._mulai()
+        ok42 = tunggu(lambda: any(c[0] == 241 and c[4] == 1
+                                  for c in baca_stats().get("cmd", [])) and
+                      any(c[0] == VO.CMD_ACCELCAL_VEHICLE_POS
+                          for c in baca_stats().get("cmd", [])), 8)
+        d42.close()
+        print("[42] accel wizard: 241 p5=1 + ACCELCAL_VEHICLE_POS:", ok42)
+        lulus &= bool(ok42)
+    except Exception as exc:                               # noqa: BLE001
+        print("[42] accel start GAGAL:", repr(exc))
+        lulus = False
+
+    # [43] estimasi LiPo dari tegangan (4S 15.47 V ~ 60%, full/empty clamp)
+    try:
+        c4, p4 = rc._lipo_pct(15.47)
+        c4f, p4f = rc._lipo_pct(16.86)
+        c2, p2 = rc._lipo_pct(7.9)
+        c2e, p2e = rc._lipo_pct(7.0)
+        ok43 = (c4 == 4 and 55 <= p4 <= 65) and (c4f == 4 and p4f == 100) and \
+            (c2 == 2 and 55 <= p2 <= 80) and (c2e == 2 and p2e <= 10)
+        print("[43] estimasi LiPo (4S 15.47 = %d%%, 16.86 = %d%%, 2S 7.9 = %d%%):"
+              % (p4, p4f, p2), ok43)
+        lulus &= bool(ok43)
+    except Exception as exc:                               # noqa: BLE001
+        print("[43] lipo est GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
@@ -599,7 +642,7 @@ def main():
     jalan(2.8)
     cmds = baca_stats().get("cmd", [])
     baru = [c for c in cmds if c[0] == 209][n209:]
-    ok_mot2 = len(baru) >= 2 and all(len(c) > 2 and c[2] == 2 for c in baru)
+    ok_mot2 = len(baru) >= 2 and all(len(c) > 5 and c[5] == 2 for c in baru)
     print("[17] motor test berulang >=2x & p6=2:", ok_mot2, "(kiriman: %d)" % len(baru))
     lulus &= bool(ok_mot2)
     d.close()

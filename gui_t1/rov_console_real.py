@@ -56,6 +56,36 @@ def _panel_float_default(p):
         pass
 
 
+# LiPo SoC estimate (voltage-based) — ARDU remaining is ENERGY consumed since
+# power-on (BATT_CAPACITY 10000 mAh current monitor), so a 15.5 V pack shows
+# ~99% while resting. The piecewise anchor curve below is the operator-facing
+# truth (piecewise linear, per cell).
+_LIPO_ANCHORS = ((4.20, 100), (4.05, 88), (3.95, 72), (3.90, 62), (3.85, 54),
+                 (3.80, 45), (3.75, 36), (3.70, 28), (3.60, 14), (3.50, 6),
+                 (3.30, 0))
+
+
+def _lipo_pct(v):
+    """(cell count, SoC percent) from pack voltage; None when no signal."""
+    if not v or v < 2.0:
+        return None
+    cells = max(2, min(6, int(round(v / 3.75)) or 2))
+    vcell = v / float(cells)
+    if vcell >= 4.20:
+        return (cells, 100)
+    if vcell <= 3.30:
+        return (cells, 0)
+    lo = hi = None
+    for a, b in zip(_LIPO_ANCHORS, _LIPO_ANCHORS[1:]):
+        if a[0] >= vcell >= b[0]:
+            lo, hi = a, b
+            break
+    if lo is None:
+        return (cells, None)
+    f = (vcell - hi[0]) / (lo[0] - hi[0])
+    return (cells, int(round(hi[1] + f * (lo[1] - hi[1]))))
+
+
 # Margin pengaman storage (permintaan pemilik 13 Okt):
 #   < MIN_FREE  -> REC & SNAP DIBLOKIR (transfer/bersihkan dulu)
 #   < WARN_FREE -> peringatan kuning di strip ALERT
@@ -524,8 +554,11 @@ class RovConsole(QtWidgets.QMainWindow):
         self.sb_link.setText("MAVLink: %s" % ("ok" if s.get("link") else "waiting"))
         v = s.get("volt")
         rem = s.get("remaining")
-        self.sb_batt.setText("BATT: %s%s" % ("%.2f V" % v if v else "—",
-                                             (" / %d%%" % rem) if rem is not None else ""))
+        _est = _lipo_pct(v) if v else None
+        self.sb_batt.setText("BATT: %s%s" % (
+            "%.2f V" % v if v else "\u2014",
+            (" / est %d%%" % _est[1] if _est and _est[1] is not None else "")
+            + (" (veh %d%%)" % rem if rem is not None else "")))
         self.sb_pad.setText("PAD: %s" % ("ready" if self.gamepad._konek else "none"))
         try:
             d = self.rawpanel.files_info
@@ -935,6 +968,15 @@ class RovConsole(QtWidgets.QMainWindow):
         for r in (self.ro_volt, self.ro_curr, self.ro_batt):
             row.addWidget(r, 1)
         p.body_layout.addLayout(row)
+        lbl_est = QtWidgets.QLabel("\u2014")
+        lbl_est.setObjectName("MicroLabel")
+        lbl_est.setWordWrap(True)
+        lbl_est.setToolTip("Percent shown by ArduPilot = ENERGY consumed since "
+                           "power-on / BATT_CAPACITY (not true state of "
+                           "charge). The estimate beside it uses the pack "
+                           "voltage (LiPo anchor curve, per cell).")
+        p.body_layout.addWidget(lbl_est)
+        self.lbl_batt_est = lbl_est
         P["power"] = p
 
         # ---- vehicle (pilot)
@@ -1059,7 +1101,7 @@ class RovConsole(QtWidgets.QMainWindow):
                   ("ACCEL (6-POS)…", self._cal_accel),
                   ("COMPASS", lambda: self._cal("mag")),
                   ("LEVEL", lambda: self._cal("level")),
-                  ("BARO", lambda: self._cal("baro")),
+                  ("DEPTH (BARO)", lambda: self._cal("depth")),
                   ("PARAMS", lambda: self.bridge.queue_param_list()))
         for i, (nama, fn) in enumerate(tombol):
             b = QtWidgets.QPushButton(nama)
@@ -1067,8 +1109,11 @@ class RovConsole(QtWidgets.QMainWindow):
             b.clicked.connect(fn)
             grid.addWidget(b, i // 2, i % 2)
         p.body_layout.addLayout(grid)
-        info = QtWidgets.QLabel("Urutan disarankan: gyro → level → accel → compass → baro "
-                                "(baro each dive start). Read the instructions in each dialog.")
+        info = QtWidgets.QLabel(
+            "Recommended order (BlueOS/QGC): accel 6-pos \u2192 compass \u2192 "
+            "LEVEL at a level surface \u2192 DEPTH (baro/ground-pressure) at "
+            "the surface on EVERY dive start. Gyro runs automatically before "
+            "accel. Restart after compass cal is recommended before arming.")
         info.setObjectName("MicroLabel")
         info.setWordWrap(True)
         p.body_layout.addWidget(info)
@@ -1962,6 +2007,18 @@ class RovConsole(QtWidgets.QMainWindow):
             self.ro_volt.set_value(s.get("volt"), "{:.2f}")
             self.ro_curr.set_value(s.get("curr"), "{:.2f}")
             self.ro_batt.set_value(s.get("remaining"), "{:.0f}")
+            v = s.get("volt")
+            lst = _lipo_pct(v)
+            rem = s.get("remaining")
+            if lst is not None:
+                cells, soc = lst
+                self.lbl_batt_est.setText(
+                    "LiPo %d-cell estimate %s%% \u00b7 Ardu remaining %s%%"
+                    " (energy consumed since power-on)"
+                    % (cells, ("\u2014" if soc is None else soc),
+                       ("\u2014" if rem is None else rem)))
+            else:
+                self.lbl_batt_est.setText("\u2014")
         except Exception:                                  # noqa: BLE001
             pass
 

@@ -89,7 +89,8 @@ def main():
                                        len(PARAMS), 0)
             elif tp == "COMMAND_LONG":
                 stats["cmd"].append([int(msg.command), float(msg.param1),
-                                     float(msg.param6)])
+                                     float(msg.param2), float(msg.param3),
+                                     float(msg.param5), float(msg.param6)])
                 m.mav.command_ack_send(int(msg.command), 0)      # ACCEPTED
             elif tp == "MANUAL_CONTROL":
                 stats["manual"] += 1
