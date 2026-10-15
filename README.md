@@ -148,8 +148,11 @@ Invoke-WebRequest -Uri "https://github.com/ZaydZaidan/deepvertex-console/release
 Windows scope note: the .EXE runs MAVLink telemetry, camera **recording** &
 snapshots (with the GStreamer runtime), parameter/preflight panels and capture
 management — live **video preview** and the **gamepad** are Linux-side
-(evdev/PyGObject) until a Windows-native reader ships. Sources remain
-buildable everywhere (this repository).
+(evdev/PyGObject) until a Windows-native reader ships. **v1.0.1 was SSH-tested
+on a real Windows laptop (Win10 19045): boots, creates the session folder
+(`~/DeepVertex-ROV-Captures/<ts>_<name>`, session.json), stays stable.**
+`DeepVMDebug.exe` is the console-mode build for troubleshooting (it prints the
+full stack on error). Sources remain buildable everywhere (this repository).
 
 ## Quick start
 
