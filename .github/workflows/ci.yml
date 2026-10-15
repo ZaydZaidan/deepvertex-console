@@ -56,6 +56,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 40
+    permissions:
+      contents: write          # release upload
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +85,8 @@ jobs:
             --windowed `
             --icon gui_t1/ikon/deepvertex-app-icon.ico `
             --add-data "gui_t1/ikon;ikon" `
-            windows_entry.py
+            --paths gui_t1 `
+            gui_t1/windows_entry.py
           ls dist
 
       - uses: actions/upload-artifact@v4
