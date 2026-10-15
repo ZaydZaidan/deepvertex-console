@@ -112,7 +112,7 @@ source ~/.bashrc && deepvertexrov        # == same console, one word
 
 Then (from the tar.gz walk-through): the script **installs everything it
 needs** into `gui_t1/.venv` — you do not need a system-wide Python install;
-`--mavlink`, `--outdir`, `--preset`, `--nome`, see `run_console_real.sh
+`--mavlink`, `--outdir`, `--preset`, `--nama-sesi`, see `run_console_real.sh
 --help` for the full option list.
 
 ### B. Install on Windows (.EXE)
@@ -148,9 +148,12 @@ Invoke-WebRequest -Uri "https://github.com/ZaydZaidan/deepvertex-console/release
 Windows scope note: the .EXE runs MAVLink telemetry, camera **recording** &
 snapshots (with the GStreamer runtime), parameter/preflight panels and capture
 management — live **video preview** and the **gamepad** are Linux-side
-(evdev/PyGObject) until a Windows-native reader ships. **v1.0.1 was SSH-tested
-on a real Windows laptop (Win10 19045): boots, creates the session folder
-(`~/DeepVertex-ROV-Captures/<ts>_<name>`, session.json), stays stable.**
+(evdev/PyGObject) until a Windows-native reader ships. **Tested on a real
+Windows laptop (Win10 19045, 1920x1080 at 150% display scale): the window is
+fitted to the screen, the UI renders at the app's own text scale (the OS
+display scale is deliberately ignored — 1:1 physical pixels), the
+notifications log is themed, the session folder (`~/DeepVertex-ROV-Captures/
+<ts>_<name>`, session.json) is created and the process stays stable.**
 `DeepVMDebug.exe` is the console-mode build for troubleshooting (it prints the
 full stack on error). Sources remain buildable everywhere (this repository).
 
