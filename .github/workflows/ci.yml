@@ -89,10 +89,24 @@ jobs:
             gui_t1/windows_entry.py
           ls dist
 
+      - name: Build debug (console) exe
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --name DeepVMDebug `
+            --onefile `
+            --icon gui_t1/ikon/deepvertex-app-icon.ico `
+            --add-data "gui_t1/ikon;ikon" `
+            --paths gui_t1 `
+            gui_t1/windows_entry.py
+          ls dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: DeepVertexMarineConsole-windows-exe
-          path: dist/DeepVertexMarineConsole.exe
+          path: |
+            dist/DeepVertexMarineConsole.exe
+            dist/DeepVMDebug.exe
 
       - name: Attach to the release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
@@ -101,4 +115,5 @@ jobs:
         shell: pwsh
         run: |
           gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVertexMarineConsole.exe --clobber
+          gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVMDebug.exe --clobber
 
