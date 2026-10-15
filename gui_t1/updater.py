@@ -21,6 +21,7 @@ import platform
 import subprocess
 import sys
 import tarfile
+import time
 import urllib.request
 
 import paths
@@ -142,45 +143,123 @@ def _dir_update():
     return d
 
 
-def _tulis_bat(dest, setup, exe_lokal):
-    """Write + launch the Windows apply script for an ALREADY-DOWNLOADED file."""
-    bat = os.path.join(_dir_update(), "apply_update.bat")
+def _tulis_bat(dest, setup, exe_lokal, target=""):
+    """Write + launch the Windows apply script for an ALREADY-DOWNLOADED file.
+
+    v2 (audit 15 Okt): everything is logged to `update\\apply_log.txt` (steps,
+    installer exit code, file-lock retries + cap) so a silent failure is never
+    a mystery again. IMPORTANT: the text is built with CONCATENATION ONLY —
+    the old `% (...)`-format crashed on batch tokens like `%~dp0`
+    (ValueError) BEFORE the bat was ever written: that was the real cause of
+    "download hits 100% then nothing happens" in v1.0.7. The installer is
+    invoked DIRECTLY (the bat waits for it) and the spawn uses explicit
+    DEVNULL handles (windowed PyInstaller builds can fail to spawn children
+    with invalid inherited handles).
+    """
+    d = _dir_update()
+    bat = os.path.join(d, "apply_update.bat")
+    log = os.path.join(d, "apply_log.txt")
+    payload = os.path.basename(dest)
     kepala = (
         "@echo off\r\n"
+        "set LOG=" + '"' + log + '"' + "\r\n"
+        "echo [%DATE% %TIME%] apply start target=" + (target or "-")
+        + " (dir %~dp0) >> %LOG%\r\n"
+        "if not exist \"%~dp0" + payload + "\" (echo [%DATE% %TIME%] "
+        "PAYLOAD MISSING >> %LOG%)\r\n"
         ":wait\r\n"
         "tasklist /fi \"imagename eq DeepVertexMarineConsole.exe\" | find /i "
         "\"DeepVertexMarineConsole.exe\" >nul && (\r\n"
         "  ping -n 2 127.0.0.1 >nul\r\n"
         "  goto wait\r\n"
-        ")\r\n")
+        ")\r\n"
+        "echo [%DATE% %TIME%] app has exited >> %LOG%\r\n")
     if setup:
         isi = (kepala +
-               "rem DeepVertex auto-update: run the installer silently, relaunch.\r\n"
-               "start /wait \"\" \"%~dp0setup-baru.exe\" /SILENT /SUPPRESSMSGBOXES "
-               "/NORESTART /CLOSEAPPLICATIONS /NOCANCEL\r\n"
-               "start \"\" \"%s\"\r\n"
-               "del /q \"%~dp0setup-baru.exe\" >nul 2>nul\r\n"
-               "del /q \"%~f0\" >nul 2>nul\r\n" % exe_lokal)
+               "echo [%DATE% %TIME%] running installer silently >> %LOG%\r\n"
+               "\"%~dp0" + payload + "\" /SILENT /SUPPRESSMSGBOXES /NORESTART "
+               "/CLOSEAPPLICATIONS /NOCANCEL\r\n"
+               "echo [%DATE% %TIME%] installer exit code %ERRORLEVEL% >> %LOG%\r\n"
+               "set N=0\r\n"
+               ":sweep\r\n"
+               "if not exist \"%~dp0" + payload + "\" goto relaunch\r\n"
+               "set /a N+=1\r\n"
+               "if %N% GEQ 15 goto relaunch\r\n"
+               "ping -n 3 127.0.0.1 >nul\r\n"
+               "del /q \"%~dp0" + payload + "\" >nul 2>nul\r\n"
+               "goto sweep\r\n")
     else:
         isi = (kepala +
-               "rem DeepVertex auto-update: swap the portable EXE, relaunch.\r\n"
+               "echo [%DATE% %TIME%] swapping portable EXE >> %LOG%\r\n"
                ":copy\r\n"
-               "copy /y \"%~dp0baru.exe\" \"%s\" >nul 2>nul\r\n"
+               "copy /y \"%~dp0" + payload + "\" \"" + exe_lokal
+               + "\" >nul 2>nul\r\n"
                "if errorlevel 1 (\r\n"
                "  ping -n 2 127.0.0.1 >nul\r\n"
                "  goto copy\r\n"
                ")\r\n"
-               "start \"\" \"%s\"\r\n"
-               "del /q \"%~dp0baru.exe\" >nul 2>nul\r\n"
-               "del /q \"%~f0\" >nul 2>nul\r\n" % (exe_lokal, exe_lokal))
+               "echo [%DATE% %TIME%] swap ok >> %LOG%\r\n"
+               "del /q \"%~dp0" + payload + "\" >nul 2>nul\r\n")
+    isi += (
+        ":relaunch\r\n"
+        "echo [%DATE% %TIME%] relaunching >> %LOG%\r\n"
+        "start \"\" \"" + exe_lokal + "\"\r\n"
+        "echo [%DATE% %TIME%] done (bat self-delete) >> %LOG%\r\n"
+        "del /q \"%~f0\" >nul 2>nul\r\n")
     with open(bat, "w", encoding="utf-8") as f:
         f.write(isi)
+    # catat target update utk banner hasil di start berikutnya
+    try:
+        with open(os.path.join(d, "pending.json"), "w",
+                  encoding="utf-8") as f:
+            json.dump({"target": target, "ts": time.time(), "log": log}, f)
+    except OSError:
+        pass
     subprocess.Popen(["cmd", "/c", bat], close_fds=True,
-                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL)
     return bat
 
 
-def _tulis_sh(tar_path, dir_instalasi, pid=None):
+def cek_hasil_update(versi_sekarang):
+    """Message for the startup banner about the previous update attempt.
+
+    * pending target == running version -> update COMPLETED (clear marker).
+    * pending target newer + older than ~15 min -> looks FAILED (keep marker;
+      the message points at update\\apply_log.txt).
+    * pending fresh (< 15 min) -> install may still be running: silent.
+    """
+    d = os.path.join(paths.data_dir(), "update")
+    p = os.path.join(d, "pending.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            st = json.load(f)
+    except Exception:                                      # noqa: BLE001
+        return None
+    target = str(st.get("target") or "")
+    umur = time.time() - float(st.get("ts") or 0)
+    if not target:
+        return None
+    try:
+        if parse_version(target) <= parse_version(versi_sekarang):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+            return ("Update complete — now running v%s (updated to "
+                    "v%s)." % (versi_sekarang, target))
+        if umur > 15 * 60:
+            return ("Update to v%s did NOT apply (still v%s). Details: %s "
+                    "— you can also run the installer from that folder "
+                    "manually." % (target, versi_sekarang,
+                                   os.path.join(d, "apply_log.txt")))
+    except Exception:                                      # noqa: BLE001
+        pass
+    return None
+
+
+def _tulis_sh(tar_path, dir_instalasi, pid=None, target=""):
     """Extract an ALREADY-DOWNLOADED source tarball + write/launch the apply
     script (Linux): waits for the app to exit, rsyncs the sources over the
     install dir keeping `.venv`, then relaunches."""
@@ -220,6 +299,14 @@ def _tulis_sh(tar_path, dir_instalasi, pid=None):
             "rm -rf \"$SRC\" \"%s\" 2>/dev/null\n"
             "rm -f \"$0\"\n" % (dir_instalasi, src_baru, tar_path))
     os.chmod(sh, 0o755)
+    try:
+        with open(os.path.join(_dir_update(), "pending.json"), "w",
+                  encoding="utf-8") as f:
+            json.dump({"target": target, "ts": time.time(),
+                       "log": os.path.join(_dir_update(), "apply_update.sh")},
+                      f)
+    except OSError:
+        pass
     subprocess.Popen(["bash", sh, str(pid or os.getpid())], start_new_session=True)
     return sh
 
@@ -430,9 +517,11 @@ def _tanya_lalu_terapkan(w, info, v_lokal):
             else:
                 exe = os.path.join(paths.APP, "installation",
                                    "DeepVertexMarineConsole.exe")
-            _tulis_bat(dest, setup, exe)
+            _tulis_bat(dest, setup, exe,
+                       target=str(info.get("tag", "")).lstrip("vV"))
         else:
-            _tulis_sh(dest, os.path.dirname(paths.APP), os.getpid())
+            _tulis_sh(dest, os.path.dirname(paths.APP), os.getpid(),
+                      target=str(info.get("tag", "")).lstrip("vV"))
     except Exception as exc:                               # noqa: BLE001
         QtWidgets.QMessageBox.warning(
             w, "DeepVertex - update",
@@ -440,8 +529,12 @@ def _tanya_lalu_terapkan(w, info, v_lokal):
         return
     QtWidgets.QMessageBox.information(
         w, "DeepVertex - update",
-        "The update is ready to be applied.\n\nThe console will now CLOSE, "
-        "be replaced with the new version and reopen automatically.")
+        "Download complete — %s (%.0f MB).\n\nThe console will now CLOSE. "
+        "The installer runs automatically and the app reopens by itself on "
+        "the new version (about a minute).\n\nIf it does not reopen, run "
+        "setup-baru.exe from:\n%s\n\n(Progress and any error are logged to "
+        "apply_log.txt in that folder.)"
+        % (info.get("tag", "?"), os.path.getsize(dest) / 1e6, _dir_update()))
     QtWidgets.QApplication.instance().quit()
 
 

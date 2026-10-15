@@ -4,6 +4,29 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.9] — 2026-10-15
+
+### Fixed
+- **"Update hits 100% and then nothing happens" — root cause found, fixed,
+  and verified end-to-end.** The Windows apply-script generator formatted
+  the .bat text with Python `%`-formatting over batch tokens like `%~dp0` —
+  which raises `ValueError: unsupported format character '~'` BEFORE the
+  script is ever written. The download completed, the install never started
+  (owner report). The script is now built by pure concatenation (regression
+  probe included), the installer is invoked directly (no `start /wait`
+  wrapper), the payload cleanup retries with a cap, and every step + the
+  installer exit code is logged to `update\apply_log.txt`. Verified on
+  Windows with the real Setup: install exit code 0, files replaced, app
+  relaunched, cleanup done.
+- **Updates are no longer silent at the end:** the final dialog states the
+  size, what happens next, and where the manual fallback installer lives;
+  on the next start the console shows a banner — "Update complete — now
+  running vX" or "Update to vX did NOT apply (see apply_log.txt)".
+
+### Changed
+- The apply spawn uses explicit DEVNULL std handles (windowed PyInstaller
+  builds can fail to spawn children with invalid inherited handles).
+
 ## [1.0.8] — 2026-10-15
 
 ### Fixed

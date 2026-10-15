@@ -125,7 +125,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.8"    # versi aplikasi (session.json + update checker)
+__version__ = "1.0.9"    # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -2465,6 +2465,15 @@ def main():
     app.processEvents()
     w._muatkan_ke_layar()
     QtCore.QTimer.singleShot(1200, w._muatkan_ke_layar)
+    # Banner hasil update sebelumnya (v1.0.9): sukses/gagal tak lagi senyap.
+    try:
+        import updater as _upd2
+        _pesan_upd = _upd2.cek_hasil_update(__version__)
+        if _pesan_upd:
+            w._catat(_pesan_upd)
+    except Exception:                                      # noqa: BLE001
+        pass
+
     # GitHub release check (online; popup = user choice; offline = silent).
     if getattr(args, "preview_update", False):
         def _pratinjau_upd():
