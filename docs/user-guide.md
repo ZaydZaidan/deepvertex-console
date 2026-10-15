@@ -41,6 +41,19 @@ defaults, and the parameter browser.
 Larger capture rail with recording/snapshot per camera and RAW transfer tools
 prominent.
 
+### Custom (drag & snap)
+Your own arrangement. Press **any panel header** and drag it — cyan snap
+suggestions appear for the **LEFT RAIL / RIGHT RAIL** (Chrome-style dock) and
+for **ABOVE / BELOW** the panel under the cursor (inserting it above/below —
+Chrome split feel; inside a rail it re-orders). Drop **outside the console**
+(or onto a floating panel) and the panel **pops out** as a free-floating
+window; drag it back into the console to re-dock. **ESC** cancels a drag and
+the panel snaps home unchanged. Every manual arrangement is saved
+automatically as the **Custom** layout (`gui_t1/saved/layout_custom.json`)
+and becomes the startup arrangement; switch back to a preset any time
+(segmented LAYOUT control or View ▸ *Layout preset*), and View ▸
+*Organize windows* has **Apply / Save as Custom / Forget** actions.
+
 ## Key panels
 
 ### VEHICLE (PILOT)

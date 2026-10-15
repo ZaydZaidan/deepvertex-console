@@ -22,3 +22,4 @@ tools/
 
 # User data (gamepad presets per machine)
 gamepad_presets.json
+gui_t1/saved/layout_custom.json

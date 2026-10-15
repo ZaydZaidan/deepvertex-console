@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GUI = os.path.join(HERE, "..", "gui_t1")
 sys.path.insert(0, GUI)
 
-from PySide6 import QtWidgets          # noqa: E402
+from PySide6 import QtCore, QtWidgets    # noqa: E402
 
 SCRATCH = os.path.expanduser("~/.hermes/cache/scratch/t1test")
 os.makedirs(SCRATCH, exist_ok=True)
@@ -443,6 +443,149 @@ def main():
     except Exception as exc:                               # noqa: BLE001
         print("[30] preflight sensor GAGAL:", repr(exc))
         lulus = False
+
+    # [36] lay-snap: drag panel ke rail KIRI (Chrome-style) + anti-nyangkut
+    try:
+        w._tata_forget()                        # mulai bersih (tanpa custom)
+        w._apply_preset("pilot-focus"); jalan(0.1)
+        before = [k for k in w._active_spec.get("left", [])]
+        w.snap.simulate_begin("notif")
+        kind36 = w.snap.simulate_move_to(20, 200)
+        ok36 = (kind36 == ("rail", "left"))
+        w.snap.simulate_drop(20, 200); jalan(0.2)
+        after = list(w._active_spec.get("left", []))
+        ok36 = ok36 and after[:len(before)] == before and \
+            w._asal_of("notif") == ["left", len(after) - 1] and \
+            (not w.P["notif"].isWindow())
+        # ganti-ganti preset cepat: panel tidak boleh "melayang nyangkut"
+        for _ in range(3):
+            w._apply_preset("mapping"); jalan(0.05)
+            w._apply_preset("pilot-focus"); jalan(0.05)
+        orphans = [k for k, p in w.P.items()
+                   if (not p.isWindow()) and p.isVisible() and
+                   p.parentWidget() is None]
+        ok36 = ok36 and not orphans
+        w._apply_custom(); jalan(0.1)           # file layout_custom masih ada
+        ok36 = ok36 and (w._asal_of("notif") == ["left", len(w._active_spec
+                           .get("left", [])) - 1])
+        print("[36] drag-snap rail kiri + anti-nyangkut:", ok36)
+        lulus &= bool(ok36)
+    except Exception as exc:                               # noqa: BLE001
+        print("[36] drag-snap GAGAL:", repr(exc))
+        lulus = False
+    finally:
+        w.snap.simulate_cancel()
+
+    # [37] lay-snap: sisip di kolom tengah (di atas/di bawah panel kamera)
+    try:
+        w._apply_custom(); jalan(0.1)
+        peta = w.P["peta"]
+        tl = peta.mapTo(w, QtCore.QPoint(0, 0))
+        pt = QtCore.QPoint(tl.x() + peta.width() // 2,
+                           tl.y() + int(peta.height() * 0.85))
+        w.snap.simulate_begin("raw")
+        kind37 = w.snap.simulate_move_to(pt.x(), pt.y())
+        ok37 = kind37[0] in ("below", "above") and kind37[1] == "peta"
+        w.snap.simulate_drop(pt.x(), pt.y()); jalan(0.2)
+        mid_keys = [it[0] if isinstance(it, tuple) else it
+                    for it in w._active_spec.get("mid", [])]
+        if kind37[0] == "below":
+            ok37 = ok37 and (mid_keys.index("raw") == mid_keys.index("peta") + 1)
+        else:
+            ok37 = ok37 and (mid_keys.index("peta") == mid_keys.index("raw") + 1)
+        w.snap.simulate_begin("raw")
+        tf = w.P["cam_front"]; tl2 = tf.mapTo(w, QtCore.QPoint(0, 0))
+        pt2 = QtCore.QPoint(tl2.x() + tf.width() // 2,
+                            tl2.y() + int(tf.height() * 0.85))
+        kind37b = w.snap.simulate_move_to(pt2.x(), pt2.y())
+        ok37 = ok37 and kind37b[0] in ("below", "above") and \
+            kind37b[1] == "cam_front"
+        w.snap.simulate_cancel()
+        print("[37] drag-snap sisip tengah (atas/bawah kamera):", ok37)
+        if not ok37:
+            print("[37] DETAIL kind37=%r kind37b=%r mid=%r asal_raw=%r"
+                  % (kind37, kind37b, mid_keys, w._asal_of("raw")))
+        lulus &= bool(ok37)
+    except Exception as exc:                               # noqa: BLE001
+        print("[37] sisip tengah GAGAL:", repr(exc))
+        lulus = False
+    finally:
+        w.snap.simulate_cancel()
+
+    # [38] lay-snap: pop-out floating window & tarik kembali ke rel
+    try:
+        w.snap.simulate_begin("teleop")
+        w.snap.simulate_move_to(w.width() + 300, 0)     # keluar jendela
+        w.snap.simulate_drop(w.width() + 300, 0); jalan(0.2)
+        ok38 = w.P["teleop"].isWindow() and w.P["teleop"].isVisible()
+        w.snap.simulate_begin("teleop")
+        w.snap.simulate_drop(20, 400); jalan(0.2)       # tarik ke rel kiri
+        ok38 = ok38 and (not w.P["teleop"].isWindow())
+        ok38 = ok38 and (w._asal_of("teleop") == ["left", len(w._active_spec
+                           .get("left", [])) - 1])
+        print("[38] pop-out floating + re-dock:", ok38)
+        lulus &= bool(ok38)
+    except Exception as exc:                               # noqa: BLE001
+        print("[38] floating GAGAL:", repr(exc))
+        lulus = False
+    finally:
+        w.snap.simulate_cancel()
+
+    # [39] persistensi layout CUSTOM (saved/layout_custom.json) + reload
+    try:
+        w.snap.simulate_begin("teleop")
+        w.snap.simulate_move_to(20, 200)
+        w.snap.simulate_drop(20, 200); jalan(0.2)
+        path = w._tata_json()
+        ok39 = os.path.isfile(path)
+        data = json.load(open(path, encoding="utf-8"))
+        ok39 = ok39 and ("teleop" in [k for k in
+                     (data.get("spec") or {}).get("left", [])])
+        w._apply_custom(); jalan(0.1)
+        ok39 = ok39 and ("teleop" in
+                         w._active_spec.get("left", []))
+        w._menu_tata_forget()
+        ok39 = ok39 and (not os.path.isfile(path))
+        print("[39] custom layout tersimpan & dimuat ulang:", ok39)
+        lulus &= bool(ok39)
+    except Exception as exc:                               # noqa: BLE001
+        print("[39] custom GAGAL:", repr(exc))
+        lulus = False
+    finally:
+        w.snap.simulate_cancel()
+
+    # [40] ESC batal drag: susunan tidak berubah; float pulang ke "asal"
+    try:
+        w._tata_forget()
+        w._apply_preset("setup"); jalan(0.1)
+        spec0 = json.dumps(w._active_spec, sort_keys=True)
+        w.snap.simulate_begin("raw")
+        w.snap.simulate_move_to(20, 200)
+        w.snap.simulate_cancel(); jalan(0.1)
+        ok40 = (json.dumps(w._active_spec, sort_keys=True) == spec0) and \
+            (not w.P["raw"].isWindow())
+        # posisi FLOAT pulang ke slot asal ("asal") saat preset diganti
+        w.snap.simulate_begin("raw")
+        w.snap.simulate_drop(w.width() + 300, 0); jalan(0.2)
+        ok40 = ok40 and w.P["raw"].isWindow()
+        w.snap.simulate_begin("raw")
+        w.snap.simulate_drop(20, 200); jalan(0.2)       # dock kanan dulu? kiri
+        ok40 = ok40 and (not w.P["raw"].isWindow())
+        w.snap.simulate_begin("raw")
+        w.snap.simulate_move_to(w.width() + 300, 0)
+        w.snap.simulate_drop(w.width() + 300, 0); jalan(0.2)   # float lagi
+        w._apply_preset("setup"); jalan(0.2)
+        ok40 = ok40 and (not w.P["raw"].isWindow())     # pulang ke asal
+        w._apply_preset("pilot-focus"); jalan(0.1)
+        w._tata_forget()
+        print("[40] ESC cancel + float pulang ke asal:", ok40)
+        lulus &= bool(ok40)
+    except Exception as exc:                               # noqa: BLE001
+        print("[40] cancel/asal GAGAL:", repr(exc))
+        lulus = False
+    finally:
+        w.snap.simulate_cancel()
+        w._tata_forget()
 
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)

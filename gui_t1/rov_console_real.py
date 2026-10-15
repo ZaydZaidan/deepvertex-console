@@ -13,6 +13,7 @@ PRE-FLIGHT CHECK (status hidup + checklist pre-dive resmi Blue Robotics).
 Jalankan: ./run_console_real.sh [opsi]   (lihat --help)
 """
 import argparse
+import copy
 import json
 import math
 import os
@@ -30,6 +31,8 @@ from gamepad import Gamepad
 from maviface import MavBridge
 from peta_misi import PlotMisi
 import padmap
+import laysnap
+import snapctl
 from peta_panel import PetaPanel
 from rawcap import RawPanel
 from video import StreamPlayer, h264parse_tersedia
@@ -39,6 +42,20 @@ STREAM_DEF = (
     ("stereo L", "CAM · STEREO L (B0495C)", 5601),
     ("stereo R", "CAM · STEREO R (B0495C)", 5602),
 )
+
+
+def _panel_float_default(p):
+    """Default geometry for a floating panel (centered-ish on the screen)."""
+    try:
+        g = QtWidgets.QApplication.primaryScreen().geometry()
+        p.resize(max(360, p.minimumSizeHint().width()),
+                 max(320, p.sizeHint().height()))
+        p.move(g.x() + (g.width() - p.width()) // 2 + 40,
+               g.y() + (g.height() - p.height()) // 3)
+    except Exception:                                      # noqa: BLE001
+        pass
+
+
 # Margin pengaman storage (permintaan pemilik 13 Okt):
 #   < MIN_FREE  -> REC & SNAP DIBLOKIR (transfer/bersihkan dulu)
 #   < WARN_FREE -> peringatan kuning di strip ALERT
@@ -143,6 +160,8 @@ class RovConsole(QtWidgets.QMainWindow):
         self.nama_sesi = (_nama or "").strip()
         self.sesi = _buat_dir_sesi(os.path.expanduser(args.outdir), self.nama_sesi)
         self.last = {}
+        self._floats_state = {}
+        self._active_spec = {}
         self._preset = args.preset if args.preset in self.SPESIFIKASI else self.PRESET_BAWAAN
         self._tilt = 1500
         self.vis = {}
@@ -257,6 +276,14 @@ class RovConsole(QtWidgets.QMainWindow):
                        "h264parse": h264parse_tersedia(), "versi": "1.0.0"}, f,
                       indent=2, ensure_ascii=False)
         self._apply_preset(self._preset)
+        # Chrome-style organize windows: snap controller + restore saved
+        # Custom arrangement on a plain start-up (no --preset given).
+        if os.environ.get("DV_NO_SNAP") != "1":
+            self.snap = snapctl.SnapController(self)
+            self.snap.attach()
+        if os.environ.get("DV_NO_SNAP") != "1" and \
+                getattr(args, "preset", None) in (None, "custom"):
+            self._apply_custom()
 
     # ================================================================ header
     def _build_header(self):
@@ -283,9 +310,13 @@ class RovConsole(QtWidgets.QMainWindow):
         lb.setObjectName("CtlLabel")
         theme.set_peran(lb, "faint")
         baris.addWidget(lb)
-        self.seg_layout = U.Segmen([(k, self.NAMA_PRESET[k],
-                                     "apply the %s layout (applies immediately)"
-                                     % self.NAMA_PRESET[k]) for k in self.SPESIFIKASI])
+        self.seg_layout = U.Segmen(
+            [(k, self.NAMA_PRESET[k],
+              "apply the %s layout (applies immediately)" % self.NAMA_PRESET[k])
+             for k in self.SPESIFIKASI]
+            + [("custom", "Custom",
+                "restore the hand-arranged Custom layout (saved automatically "
+                "after each move)")])
         self.seg_layout.set_dipilih(self._preset)
         self.seg_layout.dipilih.connect(self._apply_preset)
         baris.addWidget(self.seg_layout)
@@ -518,26 +549,46 @@ class RovConsole(QtWidgets.QMainWindow):
         body.addWidget(self.col_right, 0)
 
     def _apply_preset(self, name):
+        if name == "custom":
+            self._apply_custom()
+            return
         if name not in self.SPESIFIKASI:
             name = self.PRESET_BAWAAN
         self._preset = name
-        spec = self.SPESIFIKASI[name]
+        self._last_preset = name
+        spec = copy.deepcopy(self.SPESIFIKASI[name])
+        # FLOATING panels of a previous custom arrangement return to the
+        # position where the user originally parked them ("asal").
+        floats_old = dict(getattr(self, "_floats_state", {}) or {})
+        for fkey in list(floats_old):
+            asal = floats_old[fkey].get("asal") or []
+            if len(asal) == 2:
+                rail, idx = str(asal[0]), int(asal[1])
+                lst = spec.get(rail, []) if rail in ("left", "right") \
+                    else spec.setdefault("mid", [])
+                if rail not in ("left", "right"):
+                    lst.insert(min(len(lst), max(idx, 0)), (fkey, 0))
+                else:
+                    lst.insert(min(len(lst), max(idx, 0)), fkey)
+        self._terapkan_tata(spec, {})
         try:
             self.seg_layout.set_dipilih(name)
         except Exception:                                  # noqa: BLE001
             pass
-        # +28 buffer (audit 13 Okt): viewport harus >= lebar-minimum panel terlebar
-        # (440 px pada skala 120%) supaya TIDAK ada yang terklip tanpa jalur scroll.
-        lb = theme.px(spec.get("lebar_kiri", 350)) + theme.px(28)
-        # rail KIRI dan KANAN dibuat SAMA LEBAR PERSIS (proporsional & simetris)
-        for kol in (self.col_left, self.col_right):
-            kol.setFixedWidth(lb)
+
+    def _terapkan_tata(self, spec, floats):
+        """Apply an arrangement (spec + floats). Shared by presets and the
+        Chrome-style custom state. Anti-stuck rule kept: hide EVERY panel
+        first, then re-show only what is placed."""
+        spec = dict(spec or {})
+        try:
+            lb = theme.px(spec.get("lebar_kiri", 350)) + theme.px(28)
+            # rail KIRI dan KANAN sama lebar persis (proporsional & simetris)
+            for kol in (self.col_left, self.col_right):
+                kol.setFixedWidth(lb)
+        except Exception:                                  # noqa: BLE001
+            lb = theme.px(350) + theme.px(28)
         self.vis = {}
-        # AUDIT 13 Okt (bug "window nyangkut" saat ganti-ganti preset cepat):
-        # takeAt() hanya mengeluarkan item dari layout — widget TIDAK di-parent-ulang,
-        # sehingga panel yang tidak dipakai preset baru tetap MELAYANG & TAMPIL di
-        # atas konten (panel "salah topik"). Sembunyikan SEMUA dulu; di bawah hanya
-        # yang benar-benar ditempatkan yang di-show() kembali.
         for _w in self.P.values():
             try:
                 _w.hide()
@@ -576,13 +627,190 @@ class RovConsole(QtWidgets.QMainWindow):
             self.P[key].show()
         if row_keys and row_di >= len(mid):
             self._lay_mid.addWidget(self._baris_bawah(row_keys))
-        # tanpa panel ber-stretch di kolom tengah (mode kamera rasio-penuh):
-        # sisa ruang ke bawah supaya panel mengunci (hug) kontennya
         if not any((item[1] if isinstance(item, tuple) else None) or
                    (isinstance(item, str) and item in ("cam_front", "params"))
                    for item in mid):
             self._lay_mid.addStretch(1)
+        # floating windows (Chrome "pop out")
+        self._floats_state = {}
+        for fkey, fin in (floats or {}).items():
+            p = self.P.get(fkey)
+            if p is None:
+                continue
+            _on = bool(fin.get("on", True))
+            if not p.isWindow():
+                p.setParent(None)
+                p.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint |
+                                 Qt.WindowTitleHint |
+                                 Qt.WindowMinMaxButtonsHint |
+                                 Qt.WindowCloseButtonHint)
+                p.setWindowTitle(p.title.text() + " \u2014 DeepVertex Console")
+            geo = fin.get("geo")
+            try:
+                if geo:
+                    p.setGeometry(QtCore.QRect(*geo))
+                else:
+                    _panel_float_default(p)
+            except Exception:                              # noqa: BLE001
+                pass
+            p.setVisible(_on)
+            self._floats_state[fkey] = {
+                "geo": list(p.frameGeometry().getRect()) if _on else list(geo or []),
+                "on": _on, "asal": fin.get("asal")}
+        self._active_spec = copy.deepcopy(spec)
+        self._sinkron_menu()
         self._fade_masuk()
+
+    # ------------------------------------------------------ custom layout
+    def _apply_custom(self):
+        got = self._tata_load()
+        if got is None:
+            return False
+        spec, floats = got
+        self._preset = "custom"
+        self._terapkan_tata(spec, floats)
+        return True
+
+    def snapshot_tata(self):
+        """(spec, floats) of the CURRENT arrangement for drag editing."""
+        spec = copy.deepcopy(getattr(self, "_active_spec", {}) or {})
+        floats = {}
+        for key, p in self.P.items():
+            if p.isWindow() and p.isVisible():
+                fin = (getattr(self, "_floats_state", {}).get(key) or {})
+                floats[key] = {"geo": list(p.frameGeometry().getRect()),
+                               "on": True, "asal": fin.get("asal")}
+        return spec, floats
+
+    def _asal_of(self, key):
+        spec = getattr(self, "_active_spec", {}) or {}
+        for rail in ("left", "right"):
+            lst = spec.get(rail, [])
+            for i, it in enumerate(lst):
+                if (it if isinstance(it, str) else it[0]) == key:
+                    return [rail, i]
+        for i, it in enumerate(spec.get("mid", [])):
+            if it == key or (isinstance(it, tuple) and it[0] == key):
+                return ["mid", i]
+        return None
+
+    def commit_drag(self, kind, key):
+        """Snap-controller callback: dock/reorder `key` per zone `kind`."""
+        spec, floats = self.snapshot_tata()
+        if kind is None:
+            return
+        if kind[0] in ("above", "below"):
+            target = kind[1]
+            rail = "mid"
+            pos = None
+            for r_ in ("left", "right"):
+                lst = spec.get(r_, [])
+                for i, it in enumerate(lst):
+                    if it == target:
+                        rail, pos = r_, i
+                        break
+                if r_ == "left":
+                    for _r in ("right",):
+                        lst = spec.get("right", [])
+                        for i, it in enumerate(lst):
+                            if it == target:
+                                rail, pos = "right", i
+                                break
+            if pos is None:
+                mid = [it[0] if isinstance(it, tuple) else it
+                       for it in spec.get("mid", [])]
+                if target in mid:
+                    rail, pos = "mid", mid.index(target)
+            if pos is None:                       # target == row member?
+                row = spec.get("mid_row") or []
+                if target in row:
+                    rail, pos = "mid", int(spec.get("row_di", len(mid)))
+                else:
+                    return
+            if kind[0] == "below":
+                pos += 1
+        elif kind[0] == "rail":
+            rail, pos = kind[1], len(spec.get(kind[1], []))
+        else:                                     # ("end",) camera column
+            rail, pos = "mid", len(mid if False else spec.get("mid", []))
+        spec, floats = laysnap.move_into_spec(spec, floats, key, rail, pos)
+        self.tata_apply(spec, floats)
+
+    def commit_float(self, key):
+        """Snap-controller callback: pop the panel out as a free window."""
+        spec, floats = self.snapshot_tata()
+        asal = self._asal_of(key)
+        spec, floats = laysnap.float_in_spec(spec, floats, key)
+        floats[key]["asal"] = asal
+        self.tata_apply(spec, floats)
+
+    def tata_apply(self, spec, floats):
+        """Apply + persist as the new Custom arrangement (user rearranged)."""
+        self._preset = "custom"
+        self._terapkan_tata(spec, floats)
+        self._tata_save(spec, floats)
+
+    def _menu_tata_save(self):
+        spec, floats = self.snapshot_tata()
+        self._tata_save(spec, floats)
+        self._preset = "custom"
+        self._terapkan_tata(spec, floats)
+        self.statusBar().showMessage(
+            "Custom layout saved \u2014 it becomes the startup layout.", 4000)
+
+    def _menu_tata_forget(self):
+        self._tata_forget()
+        self._floats_state = {}
+        self._apply_preset(self._last_preset or self.PRESET_BAWAAN)
+
+    def _tata_json(self):
+        return snapctl.custom_path(os.path.dirname(os.path.abspath(__file__)))
+
+    def _tata_save(self, spec, floats):
+        try:
+            path = self._tata_json()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"spec": spec, "floats": floats}, f,
+                          indent=2, ensure_ascii=False)
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _tata_load(self):
+        try:
+            with open(self._tata_json(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            spec = data.get("spec") or {}
+            if not isinstance(spec, dict):
+                return None
+            # JSON makes tuples LISTS: restore (key, stretch) tuples for mid.
+            mid = []
+            for it in spec.get("mid", []):
+                if isinstance(it, list):
+                    it = tuple(it)
+                mid.append(it)
+            spec["mid"] = mid
+            floats = data.get("floats") or {}
+            return spec, floats
+        except Exception:                                  # noqa: BLE001
+            return None
+
+    def _tata_forget(self):
+        try:
+            os.remove(self._tata_json())
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _sinkron_menu(self):
+        """View-menu checkboxes follow the current arrangement."""
+        for key, act in (getattr(self, "vis_act", {}) or {}).items():
+            p = self.P.get(key)
+            if p is not None:
+                try:
+                    act.blockSignals(True)
+                    act.setChecked(p.isVisible())
+                finally:
+                    act.blockSignals(False)
 
     def _fade_masuk(self):
         """Apple-feel: konten muncul dengan fade 160 ms ease-out saat preset berganti
@@ -1137,6 +1365,15 @@ class RovConsole(QtWidgets.QMainWindow):
             pm.addAction(self.NAMA_PRESET[key],
                          lambda _=False, k=key: self._apply_preset(k))
         v.addSeparator()
+        to = v.addMenu("Organize windows")
+        to.addAction("Re-apply saved Custom layout", self._apply_custom)
+        to.addAction("Save current arrangement as Custom (startup layout)",
+                     self._menu_tata_save)
+        to.addAction("Forget Custom layout", self._menu_tata_forget)
+        to.addSeparator()
+        hint = to.addAction("Drag a panel header to move it \u2014 snap left / "
+                            "right / above / below; drop outside to pop out.")
+        hint.setEnabled(False)
         vm = v.addMenu("Appearance")
         self.grup_tema = QtGui.QActionGroup(self)
         self.grup_tema.setExclusive(True)
@@ -1180,9 +1417,16 @@ class RovConsole(QtWidgets.QMainWindow):
         hlp.addAction("About", self._menu_about)
 
     def _toggle_panel(self, key, on):
-        w = self.vis.get(key)
-        if w is not None:
-            w.setVisible(on)
+        # FLOATING panel (window): plain visibility; docked: show/hide in
+        # place; never-docked orphan: dock to the END of the right rail.
+        w = self.P.get(key)
+        if w is None:
+            return
+        if on and not w.isWindow() and w.parentWidget() is None:
+            self.commit_drag(("rail", "right"), key)
+            self.P[key].show()
+            return
+        w.setVisible(on)
 
     def _pill(self, lb, dot, label, value, warna_value, bg="raise_", border="line_hi",
               semua_terang=False):
@@ -1894,6 +2138,10 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def closeEvent(self, ev):
         try:
+            self.snap.detach()
+        except Exception:                                  # noqa: BLE001
+            pass
+        try:
             self._peta_timer.stop()
             self.peta.hentikan()
         except Exception:                                  # noqa: BLE001
@@ -1952,8 +2200,11 @@ def main():
                          "blank string = use 'dive'")
     ap.add_argument("--no-prompt", action="store_true",
                     help="never ask for a session name (automation)")
-    ap.add_argument("--preset", default="pilot-focus",
-                    choices=("pilot-focus", "mapping", "setup", "capture"))
+    ap.add_argument("--preset", default=None,
+                    choices=("pilot-focus", "mapping", "setup", "capture",
+                             "custom"),
+                    help="layout preset (default: restore last saved Custom "
+                         "layout, else Pilot Focus)")
     ap.add_argument("--tlog", default="auto",
                     help="'off' disabled; path to a tlog file; 'auto' = <session>/mavlink.tlog")
     ap.add_argument("--tema", default="abyss", choices=tuple(theme.tampil()),

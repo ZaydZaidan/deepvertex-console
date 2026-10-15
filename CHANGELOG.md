@@ -4,6 +4,22 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.1] — 2026-10-15
+
+### Added
+- **Chrome-style organize windows**: press & drag any panel header — cyan snap
+  suggestions appear for **left rail / right rail / above / below** (Chrome
+  split feel incl. reordering inside a rail); dropping a panel OUTSIDE the
+  console pops it out as a free-floating window (drag it back to re-dock);
+  ESC cancels a drag; **Custom** segment in the LAYOUT bar + View ▸
+  *Organize windows* (Apply / Save as Custom / Forget) — the Custom layout is
+  stored in `gui_t1/saved/layout_custom.json` and becomes the startup layout.
+- Snap-engine regression tests [36]–[40] (rail snap + anti-stuck, mid
+  above/below insert, float round-trip, custom persistence, ESC + "asal"
+  return); suite now 40 checks, all headless (incl. raw-agent tests).
+- README assets re-taken from the REAL desktop (X11 window capture), so the
+  images match the actual on-screen rendering pixel-for-pixel.
+
 ## [1.0.0] — 2026-10-14
 
 First field-complete release of the ROV mode console, verified against the real
