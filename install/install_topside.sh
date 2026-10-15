@@ -100,8 +100,8 @@ if [ ! -d "$GUI/.venv" ]; then
   /usr/bin/python3 -m venv --system-site-packages "$GUI/.venv"
   echo "   venv created: $GUI/.venv"
 fi
-"$GUI/.venv/bin/python" -m pip install --quiet PySide6 evdev pymavlink numpy pygame \
-  && echo "   PySide6 + evdev + pymavlink + numpy + pygame OK"   # evdev=Linux pad, pygame=Windows pad
+"$GUI/.venv/bin/python" -m pip install --quiet PySide6 evdev pymavlink numpy pygame paramiko \
+  && echo "   PySide6 + evdev + pymavlink + numpy + pygame + paramiko OK"   # evdev=Linux pad, pygame=Windows pad, paramiko=robot SSH
 
 echo "== 2) required GStreamer elements"
 miss=0

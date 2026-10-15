@@ -26,6 +26,7 @@ PRESET = {
         "mavlink": "udpin:0.0.0.0:14550",
         "front_port": 5600, "left_port": 5601, "right_port": 5602,
         "raw_agent": "http://192.168.2.2:8765",
+        "ssh_user": "pi", "ssh_pass": "", "agent_path": "~/onboard/raw_agent.py",
     },
     "sitl": {
         "nama": "Simulation / SITL (local)",
@@ -33,6 +34,7 @@ PRESET = {
         "mavlink": "udpin:0.0.0.0:14550",
         "front_port": 5600, "left_port": 5601, "right_port": 5602,
         "raw_agent": "http://127.0.0.1:8765",
+        "ssh_user": "pi", "ssh_pass": "", "agent_path": "~/onboard/raw_agent.py",
     },
 }
 
@@ -247,13 +249,24 @@ def buat_dialog(console):
     for sp in (f_fr, f_l, f_r):
         sp.setRange(1, 65535)
     f_raw = QtWidgets.QLineEdit()
+    f_user = QtWidgets.QLineEdit()
+    f_passw = QtWidgets.QLineEdit()
+    f_passw.setEchoMode(QtWidgets.QLineEdit.Password)
+    f_path = QtWidgets.QLineEdit()
     form.addRow("Robot host (BlueOS)", f_host)
     form.addRow("MAVLink endpoint", f_mav)
     form.addRow("Video port — front", f_fr)
     form.addRow("Video port — stereo L", f_l)
     form.addRow("Video port — stereo R", f_r)
     form.addRow("RAW agent URL", f_raw)
+    form.addRow("Robot SSH user", f_user)
+    form.addRow("Robot SSH password", f_passw)
+    form.addRow("RAW agent path (on robot)", f_path)
     v.addLayout(form)
+    v.addWidget(QtWidgets.QLabel(
+        "SSH fields power the one-click “Start RAW agent”. For auto-start at "
+        "every boot, run once on the robot: install/robot/"
+        "install_agent_service.sh (kept in the repo)."))
 
     def isi(c):
         f_host.setText(str(c.get("host", "")))
@@ -262,6 +275,9 @@ def buat_dialog(console):
         f_l.setValue(int(c.get("left_port", 5601)))
         f_r.setValue(int(c.get("right_port", 5602)))
         f_raw.setText(str(c.get("raw_agent", "")))
+        f_user.setText(str(c.get("ssh_user", "pi")))
+        f_passw.setText(str(c.get("ssh_pass", "")))
+        f_path.setText(str(c.get("agent_path", "~/onboard/raw_agent.py")))
 
     aktif = [cfg0.get("preset", "blueos") if cfg0.get("preset") in rb
              else "custom"]
@@ -270,7 +286,9 @@ def buat_dialog(console):
         return {"preset": aktif[0], "host": f_host.text().strip(),
                 "mavlink": f_mav.text().strip(),
                 "front_port": f_fr.value(), "left_port": f_l.value(),
-                "right_port": f_r.value(), "raw_agent": f_raw.text().strip()}
+                "right_port": f_r.value(), "raw_agent": f_raw.text().strip(),
+                "ssh_user": f_user.text().strip(), "ssh_pass": f_passw.text(),
+                "agent_path": f_path.text().strip()}
 
     def pilih(k, pakai_cfg=False):
         aktif[0] = k
@@ -422,10 +440,54 @@ def buat_dialog(console):
                 hasil_lbl[k].setStyleSheet("")       # informational
             else:
                 hasil_lbl[k].setStyleSheet("color:#E8804A;")
+        # one-click: RAW gagal + kredensial terisi → nyalakan agent di robot
+        if not h.get("raw", "").startswith("OK") and \
+                f_user.text().strip() and f_passw.text():
+            lbl_ssh.setText("RAW agent is not up — starting it on the robot …")
+            QtWidgets.QApplication.processEvents()
+            if _start_agent(silent=True):
+                hasil_lbl["raw"].setText(
+                    "OK — RAW agent started automatically ✓")
+                hasil_lbl["raw"].setStyleSheet("color:#5CC98F;")
 
     b_uji = QtWidgets.QPushButton("Test now")
     b_uji.clicked.connect(_uji)
     v.addWidget(b_uji)
+
+    baris_ssh = QtWidgets.QHBoxLayout()
+    b_start = QtWidgets.QPushButton("Start RAW agent on the robot")
+    b_start.setObjectName("BtnTiny")
+    lbl_ssh = QtWidgets.QLabel("")
+    lbl_ssh.setObjectName("Faint")
+    lbl_ssh.setWordWrap(True)
+    baris_ssh.addWidget(b_start)
+    baris_ssh.addWidget(lbl_ssh, 1)
+    v.addLayout(baris_ssh)
+
+    def _start_agent(silent=False):
+        c = tarik()
+        host = c["host"] or "192.168.2.2"
+        u, p = c["ssh_user"], c["ssh_pass"]
+        if not u or not p:
+            if not silent:
+                lbl_ssh.setText("fill the robot SSH user + password first")
+            return False
+        if not silent:
+            lbl_ssh.setText("starting the agent on %s …" % host)
+            QtWidgets.QApplication.processEvents()
+        try:
+            import robotops
+            ok, msg = robotops.start_agent(host, u, p, c["agent_path"])
+        except Exception as exc:                           # noqa: BLE001
+            ok, msg = False, "robotops error: %s" % exc
+        lbl_ssh.setText(msg)
+        return ok
+
+    def _start_dan_uji():
+        if _start_agent():
+            _uji()
+
+    b_start.clicked.connect(_start_dan_uji)
 
     # ---- 4) simpan & jalankan ulang
     v.addWidget(QtWidgets.QLabel(

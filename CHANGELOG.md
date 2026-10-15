@@ -4,6 +4,26 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.11] — 2026-10-15
+
+### Added
+- **One-click RAW agent start from the Connection dialog** (owner request:
+  "pencet tes connection aja langsung connect"): fill the robot SSH
+  user/password (BlueOS default: `pi`) and the agent path; pressing
+  **Test now** — if the agent is not answering, the console SSHes to the
+  robot, starts it (nohup) and re-tests automatically. A manual **Start RAW
+  agent on the robot** button is included as well.
+- **Robot-side auto-start kit**: `install/robot/install_agent_service.sh` —
+  run once on the robot to install the RAW agent as a systemd service
+  (auto-start at every boot, auto-restart on failure; service name
+  `dv-raw-agent`, log at `/tmp/dv-raw-agent.log`).
+- New `robotops.py` (paramiko-based SSH helpers; degrades gracefully when
+  paramiko is missing); `paramiko` bundled by both installers; tests [50].
+
+### Changed
+- `koneksi.json` gains `ssh_user` / `ssh_pass` / `agent_path` (stored in
+  the local user data folder).
+
 ## [1.0.10] — 2026-10-15
 
 ### Fixed

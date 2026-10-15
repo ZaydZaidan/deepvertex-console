@@ -846,6 +846,30 @@ def main():
         print("[49] gamepad SDL GAGAL:", repr(exc))
         lulus = False
 
+    # [50] robotops: perintah start/cari agent + field SSH robot di koneksi.
+    try:
+        import koneksi as _K50
+        import robotops as _RO
+        cmd50 = _RO.perintah_start("/home/pi/onboard/raw_agent.py", 8765)
+        ok50 = ("raw_agent.py" in cmd50 and "--port 8765" in cmd50 and
+                "nohup" in cmd50)
+        cari50 = _RO.perintah_cari("~/onboard/raw_agent.py")
+        ok50 = ok50 and "raw_agent.py" in cari50 and "find" in cari50
+        ok50 = ok50 and (_RO.agent_status("127.0.0.1", 1, timeout=0.3)
+                         in (True, False))
+        c50 = _K50.preset("blueos")
+        ok50 = ok50 and c50.get("ssh_user") == "pi" and "agent_path" in c50
+        ok50 = ok50 and _K50.save(dict(c50, host="10.1.1.1", ssh_user="u1",
+                                       ssh_pass="x",
+                                       agent_path="/a/raw_agent.py"))
+        ok50 = ok50 and ((_K50.load() or {}).get("ssh_user") == "u1") and \
+            ((_K50.load() or {}).get("agent_path") == "/a/raw_agent.py")
+        print("[50] robotops + robot SSH config:", ok50)
+        lulus &= bool(ok50)
+    except Exception as exc:                               # noqa: BLE001
+        print("[50] robotops GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
