@@ -50,6 +50,16 @@ def gst_init():
 
 
 def h264parse_tersedia():
+    # Windows (.EXE): PyGObject tidak ada — probe via SUBPROSES runtime
+    # GStreamer (gst-inspect-1.0 di PATH) supaya rekaman tetap jujur.
+    if not _HAS_GI:
+        try:
+            return subprocess.run(["gst-inspect-1.0", "h264parse"],
+                                  stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL,
+                                  timeout=5).returncode == 0
+        except Exception:                              # noqa: BLE001
+            return False
     gst_init()
     return Gst.ElementFactory.find("h264parse") is not None
 
