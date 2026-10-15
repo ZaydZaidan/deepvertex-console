@@ -977,6 +977,22 @@ class RovConsole(QtWidgets.QMainWindow):
                            "voltage (LiPo anchor curve, per cell).")
         p.body_layout.addWidget(lbl_est)
         self.lbl_batt_est = lbl_est
+        lbl_stop = QtWidgets.QLabel(
+            "LiPo guard: surface by 14.6 V (\u2248 3.65 V/cell under load, "
+            "est \u2248 32%) or 25% remaining \u2014 below 14.0 V (\u2248 "
+            "3.50 V/cell, est \u2248 15%) the pack degrades; never leave it "
+            "resting under 13.6 V.")
+        lbl_stop.setObjectName("MicroLabel")
+        lbl_stop.setWordWrap(True)
+        lbl_stop.setToolTip("LiPo-health guidance for the BlueROV2 + Tattu 4S "
+                            "10000 mAh pack. Defaults above are written to "
+                            "the vehicle by APPLY RECOMMENDED (BATT_LOW_VOLT="
+                            "14.6, BATT_CRT_VOLT=14.0, remaining-capacity "
+                            "2500/1500 mAh). Under-water load sags the "
+                            "voltage, so these thresholds stop well above the "
+                            "damage zone.")
+        p.body_layout.addWidget(lbl_stop)
+        self.lbl_batt_stop = lbl_stop
         P["power"] = p
 
         # ---- vehicle (pilot)
@@ -2044,8 +2060,8 @@ class RovConsole(QtWidgets.QMainWindow):
             pass
 
     _FS_REKOMENDASI = (
-        ("BATT_CAPACITY", 10000), ("BATT_LOW_VOLT", 14.0), ("BATT_CRT_VOLT", 13.2),
-        ("BATT_LOW_MAH", 2000), ("BATT_CRT_MAH", 1000),
+        ("BATT_CAPACITY", 10000), ("BATT_LOW_VOLT", 14.6), ("BATT_CRT_VOLT", 14.0),
+        ("BATT_LOW_MAH", 2500), ("BATT_CRT_MAH", 1500),
         ("BATT_FS_LOW_ACT", 1), ("BATT_FS_CRT_ACT", 3),
         ("FS_GCS_ENABLE", 2), ("FS_GCS_TIMEOUT", 5),
         ("FS_PILOT_INPUT", 2), ("FS_PILOT_TIMEOUT", 3),

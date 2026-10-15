@@ -630,6 +630,20 @@ def main():
         print("[43] lipo est GAGAL:", repr(exc))
         lulus = False
 
+    # [44] saran LiPo guard (berhenti di 14.6 V / est 32%, critical 14.0 V)
+    try:
+        fsav = dict(rc.RovConsole._FS_REKOMENDASI)
+        ok44 = (fsav.get("BATT_LOW_VOLT") == 14.6 and
+                fsav.get("BATT_CRT_VOLT") == 14.0 and
+                fsav.get("BATT_LOW_MAH") == 2500 and
+                "14.6 V" in w.lbl_batt_stop.text() and
+                "14.0 V" in w.lbl_batt_stop.text())
+        print("[44] LiPo guard: defaults + label stop-muatan:", ok44)
+        lulus &= bool(ok44)
+    except Exception as exc:                               # noqa: BLE001
+        print("[44] lipo guard GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
