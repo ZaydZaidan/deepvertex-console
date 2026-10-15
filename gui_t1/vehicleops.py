@@ -710,8 +710,8 @@ CHECKLIST_PREDIVE = (
     ("thruster", "Tug every thruster"),
     ("fairing", "Wiggle the fairing"),
     ("lumen", "Tug the Lumen lights"),
-    ("seal", "Radial seals greased & undamaged (visual)"),
-    ("area", "Thruster area clear & ROV in MANUAL mode"),
+    ("seal", "Radial seals greased and undamaged (visual)"),
+    ("area", "Thruster area clear, ROV in MANUAL mode"),
     ("tilt", "Camera tilt & lights work"),
     ("thruster_test", "Thruster test in water (<30 s), then DISARM"),
 )

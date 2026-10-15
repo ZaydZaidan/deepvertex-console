@@ -125,7 +125,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.16"    # versi aplikasi (session.json + update checker)
+__version__ = "1.0.17"    # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -1058,19 +1058,19 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addWidget(lbl_est)
         self.lbl_batt_est = lbl_est
         lbl_stop = QtWidgets.QLabel(
-            "LiPo guard: surface by 14.6 V (\u2248 3.65 V/cell under load, "
-            "est \u2248 32%) or 25% remaining \u2014 below 14.0 V (\u2248 "
-            "3.50 V/cell, est \u2248 15%) the pack degrades; never leave it "
-            "resting under 13.6 V.")
+            "Surface by 14.6 V \u00b7 degrades below 14.0 V \u00b7 never "
+            "rest under 13.6 V")
         lbl_stop.setObjectName("MicroLabel")
         lbl_stop.setWordWrap(True)
         lbl_stop.setToolTip("LiPo-health guidance for the BlueROV2 + Tattu 4S "
-                            "10000 mAh pack. Defaults above are written to "
+                            "10000 mAh pack: surface by 14.6 V (\u2248 3.65 "
+                            "V/cell under load, est \u2248 32%) or 25% "
+                            "remaining; below 14.0 V (\u2248 3.50 V/cell, est "
+                            "\u2248 15%) the pack degrades; never leave it "
+                            "resting under 13.6 V. Defaults are written to "
                             "the vehicle by APPLY RECOMMENDED (BATT_LOW_VOLT="
                             "14.6, BATT_CRT_VOLT=14.0, remaining-capacity "
-                            "2500/1500 mAh). Under-water load sags the "
-                            "voltage, so these thresholds stop well above the "
-                            "damage zone.")
+                            "2500/1500 mAh).")
         p.body_layout.addWidget(lbl_stop)
         self.lbl_batt_stop = lbl_stop
         P["power"] = p
@@ -2149,9 +2149,8 @@ class RovConsole(QtWidgets.QMainWindow):
             if lst is not None:
                 cells, soc = lst
                 self.lbl_batt_est.setText(
-                    "LiPo %d-cell estimate %s%% \u00b7 Ardu remaining %s%%"
-                    " (energy consumed since power-on)"
-                    % (cells, ("\u2014" if soc is None else soc),
+                    "LiPo est %s%% \u00b7 Ardu remaining %s%%"
+                    % (("\u2014" if soc is None else soc),
                        ("\u2014" if rem is None else rem)))
             else:
                 self.lbl_batt_est.setText("\u2014")

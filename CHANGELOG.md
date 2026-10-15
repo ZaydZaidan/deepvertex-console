@@ -4,6 +4,22 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.17] — 2026-10-15
+
+### Fixed
+- **“Ghosted/doubled text” in the PRE-FLIGHT panel** (owner screenshot): the
+  chip flow-bars could leave stale pixels behind when they reflowed to a
+  shorter layout — `FlowBox` now repaints itself and its vacated area on
+  every height change.
+- **POWER & SYSTEM text too long / chopped** (owner request): the LiPo
+  guard line is now short and direct — “Surface by 14.6 V · degrades below
+  14.0 V · never rest under 13.6 V” (full explanation moved to the
+  tooltip); the battery estimate line is now “LiPo est X% · Ardu remaining
+  Y%”.
+- Checklist items containing “&” lost spacing/letters (Qt eats `&` as a
+  mnemonic): “Thruster area clear & ROV…” → “, ROV…”; “seals greased &
+  undamaged” → “and”.
+
 ## [1.0.16] — 2026-10-15
 
 ### Fixed
