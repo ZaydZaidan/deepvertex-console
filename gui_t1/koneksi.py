@@ -454,7 +454,24 @@ def buat_dialog(console):
         console._catat("connection: saved — restarting the console")
 
         def _lahirkan():
-            QtCore.QProcess.startDetached(prog, args2)
+            # v1.0.10: relaunch DITUNDA ±4 dtk. Bug 15 Okt: folder ekstraksi
+            # onefile = _MEI<hex-PID>; PID Windows cepat didaur ulang, jadi
+            # instance baru dapat PID bekas instance lama → ekstrak ke folder
+            # yang SEDANG dihapus oleh bootloader lama → crash
+            # "numpy\_core tidak ditemukan". Jeda = biar pembersihan selesai.
+            # (Pop env PyInstaller = higiene tambahan; hasil uji: bukan faktor
+            #  penentu di build ini, tapi aman.)
+            for k in ("_MEIPASS2", "_PYI_APPLICATION_HOME_DIR",
+                      "_PYI_ARCHIVE_FILE", "_PYI_PARENT_PROCESS_LEVEL",
+                      "_PYI_SPLASH_IPC"):
+                os.environ.pop(k, None)
+            if os.name == "nt":
+                arg = " ".join('"%s"' % a if " " in a else a for a in args2)
+                baris = ('ping -n 5 127.0.0.1 >nul & start "" "%s" %s'
+                         % (prog, arg))
+                QtCore.QProcess.startDetached("cmd", ["/c", baris])
+            else:
+                QtCore.QProcess.startDetached(prog, args2)
             console.close()
 
         # PENTING (bug 15 Okt): dialog modal HARUS ditutup SEBELUM console

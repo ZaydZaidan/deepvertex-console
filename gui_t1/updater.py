@@ -218,8 +218,23 @@ def _tulis_bat(dest, setup, exe_lokal, target=""):
     subprocess.Popen(["cmd", "/c", bat], close_fds=True,
                      creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL)
+                     stderr=subprocess.DEVNULL,
+                     env=_env_bersih())
     return bat
+
+
+def _env_bersih():
+    """os.environ TANPA variabel PyInstaller (higiene spawn anak).
+
+    Uji empiris 15 Okt: build ini tetap boot walau variabel _PYI_* disetel
+    (jadi BUKAN faktor penentu crash relaunch — penyebab aslinya PID-recycle
+    folder _MEI, ditangani jeda relaunch di koneksi.py). Tetap dipakai:
+    murah + mencegah perilaku bootloader versi lain yang bisa berbeda."""
+    env = dict(os.environ)
+    for k in ("_MEIPASS2", "_PYI_APPLICATION_HOME_DIR", "_PYI_ARCHIVE_FILE",
+              "_PYI_PARENT_PROCESS_LEVEL", "_PYI_SPLASH_IPC"):
+        env.pop(k, None)
+    return env
 
 
 def cek_hasil_update(versi_sekarang):
@@ -307,7 +322,8 @@ def _tulis_sh(tar_path, dir_instalasi, pid=None, target=""):
                       f)
     except OSError:
         pass
-    subprocess.Popen(["bash", sh, str(pid or os.getpid())], start_new_session=True)
+    subprocess.Popen(["bash", sh, str(pid or os.getpid())], start_new_session=True,
+                     env=_env_bersih())
     return sh
 
 

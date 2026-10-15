@@ -344,7 +344,7 @@ class CameraTile(QtWidgets.QWidget):
         self.status = None            # teks pengganti "NO SIGNAL"
         self.setMinimumSize(240, 135)
         pol = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                    QtWidgets.QSizePolicy.MinimumExpanding)
+                                    QtWidgets.QSizePolicy.Maximum)
         pol.setHeightForWidth(True)   # tanpa flag ini layout MENGABAIKAN heightForWidth
         self.setSizePolicy(pol)
         t = QtCore.QTimer(self)
@@ -356,11 +356,15 @@ class CameraTile(QtWidgets.QWidget):
         self._sync_tinggi()
 
     def _sync_tinggi(self):
-        """Kunci tinggi panel = rasio frame (FIXED, bukan max) + minta layout ulang.
+        """Kunci tinggi panel = rasio frame, TAPI jangan memaksa bila kolom sempit.
 
-        FIXED-height (13 Okt): maximumHeight TIDAK cukup — susunan kolom memberi tinggi
-        ekstra ke panel kamera (terukur rasio 1.55, bukan 1.78). Dengan setFixedHeight,
-        panel kamera = tile + chrome PERSIS; sisa kolom jatuh ke peta (Expanding).
+        Evolusi: maximumHeight saja TIDAK cukup (13 Okt — kolom memberi tinggi
+        ekstra, rasio melar); setFixedHeight memperbaiki itu TETAPI memaksa
+        tile meluber & terpotong saat jendela besar-sempit (laporan pemilik
+        15 Okt, jendela 1920x986: kepala panel terhimpit + dasar terpotong).
+        Solusi v1.0.10: sizePolicy vertical = Maximum + setMaximumHeight(ideal)
+        → layout TIDAK melebihi rasio, dan boleh MENYUSUTKAN tile saat ruang
+        kolom kurang (gambar tetap ter-center oleh matematika paintEvent).
         """
         try:
             if self.width() <= 1:
@@ -370,7 +374,7 @@ class CameraTile(QtWidgets.QWidget):
                 h = min(h, int(self.tinggi_maks))
             if h != self._h_natural:
                 self._h_natural = h
-                self.setFixedHeight(h)
+                self.setMaximumHeight(h)
                 self.updateGeometry()
         except Exception:                  # noqa: BLE001
             pass

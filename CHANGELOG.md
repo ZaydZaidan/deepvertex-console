@@ -4,6 +4,22 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.10] — 2026-10-15
+
+### Fixed
+- **Camera panels overflowed/clipped at large window sizes** (owner
+  screenshot at 1920×986): the fixed-height tile forced the front video
+  past its panel — title row squeezed, bottom edge cut. The tile now caps
+  at its aspect height but SHRINKS smoothly when the column is tight:
+  title + bottom border always visible, image stays centered. Verified by
+  geometry measurements at the owner's exact window size.
+- **Save & Restart could relaunch into a broken extraction** (traceback:
+  `numpy._core` missing under `_MEI…`): Windows recycles PIDs, and the
+  relaunch (150 ms after close) extracted into the SAME `_MEI<pid>` folder
+  the old bootloader was still deleting. The relaunch is now delayed ~4 s
+  via a detached command line (+ PyInstaller-env hygiene), so cleanup
+  always finishes first. Verified with the recording probe.
+
 ## [1.0.9] — 2026-10-15
 
 ### Fixed
