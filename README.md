@@ -80,14 +80,65 @@ console is built around that.
 | Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
 | Controller | Sony DualShock 4 (USB) |
 
-## Downloads
+## Downloads (v1.0.1)
 
-Grab **v1.0.1** from <https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.1>:
+Available on the release page:
+<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.1>
 
-| Platform | Artifact | How to run |
+| Platform | Artifact | For |
 |---|---|---|
-| **Ubuntu / Linux** | `deepvertex-console-v1.0.1-linux.tar.gz` | Extract → run `install/install_topside.sh` (creates .venv + deps) → `./gui_t1/run_console_real.sh` |
-| **Windows (EXE)** | `DeepVertexMarineConsole.exe` (one-file, PyInstaller) | Double-click. Telemetry & recording work out of the box; gamepad preview needs the [GStreamer runtime](https://gstreamer.freedesktop.org/download/) installed (gamepad keys are Linux-side for now — see below) |
+| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.1-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
+| **Windows** | `DeepVertexMarineConsole.exe` | Windows desktop (MAVLink telemetry, panels, parameters, recorder — scope note below) |
+
+### A. Install on Ubuntu / other Linux (terminal)
+
+```bash
+# 1) Download & extract
+wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.1/deepvertex-console-v1.0.1-linux.tar.gz
+tar xzf deepvertex-console-v1.0.1-linux.tar.gz
+cd deepvertex-console-1.0.1
+
+# 2) One-time topside install (builds .venv: PySide6, evdev, pymavlink,
+#    numpy; apt deps: python3-gi + GStreamer tools/plugins; pip fallback)
+./install/install_topside.sh
+
+# 3) Launch (robot on the tether, BlueOS at 192.168.2.2)
+./gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
+
+# Optional launcher installed for future sessions (add ~/.bashrc):
+echo 'alias deepvertexrov="'$(pwd)'/gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765 --tema ink --teks 1.2"' >> ~/.bashrc
+source ~/.bashrc && deepvertexrov        # == same console, one word
+```
+
+Then (from the tar.gz walk-through): the script **installs everything it
+needs** into `gui_t1/.venv` — you do not need a system-wide Python install;
+`--mavlink`, `--outdir`, `--preset`, `--nome`, see `run_console_real.sh
+--help` for the full option list.
+
+### B. Install on Windows (.EXE)
+
+1. Download **`DeepVertexMarineConsole.exe`** from the release page.
+2. Double-click it (no installer — one-file portable). It connects to the
+   MAVLink feed (`udpin:0.0.0.0:14550` by default) and opens the console.
+3. Optional for **camera recording**: install the
+   [GStreamer runtime](https://gstreamer.freedesktop.org/download/)
+   (*runtime MSI + the matching "devel" pack*), then make sure its `bin`
+   folder is on PATH — `gst-launch-1.0` must resolve in a terminal.
+4. The gamepad teleop side is Linux-only for now (evdev); the EXE shows an
+   honest "not available on this platform" instead of breaking (**recording,
+   telemetry and all panels stay usable**).
+
+Terminal option list (works for both): `--help` shows `--mavlink`,
+`--outdir`, `--preset`, `--nama-sesi`, ports and more.
+
+Use terminal equivalents on Windows:
+
+```powershell
+# from PowerShell
+Invoke-WebRequest -Uri "https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.1/DeepVertexMarineConsole.exe" -OutFile "DeepVertexMarineConsole.exe"
+.\DeepVertexMarineConsole.exe           # console starts
+.\DeepVertexMarineConsole.exe --help    # option list (session dir, ports…)
+```
 
 Windows scope note: the .EXE runs MAVLink telemetry, camera **recording** &
 snapshots (with the GStreamer runtime), parameter/preflight panels and capture
