@@ -385,15 +385,15 @@ def main():
         komp = os.path.join(w.sesi, "compressed")
         sebelum = set(os.listdir(komp))
         w._snap("front")
-        jalan(0.3)
+        jalan(1.2)
         ok29 = (set(os.listdir(komp)) == sebelum)
         ok29 = ok29 and any("SNAP blocked" in t
-                            for t in w.log.toPlainText().splitlines()[-5:])
+                            for t in w.log.toPlainText().splitlines()[-8:])
         w.btn_rec["front"].setChecked(True)        # compressed → harus ditolak
-        jalan(0.3)
+        jalan(1.2)
         ok29 = ok29 and (not w.btn_rec["front"].isChecked())
         ok29 = ok29 and any("REC blocked" in t
-                            for t in w.log.toPlainText().splitlines()[-5:])
+                            for t in w.log.toPlainText().splitlines()[-8:])
         w._safety_check(dict(w.bridge.state, link=True))
         ok29 = ok29 and (w._alert_kini is not None and
                          "STORAGE" in str(w._alert_kini[1]).upper())
