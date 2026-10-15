@@ -131,6 +131,11 @@ needs** into `gui_t1/.venv` — you do not need a system-wide Python install;
 Terminal option list (works for both): `--help` shows `--mavlink`,
 `--outdir`, `--preset`, `--nama-sesi`, ports and more.
 
+**Terms of use**: downloading & running the console means you accept the
+[End-User Terms](docs/END-USER-TERMS.txt) (PolyForm Strict 1.0.0 — free to
+use, no redistribution/modification, commercial use needs written permission:
+founders@deepvertex.tech).
+
 Use terminal equivalents on Windows:
 
 ```powershell

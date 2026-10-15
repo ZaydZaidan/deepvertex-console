@@ -1,0 +1,40 @@
+DeepVertex Marine Technology Console — End-User Terms (v1.0.1)
+===============================================================
+
+Thank you for downloading the DeepVertex Marine Technology Console. This
+distribution ships with the PolyForm Strict 1.0.0 license (see LICENSE) — the
+operator-readable summary below is provided for convenience and does not
+replace the license text.
+
+1. WHAT YOU MAY DO
+   * Run, use inside your own organisation, and evaluate the software freely
+     (non-commercial use).
+   * Use it with your own robots/vehicles on your own topside computer.
+
+2. WHAT YOU MAY NOT DO
+   * Redistribute the software or any modified copy (do NOT upload it to
+     public mirrors, app stores, forums, or other channels).
+   * Modify the software or any file inside it — including removing or
+     altering DeepVertex branding, logos, or "Marine Technology" naming.
+   * Use it commercially (including paid operations, services, products, or
+     as part of another commercial offering) without written permission from
+     DeepVertex.
+
+3. COMMERCIAL & PARTNERSHIP LICENSING
+   Written permission, bulk/organisation licensing, and OEM/integration rights:
+   founders@deepvertex.tech
+
+4. NO WARRANTY; SAFETY WARNING
+   The software is provided "as is". You remain responsible for operating your
+   vehicle safely: never rely on the console alone for control, keep a manual
+   ill-stop path available at all times, and treat every dive in line with the
+   Blue Robotics BlueROV2 operating guidance. Check your battery limits and
+   failsafe configuration before each dive.
+
+5. DATA & PRIVACY
+   The console runs locally. It stores session data (recordings, snapshots,
+   logs) in ~/DeepVertex-ROV-Captures on your machine; the OpenStreetMap tiles
+   are fetched online. No telemetry leaves your computer.
+
+By downloading or running this software you accept the PolyForm Strict 1.0.0
+license as reproduced in the LICENSE file.
