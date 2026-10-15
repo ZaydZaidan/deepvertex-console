@@ -386,14 +386,14 @@ def main():
         sebelum = set(os.listdir(komp))
         w._snap("front")
         jalan(1.2)
+        logtxt = w.log.toPlainText()
         ok29 = (set(os.listdir(komp)) == sebelum)
-        ok29 = ok29 and any("SNAP blocked" in t
-                            for t in w.log.toPlainText().splitlines()[-8:])
+        ok29 = ok29 and ("SNAP blocked \u2014 topside storage full" in logtxt)
         w.btn_rec["front"].setChecked(True)        # compressed → harus ditolak
         jalan(1.2)
+        logtxt = w.log.toPlainText()
         ok29 = ok29 and (not w.btn_rec["front"].isChecked())
-        ok29 = ok29 and any("REC blocked" in t
-                            for t in w.log.toPlainText().splitlines()[-8:])
+        ok29 = ok29 and ("REC blocked \u2014 topside storage full" in logtxt)
         w._safety_check(dict(w.bridge.state, link=True))
         ok29 = ok29 and (w._alert_kini is not None and
                          "STORAGE" in str(w._alert_kini[1]).upper())
