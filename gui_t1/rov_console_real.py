@@ -125,7 +125,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.11"    # versi aplikasi (session.json + update checker)
+__version__ = "1.0.12"    # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -1558,7 +1558,32 @@ class RovConsole(QtWidgets.QMainWindow):
                         self._menu_koneksi)
         hlp = mb.addMenu("&Help")
         hlp.addAction("Pre-dive checklist (Blue Robotics)", self._menu_checklist)
+        hlp.addSeparator()
+        hlp.addAction("Finish pending update (run installer)…",
+                      self._menu_selesaikan_update)
         hlp.addAction("About", self._menu_about)
+
+    def _menu_selesaikan_update(self):
+        """Jalankan installer update yang sudah terunduh (jalan pemulihan)."""
+        try:
+            import updater as _upd
+            p = _upd.ada_setup_tertunda()
+        except Exception:                                  # noqa: BLE001
+            p = None
+        if not p:
+            QtWidgets.QMessageBox.information(
+                self, "Update", "No downloaded installer found.")
+            return
+        self._catat("launching pending installer: %s" % p)
+        try:
+            if os.name == "nt":
+                os.startfile(p)                            # noqa: S606
+            else:
+                QtGui.QDesktopServices.openUrl(
+                    QtCore.QUrl.fromLocalFile(p))
+        except Exception as exc:                           # noqa: BLE001
+            QtWidgets.QMessageBox.warning(
+                self, "Update", "Could not launch the installer:\n%s" % exc)
 
     def _menu_koneksi(self):
         """Buka dialog pengaturan koneksi (BlueOS / ethernet / custom)."""
@@ -2471,6 +2496,11 @@ def main():
         _pesan_upd = _upd2.cek_hasil_update(__version__)
         if _pesan_upd:
             w._catat(_pesan_upd)
+        _setup_tertunda = _upd2.ada_setup_tertunda()
+        if _setup_tertunda:
+            w._catat("An update installer is already downloaded — finish it "
+                     "from Help ▸ Finish pending update (or double-click: %s)"
+                     % _setup_tertunda)
     except Exception:                                      # noqa: BLE001
         pass
 

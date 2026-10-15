@@ -4,6 +4,26 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.12] — 2026-10-15
+
+### Fixed
+- **Update could stall right after the download** (owner report:
+  "downloaded but still not applied"). Three fixes:
+  * the reader now stops exactly at Content-Length — no more waiting for
+    EOF on a keep-alive connection (a "ghost timeout" that threw away an
+    already-complete download);
+  * if the file on disk is complete (size == expected), the flow proceeds
+    to apply even after a tail timeout or a Cancel pressed after the last
+    byte;
+  * the final notice auto-continues after 12 s — applying no longer
+    depends on clicking anything.
+
+### Added
+- **Recovery path for pending installers** (the missing "apply"
+  affordance): when a downloaded installer sits unused, the console shows
+  a banner at startup and Help gains **"Finish pending update (run
+  installer)…"** which launches it directly. Test [51].
+
 ## [1.0.11] — 2026-10-15
 
 ### Added

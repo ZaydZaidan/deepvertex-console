@@ -123,7 +123,15 @@ def download(url, dest, progress_cb=None, timeout=30, batal=None):
         while True:
             if batal is not None and batal():
                 raise RuntimeError("download cancelled")
-            blok = r.read(128 * 1024)
+            if total and dibaca >= total:
+                break                      # semua byte diterima — JANGAN
+                                           # menunggu EOF (koneksi keep-alive
+                                           # bisa menggantung → timeout hantu
+                                           # padahal file sudah lengkap)
+            minta = 128 * 1024
+            if total:
+                minta = min(minta, total - dibaca)
+            blok = r.read(minta)
             if not blok:
                 break
             f.write(blok)
@@ -270,6 +278,18 @@ def cek_hasil_update(versi_sekarang):
                     "manually." % (target, versi_sekarang,
                                    os.path.join(d, "apply_log.txt")))
     except Exception:                                      # noqa: BLE001
+        pass
+    return None
+
+
+def ada_setup_tertunda():
+    """Path installer yang sudah terunduh tapi belum terpasang (jalan
+    pemulihan Help ▸ Finish pending update), atau None."""
+    p = os.path.join(_dir_update(), "setup-baru.exe")
+    try:
+        if os.path.isfile(p) and os.path.getsize(p) > 50 * 1024 * 1024:
+            return p
+    except OSError:
         pass
     return None
 
@@ -462,6 +482,8 @@ def _unduh_dengan_progres(w, url, dest):
     prog.show()
     QtWidgets.QApplication.processEvents()
 
+    keadaan = {"total": 0}
+
     class _Unduh(QtCore.QThread):
         maju = QtCore.Signal(int, int)
 
@@ -485,6 +507,7 @@ def _unduh_dengan_progres(w, url, dest):
 
     def _maju(a, t):
         if t > 0:
+            keadaan["total"] = t
             prog.setRange(0, 100)
             prog.setValue(min(100, int(a * 100.0 / t)))
             prog.setLabelText("Downloading update...  %.1f / %.1f MB"
@@ -500,15 +523,28 @@ def _unduh_dengan_progres(w, url, dest):
         QtWidgets.QApplication.processEvents()
         th.wait(40)
     prog.close()
-    if getattr(th, "batal", False) and th.err is None:
-        return False, None
+    # File lengkap di disk = unduhan SUKSES, walau thread melaporkan timeout
+    # di ekor (koneksi keep-alive) atau user menekan Cancel tepat setelah
+    # byte terakhir — jangan buang hasil yang sudah utuh (kasus pemilik 15 Okt).
+    try:
+        ukuran = os.path.getsize(dest)
+    except OSError:
+        ukuran = 0
+    if keadaan["total"]:
+        utuh = ukuran >= keadaan["total"]
+    else:
+        utuh = ukuran > 5 * 1024 * 1024 and not th.err and not th.batal
+    if th.err and utuh:
+        th.err = None
     if th.err:
         return False, th.err
+    if not utuh:
+        return False, None                      # dibatalkan / tak lengkap
     return True, None
 
 
 def _tanya_lalu_terapkan(w, info, v_lokal):
-    from PySide6 import QtWidgets
+    from PySide6 import QtCore, QtWidgets
     if not _diskusikan_update(w, info, v_lokal):
         return
     nama = os.path.basename(str(info.get("url_aset") or "")).lower()
@@ -543,14 +579,18 @@ def _tanya_lalu_terapkan(w, info, v_lokal):
             w, "DeepVertex - update",
             "Failed to apply the update:\n%s" % exc)
         return
-    QtWidgets.QMessageBox.information(
-        w, "DeepVertex - update",
+    kotak = QtWidgets.QMessageBox(
+        QtWidgets.QMessageBox.Information, "DeepVertex - update",
         "Download complete — %s (%.0f MB).\n\nThe console will now CLOSE. "
         "The installer runs automatically and the app reopens by itself on "
         "the new version (about a minute).\n\nIf it does not reopen, run "
         "setup-baru.exe from:\n%s\n\n(Progress and any error are logged to "
         "apply_log.txt in that folder.)"
-        % (info.get("tag", "?"), os.path.getsize(dest) / 1e6, _dir_update()))
+        % (info.get("tag", "?"), os.path.getsize(dest) / 1e6, _dir_update()),
+        QtWidgets.QMessageBox.Ok, w)
+    QtCore.QTimer.singleShot(12000, kotak.accept)   # lanjut otomatis 12 dtk —
+                                                    # apply TIDAK bergantung klik
+    kotak.exec()
     QtWidgets.QApplication.instance().quit()
 
 

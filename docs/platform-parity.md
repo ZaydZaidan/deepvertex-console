@@ -1,6 +1,6 @@
 # Platform parity — Windows (.EXE) vs Linux (source)
 
-Version: v1.0.11 · 2026-10-15
+Version: v1.0.12 · 2026-10-15
 
 Audit scope: the ROV-mode console as shipped in this repository. The console
 is the same application, same layout engine and the same automated test suite

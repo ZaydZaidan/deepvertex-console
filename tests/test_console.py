@@ -870,6 +870,25 @@ def main():
         print("[50] robotops GAGAL:", repr(exc))
         lulus = False
 
+    # [51] updater: deteksi setup tertunda (jalan pemulihan "Finish pending
+    # update") — file besar di update/setup-baru.exe terdeteksi & dibersihkan.
+    try:
+        import paths as _P51
+        import updater as _U51
+        p51 = os.path.join(_P51.data_dir(), "update")
+        os.makedirs(p51, exist_ok=True)
+        f51 = os.path.join(p51, "setup-baru.exe")
+        with open(f51, "wb") as fh:
+            fh.truncate(60 * 1024 * 1024)          # sparse, instan
+        ok51 = _U51.ada_setup_tertunda() == f51
+        os.remove(f51)
+        ok51 = ok51 and (_U51.ada_setup_tertunda() is None)
+        print("[51] setup tertunda (deteksi):", ok51)
+        lulus &= bool(ok51)
+    except Exception as exc:                               # noqa: BLE001
+        print("[51] setup tertunda GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
