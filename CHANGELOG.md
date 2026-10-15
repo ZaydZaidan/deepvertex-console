@@ -19,6 +19,13 @@ the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will s
   return); suite now 40 checks, all headless (incl. raw-agent tests).
 - README assets re-taken from the REAL desktop (X11 window capture), so the
   images match the actual on-screen rendering pixel-for-pixel.
+- **Distribution builds** (owner request 15 Oct): Linux **.tar.gz** source
+  package (git archive, extract → `install/install_topside.sh`) and a Windows
+  **one-file .EXE** built by CI on windows-latest with PyInstaller
+  (`windows_entry.py` shim, icon bundled) — attached automatically to the
+  `v1.0.1` release. Windows scope: telemetry/recording/capture work; live
+  preview & gamepad stay Linux-side (PyGObject/evdev), video.py degrades
+  gracefully without `gi`. App version bumped to 1.0.1.
 
 ## [1.0.0] — 2026-10-14
 

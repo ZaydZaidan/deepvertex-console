@@ -303,7 +303,7 @@ class RovConsole(QtWidgets.QMainWindow):
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
                        "raw_agent": args.raw_agent,
-                       "h264parse": h264parse_tersedia(), "versi": "1.0.0"}, f,
+                       "h264parse": h264parse_tersedia(), "versi": "1.0.1"}, f,
                       indent=2, ensure_ascii=False)
         self._apply_preset(self._preset)
         # Chrome-style organize windows: snap controller + restore saved

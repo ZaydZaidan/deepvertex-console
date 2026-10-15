@@ -46,3 +46,56 @@ jobs:
         run: |
           xvfb-run -a python3 ../tests/test_video.py
           xvfb-run -a python3 ../tests/test_raw.py
+
+  # Windows .exe distribution (PyInstaller one-file). Built ON Windows by GitHub
+  # Actions (cross-build is impossible) and attached to the release when a v*
+  # tag is pushed. Scope note: gamepad reading is Linux evdev -> the .EXE runs
+  # telemetry + streams (GStreamer runtime must be installed separately) + the
+  # capture suite, with the gamepad side disabled.
+  windows-exe:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6 numpy pymavlink pyinstaller
+
+      - name: Sanity import (headless, offscreen)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python gui_t1/windows_entry.py --help
+
+      - name: Build one-file exe
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --name DeepVertexMarineConsole `
+            --onefile `
+            --windowed `
+            --icon gui_t1/ikon/deepvertex-app-icon.ico `
+            --add-data "gui_t1/ikon;ikon" `
+            windows_entry.py
+          ls dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeepVertexMarineConsole-windows-exe
+          path: dist/DeepVertexMarineConsole.exe
+
+      - name: Attach to the release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVertexMarineConsole.exe --clobber
+

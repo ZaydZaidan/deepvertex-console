@@ -23,10 +23,17 @@ import signal
 import subprocess
 import time
 
-import gi
+# PyGObject/GStreamer are Linux-only (field machines). The Windows .EXE runs
+# the console WITHOUT preview (gi absent): telemetry + recording (gst-launch
+# subprocess, when the GStreamer runtime is installed) stay available.
+try:
+    import gi  # noqa: N811
 
-gi.require_version("Gst", "1.0")
-from gi.repository import Gst  # noqa: E402
+    gi.require_version("Gst", "1.0")
+    from gi.repository import Gst  # noqa: E402
+    _HAS_GI = True
+except Exception:                                      # noqa: BLE001
+    _HAS_GI = False
 
 from PySide6 import QtCore, QtGui  # noqa: E402
 
@@ -37,7 +44,7 @@ _init = False
 
 def gst_init():
     global _init
-    if not _init:
+    if _HAS_GI and not _init:
         Gst.init(None)
         _init = True
 
@@ -77,6 +84,12 @@ class StreamPlayer(QtCore.QObject):
 
     # ------------------------------------------------------------------ hidup
     def start(self):
+        if not _HAS_GI:
+            # Windows (.EXE): tidak ada PyGObject -> preview tidak tersedia.
+            self.sig_status.emit(
+                f"{self.nama}: preview unavailable (no GStreamer/PyGObject on "
+                "this platform \u2014 telemetry & recording still work)")
+            return
         if self.pipeline is not None:
             return
         pipe = (

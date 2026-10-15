@@ -80,6 +80,21 @@ console is built around that.
 | Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
 | Controller | Sony DualShock 4 (USB) |
 
+## Downloads
+
+Grab **v1.0.1** from <https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.1>:
+
+| Platform | Artifact | How to run |
+|---|---|---|
+| **Ubuntu / Linux** | `deepvertex-console-v1.0.1-linux.tar.gz` | Extract → run `install/install_topside.sh` (creates .venv + deps) → `./gui_t1/run_console_real.sh` |
+| **Windows (EXE)** | `DeepVertexMarineConsole.exe` (one-file, PyInstaller) | Double-click. Telemetry & recording work out of the box; gamepad preview needs the [GStreamer runtime](https://gstreamer.freedesktop.org/download/) installed (gamepad keys are Linux-side for now — see below) |
+
+Windows scope note: the .EXE runs MAVLink telemetry, camera **recording** &
+snapshots (with the GStreamer runtime), parameter/preflight panels and capture
+management — live **video preview** and the **gamepad** are Linux-side
+(evdev/PyGObject) until a Windows-native reader ships. Sources remain
+buildable everywhere (this repository).
+
 ## Quick start
 
 ```bash
