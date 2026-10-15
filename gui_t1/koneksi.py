@@ -264,9 +264,12 @@ def buat_dialog(console):
     form.addRow("RAW agent path (on robot)", f_path)
     v.addLayout(form)
     v.addWidget(QtWidgets.QLabel(
-        "SSH fields power the one-click “Start RAW agent”. For auto-start at "
-        "every boot, run once on the robot: install/robot/"
-        "install_agent_service.sh (kept in the repo)."))
+        "SSH fields power the one-click “Start RAW agent on the robot” — "
+        "fill them with the SAME user + password you use when you run "
+        "“ssh” to the robot from a terminal (BlueOS default user: pi). "
+        "Saved locally with the rest of the connection settings.\n"
+        "For auto-start at every boot, run once on the robot: "
+        "install/robot/install_agent_service.sh (kept in the repo)."))
 
     def isi(c):
         f_host.setText(str(c.get("host", "")))
@@ -470,7 +473,14 @@ def buat_dialog(console):
         u, p = c["ssh_user"], c["ssh_pass"]
         if not u or not p:
             if not silent:
-                lbl_ssh.setText("fill the robot SSH user + password first")
+                lbl_ssh.setText(
+                    "Fill “Robot SSH user” + “Robot SSH password” above "
+                    "first — the SAME credentials you use for “ssh <user>@"
+                    "%s” in a terminal (they are saved locally)." % host)
+                try:
+                    (f_passw if not p else f_user).setFocus()
+                except Exception:                          # noqa: BLE001
+                    pass
             return False
         if not silent:
             lbl_ssh.setText("starting the agent on %s …" % host)

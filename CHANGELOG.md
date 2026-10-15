@@ -4,6 +4,14 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.14] — 2026-10-15
+
+### Changed
+- Clearer Connection-dialog help for the robot SSH fields (owner question):
+  the hint now says exactly WHAT to fill — the same user + password used
+  for a terminal `ssh` to the robot (BlueOS default user `pi`) — and the
+  “fill first” message also names the fields and focuses the empty one.
+
 ## [1.0.13] — 2026-10-15
 
 ### Added
