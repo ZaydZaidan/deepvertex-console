@@ -271,6 +271,76 @@ def buat_dialog(console):
         "For auto-start at every boot, run once on the robot: "
         "install/robot/install_agent_service.sh (kept in the repo)."))
 
+    # ---- tombol utama: SATU KLIK menyambungkan semuanya (permintaan pemilik)
+    b_oc = QtWidgets.QPushButton("Connect everything (one click)")
+    b_oc.setObjectName("BtnPrimary")
+    lbl_oc = QtWidgets.QLabel("")
+    lbl_oc.setObjectName("Faint")
+    lbl_oc.setWordWrap(True)
+    baris_oc = QtWidgets.QHBoxLayout()
+    baris_oc.addWidget(b_oc)
+    baris_oc.addWidget(lbl_oc, 1)
+    v.addLayout(baris_oc)
+
+    def _oneclick():
+        c = tarik()
+        host = c["host"] or "192.168.2.2"
+        b_oc.setEnabled(False)
+        lbl_oc.setText("connecting …")
+        QtWidgets.QApplication.processEvents()
+        langkah = []
+        try:
+            import robotops
+            # 1) IP laptop di subnet robot
+            ip = robotops.ip_ke_robot(host)
+            if not ip:
+                langkah.append("✗ laptop IP not found — check the tether cable")
+            else:
+                langkah.append("✓ laptop IP %s" % ip)
+                # 2) BlueOS hidup?
+                hidup = False
+                try:
+                    with urllib.request.urlopen("http://%s/" % host,
+                                                timeout=4) as r:
+                        hidup = r.status < 500
+                except Exception:                          # noqa: BLE001
+                    hidup = False
+                if not hidup:
+                    langkah.append("✗ BlueOS not reachable at %s — check ROV "
+                                   "power/cable" % host)
+                else:
+                    langkah.append("✓ BlueOS alive")
+                    # 3) pastikan endpoint MAVLink -> laptop ini
+                    ok, msg = robotops.blueos_pastikan_endpoint(host, ip, 14550)
+                    langkah.append(("✓ " if ok else "✗ ") + msg)
+                    # 4) verifikasi telemetri
+                    if ok and robotops.tunggu_link(getattr(console, "bridge", None), 8):
+                        langkah.append("✓ MAVLink telemetry flowing (LINK up)")
+                    elif ok:
+                        langkah.append("… LINK not up yet — if it stays "
+                                       "“wait”: allow UDP 14550 in Windows "
+                                       "Firewall (Admin CMD: netsh advfirewall "
+                                       "firewall add rule name=\"DeepVertex "
+                                       "MAVLink UDP In\" dir=in action=allow "
+                                       "protocol=UDP localport=14550)")
+                    # 5) RAW agent (bila kredensial SSH terisi)
+                    if c["ssh_user"] and c["ssh_pass"]:
+                        ok2, msg2 = robotops.start_agent(
+                            host, c["ssh_user"], c["ssh_pass"],
+                            c["agent_path"])
+                        langkah.append(("✓ " if ok2 else "✗ ") + "RAW: " + msg2)
+                    else:
+                        langkah.append("• RAW agent: fill the SSH fields "
+                                       "above to enable the one-click start")
+        except Exception as exc:                           # noqa: BLE001
+            langkah.append("✗ error: %s" % exc)
+        lbl_oc.setText("    ".join(langkah))
+        console._catat("one-click connect: " + " | ".join(langkah))
+        b_oc.setEnabled(True)
+        _uji()
+
+    b_oc.clicked.connect(_oneclick)
+
     def isi(c):
         f_host.setText(str(c.get("host", "")))
         f_mav.setText(str(c.get("mavlink", "")))

@@ -4,6 +4,23 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.15] — 2026-10-15
+
+### Added
+- **“Connect everything (one click)” button** in the Connection dialog
+  (owner request: users shouldn't need to configure BlueOS by hand). One
+  press runs the whole chain and reports each step:
+  1. laptop tether IP detection;
+  2. BlueOS reachability;
+  3. **adds the MAVLink endpoint on the robot automatically** via the
+     BlueOS API (`ardupilot-manager` `/endpoints`, discovered on the real
+     robot — idempotent, no duplicates);
+  4. waits for telemetry (LINK) and, if needed, shows the exact Windows
+     Firewall command;
+  5. starts the RAW agent over SSH when the SSH fields are filled.
+- `robotops`: BlueOS API helpers (`blueos_pastikan_endpoint`, endpoint
+  list/detect) + tests [53].
+
 ## [1.0.14] — 2026-10-15
 
 ### Changed

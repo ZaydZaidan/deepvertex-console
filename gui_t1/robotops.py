@@ -6,6 +6,7 @@ automatically. Pure command builders are unit-tested [50]; the SSH part
 needs `paramiko` (bundled in the installers; the module degrades gracefully
 when paramiko is missing).
 """
+import json
 import time
 import urllib.request
 
@@ -96,3 +97,93 @@ def start_agent(host, user, password, path_agent, port=8765):
             return True, "agent started ✓ (%s)" % jalur
     return False, ("command sent but /status did not answer — check "
                    "/tmp/dv-raw-agent.log on the robot")
+
+
+# ------------------------------------------------- BlueOS API (one-click connect)
+# Dipelajari dari robot asli (15 Okt, BlueOS ardupilot-manager):
+#   GET  http://<host>/ardupilot-manager/v1.0/endpoints/   -> daftar endpoint
+#   POST http://<host>/ardupilot-manager/v1.0/endpoints/   -> body = [ {objek} ]
+#   objek: name, owner="User", connection_type ("udpin"/"udpout"/"tcpin"/...),
+#          place (ip), argument (port), persistent, enabled
+def blueos_api(host):
+    return "http://%s/ardupilot-manager/v1.0/endpoints/" % host
+
+
+def endpoint_ada(daftar, ip, port=14550):
+    """True bila sudah ada endpoint udpout aktif ke ip:port (fungsi murni)."""
+    for e in daftar or []:
+        try:
+            if (str(e.get("connection_type", "")).lower() == "udpout"
+                    and str(e.get("place", "")) == str(ip)
+                    and int(e.get("argument", 0)) == int(port)
+                    and e.get("enabled", True)):
+                return True
+        except Exception:                                  # noqa: BLE001
+            continue
+    return False
+
+
+def blueos_daftar(host, timeout=5):
+    """Daftar endpoint BlueOS (list of dict) atau raises."""
+    req = urllib.request.Request(blueos_api(host),
+                                 headers={"User-Agent": "dv-robotops"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.load(r)
+
+
+def blueos_pastikan_endpoint(host, ip_lokal, port=14550, nama=None,
+                             timeout=8):
+    """Pastikan robot mengirim MAVLink ke ip_lokal:port (one-click).
+
+    Returns (ok, pesan). Idempoten: bila endpoint yang cocok sudah ada,
+    tidak menambah apa pun."""
+    nama = nama or ("DeepVertex Console (%s)" % ip_lokal)
+    try:
+        daftar = blueos_daftar(host, timeout=timeout)
+    except Exception as exc:                               # noqa: BLE001
+        return False, "BlueOS API tidak menjawab di %s (%s)" % (host, exc)
+    if endpoint_ada(daftar, ip_lokal, port):
+        return True, "endpoint MAVLink sudah ada (udpout -> %s:%d)" % (
+            ip_lokal, port)
+    badan = json.dumps([{
+        "name": nama, "owner": "User", "connection_type": "udpout",
+        "place": str(ip_lokal), "argument": int(port),
+        "persistent": True, "enabled": True}]).encode()
+    req = urllib.request.Request(blueos_api(host), data=badan, method="POST",
+                                 headers={"User-Agent": "dv-robotops",
+                                          "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            kode = r.status
+    except Exception as exc:                               # noqa: BLE001
+        return False, "gagal menambah endpoint: %s" % exc
+    if 200 <= kode < 300:
+        return True, "endpoint MAVLink dibuat (udpout -> %s:%d) ✓" % (
+            ip_lokal, port)
+    return False, "endpoint ditolak (HTTP %d)" % kode
+
+
+def ip_ke_robot(host, port=14550):
+    """IP lokal yang akan dilihat robot (trik connect UDP tanpa kirim paket)."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((host, port))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:                                      # noqa: BLE001
+        return None
+
+
+def tunggu_link(bridge, maks_detik=6.0):
+    """Tunggu state link konsol hidup; True bila telemetri masuk."""
+    t0 = time.time()
+    while time.time() - t0 < maks_detik:
+        try:
+            if bridge is not None and bridge.state.get("link"):
+                return True
+        except Exception:                                  # noqa: BLE001
+            pass
+        time.sleep(0.4)
+    return False

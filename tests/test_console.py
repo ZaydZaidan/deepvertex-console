@@ -912,6 +912,26 @@ def main():
         print("[52] auto-bersih GAGAL:", repr(exc))
         lulus = False
 
+    # [53] robotops BlueOS API: jalur + payload + deteksi endpoint (murni).
+    try:
+        import robotops as _RO53
+        ok53 = _RO53.blueos_api("192.168.2.2").endswith(
+            "/ardupilot-manager/v1.0/endpoints/")
+        daftar53 = [
+            {"connection_type": "udpin", "place": "127.0.0.1",
+             "argument": 14001, "enabled": True},
+            {"connection_type": "udpout", "place": "192.168.2.1",
+             "argument": 14550, "enabled": True},
+        ]
+        ok53 = ok53 and _RO53.endpoint_ada(daftar53, "192.168.2.1", 14550)
+        ok53 = ok53 and not _RO53.endpoint_ada(daftar53, "192.168.2.129", 14550)
+        ok53 = ok53 and (_RO53.ip_ke_robot("127.0.0.1") in ("127.0.0.1", None))
+        print("[53] robotops BlueOS API (payload+deteksi):", ok53)
+        lulus &= bool(ok53)
+    except Exception as exc:                               # noqa: BLE001
+        print("[53] robotops BlueOS API GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)
