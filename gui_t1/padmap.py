@@ -38,25 +38,25 @@ FUNGSI = (
     ("axis_tilt",  "Camera tilt",           "axis",
      "D-PAD up / down tilts the camera (dpadY [7])",
      "dpad"),
-    ("deadman_buttons", "DEADMAN — hold to move", "tombol",
+    ("deadman_buttons", "DEADMAN — hold to move", "button",
      "Hold LB or RB (L1 / R1): no thrust reaches the ROV unless held",
      ["lb", "rb"]),
-    ("btn_arm_toggle",  "ARM / DISARM",     "tombol",
+    ("btn_arm_toggle",  "ARM / DISARM",     "button",
      "Face buttons — △ = Y (top) · ○ = B (right) · × = A (bottom) · □ = X (left)",
      "auto_btn"),
-    ("btn_mode_cycle",  "Cycle flight mode", "tombol",
+    ("btn_mode_cycle",  "Cycle flight mode", "button",
      "SHARE (Select) — MANUAL → ALT_HOLD → back",
      "auto_btn"),
-    ("btn_depth_hold",  "Depth hold — hold", "tombol",
+    ("btn_depth_hold",  "Depth hold — hold", "button",
      "Hold LT (L2) = ALT_HOLD; release = back to MANUAL",
      "auto_btn"),
-    ("btn_center_cam",  "Camera back to center", "tombol",
+    ("btn_center_cam",  "Camera back to center", "button",
      "Press the button = camera tilt returns to 50%",
      "auto_btn"),
-    ("btn_record",  "Record video (toggle)", "tombol",
+    ("btn_record",  "Record video (toggle)", "button",
      "Press = start / stop recording the front camera (default □ — X left)",
      "auto_btn"),
-    ("btn_photo",   "Take photo (snapshot)", "tombol",
+    ("btn_photo",   "Take photo (snapshot)", "button",
      "Press = save a snapshot of the front camera (default ○ — B right)",
      "auto_btn"),
 )
@@ -596,7 +596,7 @@ class PadMapDialog(QtWidgets.QDialog):
             if self._tangkap is None:
                 return
             key = self._tangkap
-            if self.tipe.get(key) == "tombol":
+            if self.tipe.get(key) == "button":
                 pressed = {i for i, b in enumerate(live.get("buttons") or []) if b}
                 baru = pressed - self._prev_btn
                 self._prev_btn = pressed

@@ -4,6 +4,25 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.7] — 2026-10-15
+
+### Fixed
+- **Update download progress now actually moves.** Downloads run in a
+  background thread inside a proper progress dialog with a live MB counter
+  and a working Cancel button; the freeze that left the bar stuck at 0%
+  (and never even wrote the file) is gone.
+- `--preview-update` flag: shows the update dialog with demo data (small real
+  download) so the design and progress can be reviewed without waiting for a
+  release; nothing is installed in preview mode.
+
+### Changed
+- **Update popup redesigned** — header with the app icon, "A new version is
+  available", version chips (current → new, accent), readable release notes,
+  and a footer with Open release page / Not now / Update now.
+- **The in-app UI is now fully English** — comprehensive audit across menus,
+  dialogs, tooltips, notifications, logs, checklist, connection dialog and
+  updater. `--nama-sesi` keeps working and gains the alias `--session-name`.
+
 ## [1.0.6] — 2026-10-15
 
 ### Added

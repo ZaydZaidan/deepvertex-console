@@ -185,7 +185,7 @@ class MavBridge(QtCore.QObject):
                     self._params_done = False
                     self.mav.mav.param_request_list_send(self.mav.target_system,
                                                          self.mav.target_component)
-                    self.sig_status.emit("meminta daftar parameter ...")
+                    self.sig_status.emit("requesting parameter list ...")
                 elif kind == "cmdlong":
                     cmd, (p1, p2, p3, p4, p5, p6, p7), tag = val
                     self.mav.mav.command_long_send(self.mav.target_system,
@@ -193,7 +193,7 @@ class MavBridge(QtCore.QObject):
                                                    cmd, 0, p1, p2, p3, p4, p5, p6, p7)
                     self._ack_wait.append([cmd, tag, (p1, p2, p3, p4, p5, p6, p7),
                                            time.monotonic(), 0])
-                    self.sig_status.emit("cmd %d dikirim (%s)" % (cmd, tag or "perintah"))
+                    self.sig_status.emit("cmd %d sent (%s)" % (cmd, tag or "command"))
             except Exception as e:
                 self.sig_status.emit("vehicle command failed: %r" % e)
 
@@ -234,8 +234,8 @@ class MavBridge(QtCore.QObject):
                                                self.mav.target_component,
                                                cmd, 0, *params)
                 item[4] = 1
-                self.sig_status.emit("cmd %d tanpa ACK — dikirim ulang sekali (%s)"
-                                     % (cmd, tag or "perintah"))
+                self.sig_status.emit("cmd %d without ACK — resent once (%s)"
+                                     % (cmd, tag or "command"))
             except Exception:                              # noqa: BLE001
                 pass
         if len(self._ack_wait) > 40:
@@ -307,7 +307,7 @@ class MavBridge(QtCore.QObject):
                         return s
 
                     self.mav.recv = _tap_recv
-                    self.sig_status.emit("tlog aktif: %s" % self.tlog_path)
+                    self.sig_status.emit("tlog recording: %s" % self.tlog_path)
                 except Exception as exc:                       # noqa: BLE001
                     self.sig_status.emit("tlog not active: %r" % exc)
         except Exception as exc:

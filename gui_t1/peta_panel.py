@@ -107,7 +107,7 @@ class PengunduhUbin(QtCore.QThread):
                     self.ubin_baru.emit(0, 0, 0)
             except Exception:                                  # noqa: BLE001
                 try:                                           # tandai gagal supaya tidak diulang terus
-                    open(path + ".gagal", "w").close()
+                    open(path + ".failed", "w").close()
                 except OSError:
                     pass
             finally:
@@ -526,7 +526,7 @@ class PetaPanel(QtWidgets.QWidget):
             for tx in range(min(xs), max(xs) + 1):
                 for ty in range(min(ys), max(ys) + 1):
                     p = self._path_ubin(z, tx % n, ty)
-                    if os.path.exists(p) or os.path.exists(p + ".gagal"):
+                    if os.path.exists(p) or os.path.exists(p + ".failed"):
                         continue
                     self.unduh.minta(self._url_ubin(z, tx % n, ty), p)
                     diantre += 1
@@ -641,7 +641,7 @@ class PetaPanel(QtWidgets.QWidget):
                     perlu = True
             elif self._sumber_aktif() == "lokal":
                 continue                              # folder lokal: tidak ada yang diunduh
-            elif not os.path.exists(p + ".gagal") and not self.jeda:
+            elif not os.path.exists(p + ".failed") and not self.jeda:
                 self._minta.add(kunci)
                 self.unduh.minta(self._url_ubin(zz, tx, ty), self._path_ubin(zz, tx, ty))
                 self.stat["diantre"] += 1
@@ -657,7 +657,7 @@ class PetaPanel(QtWidgets.QWidget):
         # dihitung sebagai "tidak tersedia" juga, supaya zoom-mundur otomatis turun ke zoom
         # terdalam yang ada — bukan berhenti di zoom yang tak punya citra.
         gagal_zoom = sum(1 for (zz, tx, ty, px, py) in ub
-                         if os.path.exists(self._path_ubin(zz, tx, ty) + ".gagal"))
+                         if os.path.exists(self._path_ubin(zz, tx, ty) + ".failed"))
         total2 = total + gagal_zoom
         kosong2 = kosong + gagal_zoom
         if total2 >= 4 and kosong2 / max(1, total2) > 0.7 and getattr(self, "_zoom_mundur", 0) < 5:

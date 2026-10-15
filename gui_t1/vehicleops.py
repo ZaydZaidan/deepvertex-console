@@ -177,7 +177,7 @@ class SimpleCalDialog(QtWidgets.QDialog):
             if not d.get("autosaved", 1):
                 # sukses tapi BELUM tersimpan -> terima eksplisit (pola QGC)
                 self.bridge.queue_command(CMD_DO_ACCEPT_MAG_CAL, p1=0, tag="mag-accept")
-                self.lbl.setText("kompas SUKSES — menyimpan paksa (DO_ACCEPT_MAG_CAL) …")
+                self.lbl.setText("compass SUCCESS — force-saving (DO_ACCEPT_MAG_CAL) …")
             else:
                 self.lbl.setText("compass SUCCESS & saved. Rebooting the autopilot is recommended "
                                  "before arming.")
@@ -299,7 +299,7 @@ class MotorTestDialog(QtWidgets.QDialog):
         t.setObjectName("PanelTitle")
         warn = QtWidgets.QLabel(
             "⚠ PROPS OFF / SUPPORTED for bench testing. Do not run thrusters in air "
-            "> for more than a few seconds (bearings need water). To check spin DIRECTION in water use "
+            "for more than a few seconds (bearings need water). To check spin DIRECTION in water use "
             "MOTOR DETECT mode. Tick 'safe' before testing.")
         warn.setWordWrap(True)
         theme.set_peran(warn, "warn")
@@ -336,8 +336,8 @@ class MotorTestDialog(QtWidgets.QDialog):
         row.addWidget(self.b_detect)
         row.addWidget(self.b_close)
         self.lbl = QtWidgets.QLabel(
-            "catatan: ArduSub mewajibkan ROV ARMED + safety switch dilepas; perintah dikirim "
-            "ulang otomatis tiap 0,4 dtk (watchdog 500 ms). Nomor motor 0/1-based: VERIFY di bench.")
+            "note: ArduSub requires the ROV ARMED + the safety switch released; commands are "
+            "re-sent automatically every 0.4 s (500 ms watchdog). Motor numbering 0/1-based: VERIFY on the bench.")
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         v.addWidget(t)
@@ -378,7 +378,7 @@ class MotorTestDialog(QtWidgets.QDialog):
             p1=self.sp_motor.value(), p2=0, p3=self.sp_thr.value(),
             p4=self.sp_dur.value(), p5=1, p6=2,
             tag="motor-%d" % self.sp_motor.value())
-        self.lbl.setText("motor %d @ %d%% — %d kiriman lagi …" %
+        self.lbl.setText("motor %d @ %d%% — %d sends remaining …" %
                          (self.sp_motor.value(), self.sp_thr.value(), self._sisa))
 
     def _hentikan_motor(self):
@@ -393,7 +393,7 @@ class MotorTestDialog(QtWidgets.QDialog):
     def _ack(self, cmd, hasil, tag):
         if cmd != CMD_DO_MOTOR_TEST:
             return
-        nama = {0: "DITERIMA ✓", 1: "DITOLAK SEMENTARA", 2: "DITOLAK — cek kondisi senjata/disarm",
+        nama = {0: "ACCEPTED ✓", 1: "TEMPORARILY REJECTED", 2: "REJECTED — check arm/disarm state",
                 3: "NOT SUPPORTED", 4: "FAILED"}.get(hasil, str(hasil))
         self.lbl.setText("motor test [%s]: %s" % (tag, nama))
 
@@ -517,7 +517,7 @@ class ParamBrowser(QtWidgets.QWidget):
             self.tabel.setItem(i, 1, QtWidgets.QTableWidgetItem(""))
         self.tabel.item(i, 1).setText("%.6g" % nilai)
         if len(self._terisi) % 25 == 0:
-            self.lbl.setText("memuat … %d parameter" % len(self._terisi))
+            self.lbl.setText("loading … %d parameters" % len(self._terisi))
 
     def _refilter(self):
         self.tabel.setRowCount(0)
@@ -546,31 +546,31 @@ class FailsafePanel(QtWidgets.QWidget):
 
     BARIS = (
         ("FS_GCS_ENABLE", "Failsafe GCS", "combo",
-         [("Nonaktif", 0), ("Warning", 1), ("Disarm", 2), ("ALT_HOLD", 3), ("SURFACE", 4)],
+         [("Disabled", 0), ("Warning", 1), ("Disarm", 2), ("ALT_HOLD", 3), ("SURFACE", 4)],
          "Action when the GCS heartbeat is lost (this GUI = GCS). VERIFY in the pool."),
         ("FS_GCS_TIMEOUT", "Timeout GCS", "spin", (1, 30, 1),
          "seconds without a heartbeat before failsafe. Default 5 s."),
         ("FS_PILOT_INPUT", "Failsafe pilot input", "combo",
-         [("Nonaktif", 0), ("Warning", 1), ("Disarm", 2)],
+         [("Disabled", 0), ("Warning", 1), ("Disarm", 2)],
          "Action when pilot input (GCS joystick) is lost."),
         ("FS_PILOT_TIMEOUT", "Timeout pilot input", "spin", (1, 30, 1),
          "seconds without pilot input before failsafe."),
         ("FS_LEAK_ENABLE", "Failsafe kebocoran", "combo",
-         [("Nonaktif", 0), ("Warning", 1), ("SURFACE", 2)],
+         [("Disabled", 0), ("Warning", 1), ("SURFACE", 2)],
          "The Navigator has a leak sensor — SURFACE is strongly recommended."),
         ("BATT_LOW_VOLT", "Low battery (V)", "spin", (8.0, 30.0, 0.1),
          "BlueRobotics: recover at 12.5 V; never below 12.0 V (4S)."),
         ("BATT_LOW_MAH", "Low battery (mAh)", "spin", (0, 30000, 100),
          "0 = disabled."),
         ("BATT_FS_LOW_ACT", "Low battery action", "combo",
-         [("Nonaktif", 0), ("Warning", 1), ("Disarm", 2), ("SURFACE", 3)],
-         "VERIFY: opsi Surface di firmware Anda."),
+         [("Disabled", 0), ("Warning", 1), ("Disarm", 2), ("SURFACE", 3)],
+         "VERIFY: Surface option availability in your firmware."),
         ("BATT_CRT_VOLT", "Critical battery (V)", "spin", (8.0, 30.0, 0.1),
-         "Ambang layer kedua."),
+         "Second-layer threshold."),
         ("BATT_CRT_MAH", "Critical battery (mAh)", "spin", (0, 30000, 100), "0 = disabled."),
         ("BATT_FS_CRT_ACT", "Critical battery action", "combo",
-         [("Nonaktif", 0), ("Warning", 1), ("Disarm", 2), ("SURFACE", 3)],
-         "VERIFY: opsi Surface di firmware Anda."),
+         [("Disabled", 0), ("Warning", 1), ("Disarm", 2), ("SURFACE", 3)],
+         "VERIFY: Surface option availability in your firmware."),
         ("ARMING_SKIPCHK", "Arming checks to SKIP", "combo",
          [("Run ALL checks (recommended)", 0), ("Skip barometer", 1),
           ("Skip compass", 2), ("Skip INS", 8), ("Skip battery", 128)],
@@ -664,7 +664,7 @@ class FailsafePanel(QtWidgets.QWidget):
                 val = w.value()
             self.bridge.queue_param_set(nama, val)
             n += 1
-        self.lbl.setText("%d parameter dikirim (PARAM_SET) — cek ACK/notifikasi" % n)
+        self.lbl.setText("%d parameters sent (PARAM_SET) — check ACK/notifications" % n)
 
     def simpan(self, path=None):
         """Save the failsafe profile (default: app folder saved/failsafe.json)."""
@@ -704,14 +704,14 @@ CHECKLIST_PREDIVE = (
     ("kabel", "Pull the cable bundle at the 14-hole end cap"),
     ("tether_thimble", "Pull & twist the tether thimble"),
     ("penetrator", "Check all penetrators are snug (by hand)"),
-    ("vent", "Vent plug terpasang"),
+    ("vent", "Vent plug installed"),
     ("batt_tube", "Press & rotate battery tubes (sealed shut)"),
-    ("sekrup", "Sekrup end cap + dome kencang (visual)"),
-    ("thruster", "Tarik semua thruster"),
+    ("sekrup", "End-cap screws + dome tight (visual)"),
+    ("thruster", "Tug every thruster"),
     ("fairing", "Wiggle the fairing"),
-    ("lumen", "Tarik lampu Lumen"),
+    ("lumen", "Tug the Lumen lights"),
     ("seal", "Radial seals greased & undamaged (visual)"),
-    ("area", "Area thruster bebas & ROV mode MANUAL"),
+    ("area", "Thruster area clear & ROV in MANUAL mode"),
     ("tilt", "Camera tilt & lights work"),
     ("thruster_test", "Thruster test in water (<30 s), then DISARM"),
 )
@@ -797,7 +797,7 @@ class PreflightPanel(QtWidgets.QWidget):
         b_r = QtWidgets.QPushButton("RESET")
         b_r.setObjectName("BtnTiny")
         b_r.clicked.connect(lambda: self._set_semua(False))
-        b_a = QtWidgets.QPushButton("SEMUA ✓")
+        b_a = QtWidgets.QPushButton("ALL ✓")
         b_a.setObjectName("BtnTiny")
         b_a.clicked.connect(lambda: self._set_semua(True))
         row.addStretch(1)
@@ -898,7 +898,7 @@ class PreflightPanel(QtWidgets.QWidget):
         # pre-arm: bit kesehatan SYS_STATUS (MAV_SYS_STATUS_PREARM_CHECK) = pola QGC;
         # pesan "PreArm:" terbaru menang bila severity warning/lebih buruk.
         if ("prearm" in txt or "pre-arm" in txt) and s.get("last_text_sev", 6) <= 4:
-            self._set("prearm", "err", "cek notifikasi")
+            self._set("prearm", "err", "check notifications")
         elif s.get("prearm_ok") is False:
             self._set("prearm", "warn", "not ready")
         elif s.get("prearm_ok"):
@@ -957,7 +957,7 @@ class PreflightPanel(QtWidgets.QWidget):
         kurang = [k for k, c in self.cb.items() if not c.isChecked()]
         siap = (s.get("link") and v is not None and v >= 12.5 and "leak" not in txt)
         if siap and not kurang:
-            self.lbl_status.setText("STATUS: SIAP BERENANG ✓ (checklist lengkap)")
+            self.lbl_status.setText("STATUS: READY TO DIVE ✓ (checklist complete)")
         elif siap:
             self.lbl_status.setText("STATUS: system OK — %d checklist items not ticked" % len(kurang))
         else:

@@ -293,7 +293,7 @@ class Handler(BaseHTTPRequestHandler):
                 shutil.copyfileobj(f, self.wfile, 1024 * 1024)
             return
 
-        self._json({"ok": False, "error": "endpoint tidak dikenal: %s" % p}, 404)
+        self._json({"ok": False, "error": "unknown endpoint: %s" % p}, 404)
 
     # -------------------------------------------------------------- POST
     def do_POST(self):
@@ -303,7 +303,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = self._body()
         except Exception as exc:                                # noqa: BLE001
-            return self._json({"ok": False, "error": "body bukan JSON: %s" % exc}, 400)
+            return self._json({"ok": False, "error": "body is not JSON: %s" % exc}, 400)
 
         if p == "/capture/start":
             cam = str(body.get("cam", "left"))
@@ -330,7 +330,7 @@ class Handler(BaseHTTPRequestHandler):
                     hasil[str(rel)] = "tidak ada"
             return self._json({"ok": True, "hasil": hasil})
 
-        self._json({"ok": False, "error": "endpoint tidak dikenal: %s" % p}, 404)
+        self._json({"ok": False, "error": "unknown endpoint: %s" % p}, 404)
 
 
 # --------------------------------------------------------------------------- #

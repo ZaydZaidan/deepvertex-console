@@ -21,14 +21,14 @@ BENDA = "koneksi.json"
 
 PRESET = {
     "blueos": {
-        "nama": "BlueOS (standar)",
+        "nama": "BlueOS (standard)",
         "host": "192.168.2.2",
         "mavlink": "udpin:0.0.0.0:14550",
         "front_port": 5600, "left_port": 5601, "right_port": 5602,
         "raw_agent": "http://192.168.2.2:8765",
     },
     "sitl": {
-        "nama": "Simulasi / SITL (lokal)",
+        "nama": "Simulation / SITL (local)",
         "host": "127.0.0.1",
         "mavlink": "udpin:0.0.0.0:14550",
         "front_port": 5600, "left_port": 5601, "right_port": 5602,
@@ -36,7 +36,7 @@ PRESET = {
     },
 }
 
-IP_SARAN = "192.168.2.50    (laptop) — jangan pakai .2 (itu BlueOS)"
+IP_SARAN = "192.168.2.50    (laptop) — do not use .2 (that is BlueOS)"
 SUBNET_DEFAULT = "192.168.2.50/24"
 
 
@@ -95,11 +95,11 @@ def perintah_ethernet(os_name, iface, ip=SUBNET_DEFAULT, dhcp=True):
                      % (na, ip.split("/")[0])]
             permanen = list(cepat)
         return {"cepat": cepat, "permanen": permanen,
-                "catatan": "Jalankan sebagai Administrator (tombol Terapkan memakai UAC)."}
+                "catatan": "Run as Administrator (the Apply button uses UAC)."}
     # Linux (NetworkManager / iproute2)
     if dhcp:
         cepat = ["sudo nmcli device set %s managed yes" % iface,
-                 "sudo nmcli con up %s 2>/dev/null || true  # pakai profil apa pun" % iface]
+                 "sudo nmcli con up %s 2>/dev/null || true  # use any existing profile" % iface]
         permanen = ["sudo nmcli con mod '%s' ipv4.method auto && sudo nmcli con up '%s'"
                     % (iface, iface)]
     else:
@@ -109,7 +109,7 @@ def perintah_ethernet(os_name, iface, ip=SUBNET_DEFAULT, dhcp=True):
                     % (iface, ip),
                     "sudo nmcli con up '%s'" % iface]
     return {"cepat": cepat, "permanen": permanen,
-            "catatan": "Butuh sudo (diminta oleh terminal). Cek: ip -br addr show %s" % iface}
+            "catatan": "Needs sudo (the terminal will ask). Check: ip -br addr show %s" % iface}
 
 
 def args_terapan(cfg, argv):
@@ -154,23 +154,23 @@ def uji(host, port_video=5600, raw_url="", timeout=1.5):
     try:
         s = socket.create_connection((host, int(port_video)), timeout=timeout)
         s.close()
-        hasil["video"] = "OK — %s:%d menerima TCP" % (host, port_video)
+        hasil["video"] = "OK — %s:%d accepts TCP" % (host, port_video)
     except Exception as exc:                               # noqa: BLE001
-        hasil["video"] = "GAGAL — %s:%d (%s)" % (host, port_video, exc)
+        hasil["video"] = "FAILED — %s:%d (%s)" % (host, port_video, exc)
     try:
         s = socket.create_connection((host, 22), timeout=timeout)
         s.close()
-        hasil["ssh"] = "OK — %s:22 (BlueOS/SSH terbuka)" % host
+        hasil["ssh"] = "OK — %s:22 (BlueOS/SSH open)" % host
     except Exception as exc:                               # noqa: BLE001
-        hasil["ssh"] = "tidak terbuka — %s:22 (%s)" % (host, exc)
+        hasil["ssh"] = "not open — %s:22 (%s)" % (host, exc)
     if raw_url:
         try:
             req = urllib.request.Request(raw_url.rstrip("/") + "/status",
                                          headers={"User-Agent": "dv-koneksi"})
             with urllib.request.urlopen(req, timeout=timeout + 1.0) as r:
-                hasil["raw"] = "OK — agen RAW menjawab (HTTP %d)" % r.status
+                hasil["raw"] = "OK — RAW agent responded (HTTP %d)" % r.status
         except Exception as exc:                           # noqa: BLE001
-            hasil["raw"] = "GAGAL — %s (%s)" % (raw_url, exc)
+            hasil["raw"] = "FAILED — %s (%s)" % (raw_url, exc)
     return hasil
 
 
@@ -335,7 +335,7 @@ def buat_dialog(console):
 
     def _copy():
         QtWidgets.QApplication.clipboard().setText(perintah_txt.toPlainText())
-        console._catat("koneksi: perintah ethernet disalin")
+        console._catat("connection: ethernet command copied")
 
     def _apply_admin():
         if not _iface_sekarang():
@@ -351,11 +351,11 @@ def buat_dialog(console):
                 ["-NoProfile", "-Command",
                  "Start-Process powershell -Verb RunAs -ArgumentList "
                  "'-NoProfile','-Command','%s'" % script])
-            console._catat("koneksi: menerapkan IP (UAC) — %s" % kk)
+            console._catat("connection: applying IP (UAC) — %s" % kk)
         else:
             _copy()
-            console._catat("koneksi: perintah disalin — jalankan di terminal "
-                           "(perlu sudo)")
+            console._catat("connection: command copied — run it in a terminal "
+                           "(needs sudo)")
 
     b_copy.clicked.connect(_copy)
     b_apply.clicked.connect(_apply_admin)
@@ -378,7 +378,7 @@ def buat_dialog(console):
     def _uji():
         c = tarik()
         host = c["host"] or "192.168.2.2"
-        hasil_lbl["ssh"].setText("menguji %s …" % host)
+        hasil_lbl["ssh"].setText("testing %s …" % host)
         QtWidgets.QApplication.processEvents()
         h = uji(host, c["front_port"], c["raw_agent"])
         for k in ("ssh", "video", "raw"):
@@ -408,7 +408,7 @@ def buat_dialog(console):
         c = tarik()
         if not save(c):
             QtWidgets.QMessageBox.warning(d, "Connection",
-                                          "Gagal menyimpan koneksi.json")
+                                          "Failed to save koneksi.json")
             return
         argv_baru = args_terapan(c, sys.argv)
         if getattr(sys, "frozen", False):
@@ -416,7 +416,7 @@ def buat_dialog(console):
         else:
             QtCore.QProcess.startDetached(sys.executable,
                                           [sys.argv[0]] + argv_baru)
-        console._catat("koneksi: disimpan — konsol dijalankan ulang")
+        console._catat("connection: saved — restarting the console")
         console.close()
 
     b_simpan.clicked.connect(_simpan_restart)

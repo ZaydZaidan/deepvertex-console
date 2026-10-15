@@ -125,7 +125,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.6"    # versi aplikasi (session.json + update checker)
+__version__ = "1.0.7"    # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -292,7 +292,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.pf.muat_ck()
         def _raw_pesan(tag, d):
             if tag == "status":
-                self._catat("RAW agen: %s" % ("OK, disk %s MB" % d.get("disk_free_mb")
+                self._catat("RAW agent: %s" % ("OK, disk %s MB" % d.get("disk_free_mb")
                                               if d.get("ok") else str(d.get("error"))[:80]))
             elif tag == "files":
                 self._catat("RAW: %d chunk" % len(d.get("files", [])))
@@ -324,7 +324,7 @@ class RovConsole(QtWidgets.QMainWindow):
             import paths as _paths
             _mig = _paths.migrate_legacy()
             if _mig:
-                self._catat("data: migrasi %d berkas lama -> %s"
+                self._catat("data: migrated %d legacy files -> %s"
                             % (len(_mig), _paths.saved_dir()))
         except Exception:                              # noqa: BLE001
             pass
@@ -357,7 +357,7 @@ class RovConsole(QtWidgets.QMainWindow):
         # diagnostik lapangan: catat apa yang SEBENARNYA dilihat Qt (dpr!)
         if not getattr(self, "_muat_logged", False):
             self._muat_logged = True
-            self._catat("tampilan: dpr=%.2f · area %dx%d (%s)"
+            self._catat("display: dpr=%.2f · area %dx%d (%s)"
                         % (scr.devicePixelRatio(), av.width(), av.height(),
                            QtWidgets.QApplication.platformName()))
         app = QtWidgets.QApplication.instance()
@@ -377,10 +377,10 @@ class RovConsole(QtWidgets.QMainWindow):
         m = self.minimumSizeHint()
         if m.width() > av.width() or m.height() > av.height():
             self.setMinimumSize(0, 0)
-            self._catat("tampilan: skala %.1f, konten > layar %dx%d — di-scroll"
+            self._catat("display: scale %.1f, content > screen %dx%d — scrollable"
                         % (theme.SKALA, av.width(), av.height()))
         elif theme.SKALA < 1.2:
-            self._catat("tampilan: skala teks otomatis %.1f (layar %dx%d)"
+            self._catat("display: text scale auto-set to %.1f (screen %dx%d)"
                         % (theme.SKALA, av.width(), av.height()))
         w, h, dx, dy, _longgar = hitung_geometri_jendela(
             av.width(), av.height(), m.width(), m.height())
@@ -1081,7 +1081,7 @@ class RovConsole(QtWidgets.QMainWindow):
         row.setSpacing(6)
         self.cb_mode = QtWidgets.QComboBox()
         self.cb_mode.addItems([n for n, _m in MODE_LIST])
-        self.cb_mode.setToolTip("mode ArduSub aktif  (otonom/posisi = coming soon)")
+        self.cb_mode.setToolTip("active ArduSub mode  (auto/position = coming soon)")
         b_go = QtWidgets.QPushButton("SET")
         b_go.setObjectName("BtnTiny")
         b_go.clicked.connect(lambda: self._buka_mode_nama(self.cb_mode.currentIndex()))
@@ -1181,7 +1181,7 @@ class RovConsole(QtWidgets.QMainWindow):
         for teks, val in (("25%", 0.25), ("50%", 0.5), ("75%", 0.75), ("100%", 1.0)):
             self.cb_cap.addItem(teks, val)
         self.cb_cap.setCurrentIndex(3)
-        self.cb_cap.setToolTip("batas kecepatan perintah pilot (skala stick → MANUAL_CONTROL).\n"
+        self.cb_cap.setToolTip("pilot command speed cap (stick scaling → MANUAL_CONTROL).\n"
                                "100% = full. Set from the GUI; does not write a vehicle param.")
         self.cb_cap.currentIndexChanged.connect(self._set_cap)
         row4.addWidget(lab4)
@@ -1237,8 +1237,8 @@ class RovConsole(QtWidgets.QMainWindow):
         p.body_layout.addWidget(VO.FailsafePanel(self.bridge))
         b_fs = QtWidgets.QPushButton("APPLY RECOMMENDED (4S 10000 mAh)")
         b_fs.setObjectName("BtnTiny")
-        b_fs.setToolTip("tulis setelan default aman untuk BlueROV2 + Tattu 4S 10Ah\n"
-                        "(BATT_* + FS_*). Setelah ini SEMUA masih bisa diubah manual.")
+        b_fs.setToolTip("write safe default settings for the BlueROV2 + Tattu 4S 10Ah\n"
+                        "(BATT_* + FS_*). Everything can still be changed manually afterwards.")
         b_fs.clicked.connect(self._apply_failsafe_defaults)
         p.body_layout.addWidget(b_fs)
         rowt = QtWidgets.QHBoxLayout()
@@ -1469,10 +1469,10 @@ class RovConsole(QtWidgets.QMainWindow):
         P["preflight"] = p
 
         # ---- coming soon
-        p = W.Panel("AUTONOMOUS · VIO", "TAHAP 2 — mode AUV (coming soon)", domain="mission")
+        p = W.Panel("AUTONOMOUS · VIO", "STAGE 2 — AUV mode (coming soon)", domain="mission")
         p.body_layout.addWidget(W.Placeholder(
             "COMING SOON",
-            "Autonomous, VIO, dan pemetaan berjalan pada Tahap 2 (mode AUV, Jetson Orin Nano). "
+            "Autonomous, VIO and mapping run in Stage 2 (AUV mode, Jetson Orin Nano). "
             "ROV mode is ROV mode only: manual pilot + capture."))
         P["soon"] = p
 
@@ -1546,11 +1546,11 @@ class RovConsole(QtWidgets.QMainWindow):
         veh.addAction("Motor test…", self._motor_dialog)
         kal = veh.addMenu("Calibration")
         kal.addAction("Gyroscope", lambda: self._cal("gyro"))
-        kal.addAction("Accelerometer (6 posisi)…", self._cal_accel)
+        kal.addAction("Accelerometer (6-position)…", self._cal_accel)
         kal.addAction("Compass (onboard)", lambda: self._cal("mag"))
         kal.addAction("Level horizon", lambda: self._cal("level"))
         kal.addAction("Barometer (ground pressure)", lambda: self._cal("baro"))
-        veh.addAction("Unduh parameter", lambda: self.bridge.queue_param_list())
+        veh.addAction("Download parameters", lambda: self.bridge.queue_param_list())
         veh.addSeparator()
         veh.addAction("Gamepad mapping…", self._padmap_dialog)
         konek = mb.addMenu("&Connection")
@@ -1566,7 +1566,7 @@ class RovConsole(QtWidgets.QMainWindow):
             import koneksi as _kon
             _kon.buat_dialog(self)
         except Exception as exc:                           # noqa: BLE001
-            self._catat("koneksi: dialog gagal: %s" % exc)
+            self._catat("connection: dialog failed: %s" % exc)
 
     def _toggle_panel(self, key, on):
         # FLOATING panel (window): plain visibility; docked: show/hide in
@@ -1664,9 +1664,9 @@ class RovConsole(QtWidgets.QMainWindow):
     def _menu_about(self):
         QtWidgets.QMessageBox.about(
             self, "DeepVertex ROV Console",
-            "Marine Technology \u2014 ROV console (ROV mode, ROV mode)\n"
+            "Marine Technology \u2014 ROV console (ROV mode)\n"
             "BlueROV2 via BlueOS · MAVLink (pymavlink) · GStreamer · PySide6\n"
-            "Basis tampilan: konsol sim DeepVertex (satu bahasa desain).\n"
+            "Design language: DeepVertex console (one design system).\n"
             "Features: gamepad teleop, calibration, motor test, failsafe, parameters, "
             "preflight, compressed + RAW onboard capture.")
 
@@ -1702,7 +1702,7 @@ class RovConsole(QtWidgets.QMainWindow):
     def _buka_mode_nama(self, idx):
         nama, angka = MODE_LIST[idx] if 0 <= idx < len(MODE_LIST) else MODE_LIST[0]
         self.bridge.queue_mode(angka)
-        self._catat("perintah mode %s (%d) dikirim" % (nama, angka))
+        self._catat("mode command %s (%d) sent" % (nama, angka))
 
     def _spin_lights(self, v):
         """Typing a percent moves the slider (same code path as the slider)."""
@@ -1963,7 +1963,7 @@ class RovConsole(QtWidgets.QMainWindow):
 
     def _rec_selesai(self, aktif, path):
         if not aktif and path:
-            self._catat("rekaman tersimpan: " + path)
+            self._catat("recording saved: " + path)
             try:
                 mb = os.path.getsize(path) / 1e6
                 self.lbl_cap_last.setText("last: %s · %.1f MB" %
@@ -2098,7 +2098,7 @@ class RovConsole(QtWidgets.QMainWindow):
                 # kembalikan ke 50% SEKALI di setiap awal sesi.
                 self._perlu_center_awal = False
                 if abs(float(camt) - 0.5) > 0.05:
-                    self._catat("camera tilt saat start: %.0f%% — RESET ke 50%%"
+                    self._catat("camera tilt at start: %.0f%% — RESET to 50%%"
                                 % (camt * 100))
                     self._reset_tilt()
                 else:
@@ -2252,7 +2252,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self.gamepad.cap = val
         except Exception:                                  # noqa: BLE001
             pass
-        self._catat("MAX SPEED %.0f%% — perintah pilot diskalakan ke %.0f%%"
+        self._catat("MAX SPEED %.0f%% — pilot commands scaled to %.0f%%"
                     % (val * 100, val * 100))
 
     def _gain_step(self, delta):
@@ -2392,15 +2392,15 @@ def main():
     os.environ.setdefault("QT_FONT_DPI", "96")
     os.environ.setdefault("QT_SCREEN_SCALE_FACTORS", "1")
     ap = argparse.ArgumentParser(
-        description="DeepVertex Marine Technology \u2014 ROV console (ROV mode, ROV mode)")
+        description="DeepVertex Marine Technology \u2014 ROV console (ROV mode)")
     ap.add_argument("--mavlink", default="udpin:0.0.0.0:14550",
-                    help="endpoint MAVLink (mis. udpin:0.0.0.0:14550 / udp:192.168.2.2:14550)")
+                    help="MAVLink endpoint (e.g. udpin:0.0.0.0:14550 / udp:192.168.2.2:14550)")
     ap.add_argument("--front-port", type=int, default=5600)
     ap.add_argument("--left-port", type=int, default=5601)
     ap.add_argument("--right-port", type=int, default=5602)
     ap.add_argument("--raw-agent", default="http://127.0.0.1:8765")
     ap.add_argument("--outdir", default=os.path.expanduser("~/DeepVertex-ROV-Captures"))
-    ap.add_argument("--nama-sesi", default=None,
+    ap.add_argument("--nama-sesi", "--session-name", default=None,
                     help="session folder name (e.g. 'Coral Survey A'); "
                          "blank string = use 'dive'")
     ap.add_argument("--no-prompt", action="store_true",
@@ -2415,10 +2415,12 @@ def main():
     ap.add_argument("--tema", default="ink", choices=tuple(theme.tampil()),
                     help="color palette (ink = dark) — switchable live in View > Appearance")
     ap.add_argument("--teks", type=float, default=1.2, metavar="SKALA",
-                    help="skala ukuran teks (1.0/1.2/1.4) utk keterbacaan di lapangan")
+                    help="text size scale (1.0/1.2/1.4) for field readability")
     ap.add_argument("--no-pad", action="store_true", help="do not enable gamepad teleop")
     ap.add_argument("--no-update", action="store_true",
-                    help="jangan cek update rilis GitHub saat mulai (otomasi)")
+                    help="skip the GitHub release check at startup (automation)")
+    ap.add_argument("--preview-update", action="store_true",
+                    help="preview the update dialog with demo data (UI review)")
     ap.add_argument("--shot", default=None, help="save a window screenshot to PATH (UI testing)")
     ap.add_argument("--shot-after", type=float, default=6.0, help="seconds before the screenshot")
     args = ap.parse_args()
@@ -2463,8 +2465,16 @@ def main():
     app.processEvents()
     w._muatkan_ke_layar()
     QtCore.QTimer.singleShot(1200, w._muatkan_ke_layar)
-    # Cek update rilis GitHub (online; popup = pilihan user; offline = diam).
-    if not getattr(args, "no_update", False) and \
+    # GitHub release check (online; popup = user choice; offline = silent).
+    if getattr(args, "preview_update", False):
+        def _pratinjau_upd():
+            try:
+                import updater as _upd
+                _upd.pratinjau(w, __version__)
+            except Exception:                              # noqa: BLE001
+                pass
+        QtCore.QTimer.singleShot(1200, _pratinjau_upd)
+    elif not getattr(args, "no_update", False) and \
             os.environ.get("DV_NO_UPDATE") != "1":
         def _cek_upd():
             try:
@@ -2476,7 +2486,7 @@ def main():
     if args.shot:
         def _ambil_shot():
             ok = w.grab().save(args.shot)
-            print("shot:", args.shot, "ok" if ok else "GAGAL", flush=True)
+            print("shot:", args.shot, "ok" if ok else "FAILED", flush=True)
         QtCore.QTimer.singleShot(int(args.shot_after * 1000), _ambil_shot)
     return app.exec()
 

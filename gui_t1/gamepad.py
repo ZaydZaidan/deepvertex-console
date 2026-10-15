@@ -294,7 +294,7 @@ class Gamepad(QtCore.QObject):
             pygame.init()
             pygame.joystick.init()
         except Exception as exc:                           # noqa: BLE001
-            return None, "pygame init gagal: %s" % exc
+            return None, "pygame init failed: %s" % exc
         try:
             jumlah = pygame.joystick.get_count()
         except Exception:                                  # noqa: BLE001
@@ -305,7 +305,7 @@ class Gamepad(QtCore.QObject):
             j = pygame.joystick.Joystick(0)
             j.init()
         except Exception as exc:                           # noqa: BLE001
-            return None, "gamepad terdeteksi tapi gagal dibuka: %s" % exc
+            return None, "gamepad detected but could not be opened: %s" % exc
         return _SdlPad(j), None
 
     def _sdl_baca(self):
