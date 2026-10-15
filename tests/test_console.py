@@ -649,6 +649,24 @@ def main():
         print("[44] lipo guard GAGAL:", repr(exc))
         lulus = False
 
+    # [45] geometri jendela dimuatkan ke area kerja (layar kecil / DPI besar):
+    # 1920x1040 -> 1620x1000 tengah; 1536x816 (125% DPI) & 1280x720 -> isi layar
+    # penuh + tandai "longgar"; 2560x1440 -> 1620x1000 tengah.
+    try:
+        g1 = rc.hitung_geometri_jendela(1920, 1040, 1432, 915)
+        ok45 = (g1 == (1620, 1000, 150, 20, False))
+        g2 = rc.hitung_geometri_jendela(1536, 816, 1432, 915)
+        ok45 = ok45 and (g2 == (1536, 816, 0, 0, True))
+        g3 = rc.hitung_geometri_jendela(1280, 720, 1600, 1000)
+        ok45 = ok45 and (g3 == (1280, 720, 0, 0, True))
+        g4 = rc.hitung_geometri_jendela(2560, 1440, 1432, 915)
+        ok45 = ok45 and (g4 == (1620, 1000, 470, 220, False))
+        print("[45] geometri muat-layar (1920/1536/1280/2560):", ok45)
+        lulus &= bool(ok45)
+    except Exception as exc:                               # noqa: BLE001
+        print("[45] muat-layar GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

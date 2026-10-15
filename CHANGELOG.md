@@ -4,6 +4,27 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.2] — 2026-10-15
+
+### Fixed
+- **Window now always fits the screen** (owner report from the Windows laptop
+  audit): on Windows the console opened larger than the display (right side and
+  bottom clipped, status bar off-screen) because system-font metrics + display
+  scaling inflated the layout minimum. The window is now fitted to the
+  available work area at startup (centred when it fits, clamped to the full
+  work area otherwise, minimum relaxed so the resize is honoured; rails stay
+  scrollable). New headless check [45] covers the geometry maths for
+  1920×1040, 1536×816, 1280×720 and 2560×1440.
+- **Fonts bundled into the Windows .EXE** (`--add-data gui_t1/fonts;fonts`):
+  the packaged app previously fell back to the system font, which changed the
+  layout metrics and the on-brand type. The bundled DeepVertex Sans family now
+  loads on Windows exactly like on Linux.
+- **QSS icon paths use forward slashes**: the runtime chevron PNGs (spin-box /
+  combo arrows) were referenced with Windows backslash paths in `url()` — they
+  loaded inconsistently; URLs are now emitted POSIX-style (works on both OSes).
+- **Session-name dialog is centred on the screen** (previously it appeared in
+  the top-left corner on Windows as a parentless dialog).
+
 ## [1.0.1] — 2026-10-15
 
 ### Added

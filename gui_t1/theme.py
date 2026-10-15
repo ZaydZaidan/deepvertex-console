@@ -513,8 +513,11 @@ def _ikon_panah(arah, warna_hex, ukuran=(13, 9)):
     nama = "chev_%s_%s_%dx%d.png" % (arah, str(warna_hex).strip("#"),
                                      ukuran[0], ukuran[1])
     path = os.path.join(d, nama)
+    # QSS url() WAJIB garis miring "/" — path Windows "\\" membuat url() tidak
+    # dimuat Qt (chevon spinbox/combo tampil KOSONG di build Windows).
+    path_qss = path.replace("\\", "/")
     if os.path.exists(path):
-        return path
+        return path_qss
     pm = _Qg.QPixmap(ukuran[0] * 2, ukuran[1] * 2)          # 2x: tajam di layar
     pm.fill(_Qc.Qt.transparent)
     pt = _Qg.QPainter(pm)
@@ -534,7 +537,7 @@ def _ikon_panah(arah, warna_hex, ukuran=(13, 9)):
                          _Qc.QPointF(w - m, h - m)])
     pt.end()
     pm.save(path, "PNG")
-    return path
+    return path_qss
 
 
 def _aturan_peran():

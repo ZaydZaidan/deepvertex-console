@@ -180,11 +180,20 @@ class RovConsole(QtWidgets.QMainWindow):
         _nama = getattr(args, "nama_sesi", None)
         if _nama is None and not getattr(args, "no_prompt", False):
             try:
-                _nama, _ok = QtWidgets.QInputDialog.getText(
-                    None, "Session name",
-                    "Name this session (blank = \u201cdive\u201d):",
-                    text="dive")
-                _nama = _nama.strip() if _ok else ""
+                _dlg = QtWidgets.QInputDialog()
+                _dlg.setWindowTitle("Session name")
+                _dlg.setLabelText("Name this session (blank = \u201cdive\u201d):")
+                _dlg.setTextValue("dive")
+                # pusatkan di layar (tanpa parent, Windows menaruhnya di pojok)
+                _scr = QtWidgets.QApplication.primaryScreen()
+                if _scr is not None:
+                    _dlg.adjustSize()
+                    _dlg.move(_scr.availableGeometry().center() -
+                              _dlg.rect().center())
+                if _dlg.exec():
+                    _nama = _dlg.textValue().strip()
+                else:
+                    _nama = ""
             except Exception:                              # noqa: BLE001
                 _nama = ""
         self.nama_sesi = (_nama or "").strip()
@@ -303,7 +312,7 @@ class RovConsole(QtWidgets.QMainWindow):
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
                        "raw_agent": args.raw_agent,
-                       "h264parse": h264parse_tersedia(), "versi": "1.0.1"}, f,
+                       "h264parse": h264parse_tersedia(), "versi": "1.0.2"}, f,
                       indent=2, ensure_ascii=False)
         self._apply_preset(self._preset)
         # Chrome-style organize windows: snap controller + restore saved
@@ -314,6 +323,49 @@ class RovConsole(QtWidgets.QMainWindow):
         if os.environ.get("DV_NO_SNAP") != "1" and \
                 getattr(args, "preset", None) in (None, "custom"):
             self._apply_custom()
+
+    # ------------------------------------------------- geometri jendela
+    def _muatkan_ke_layar(self):
+        """Pastikan jendela SELALU muat di area kerja layar (fix 15 Okt).
+
+        Windows: font sistem + skala DPI memperbesar minimum layout sehingga
+        jendela terbuka lebih besar dari layar (kanan/bawah terpotong, status
+        bar hilang). Urutan upaya: (1) bila minimum melebihi layar, turunkan
+        skala teks ke 1.0 lebih dulu (rail tetap terbaca); (2) muatkan ukuran
+        ke area kerja; (3) sebagai upaya terakhir longgarkan minimumSize.
+        """
+        if QtWidgets.QApplication.platformName() == "offscreen":
+            return                       # probe headless: ukuran bebas
+        scr = self.screen() or QtWidgets.QApplication.primaryScreen()
+        if scr is None:
+            return
+        av = scr.availableGeometry()
+        app = QtWidgets.QApplication.instance()
+        # tangga skala: pakai skala sekarang; bila minimum konten melebihi
+        # layar, turunkan bertahap (rail & tengah scrollable — umumnya cukup
+        # 1.0; 1.0 = ~1.5x efektif pada DPI 150%).
+        for sk in (theme.SKALA, 1.0, 0.9, 0.8):
+            if sk > theme.SKALA:
+                continue
+            m = self.minimumSizeHint()
+            if m.width() <= av.width() and m.height() <= av.height():
+                break
+            if sk < theme.SKALA and app is not None:
+                theme.set_skala(sk)
+                theme.apply(theme.aktif(), app)
+                self.layout().activate()
+        m = self.minimumSizeHint()
+        if m.width() > av.width() or m.height() > av.height():
+            self.setMinimumSize(0, 0)
+            self._catat("tampilan: skala %.1f, konten > layar %dx%d — di-scroll"
+                        % (theme.SKALA, av.width(), av.height()))
+        elif theme.SKALA < 1.2:
+            self._catat("tampilan: skala teks otomatis %.1f (layar %dx%d)"
+                        % (theme.SKALA, av.width(), av.height()))
+        w, h, dx, dy, _longgar = hitung_geometri_jendela(
+            av.width(), av.height(), m.width(), m.height())
+        self.resize(w, h)
+        self.move(av.x() + dx, av.y() + dy)
 
     # ================================================================ header
     def _build_header(self):
@@ -572,10 +624,18 @@ class RovConsole(QtWidgets.QMainWindow):
     def _bangun_kolom(self, body):
         self._baris_row = None
         self.col_left, self._lay_left = U.kolom_rel(340, 370)
-        self.col_mid = QtWidgets.QWidget()
-        self._lay_mid = QtWidgets.QVBoxLayout(self.col_mid)
+        # Kolom TENGAH juga scrollable (fix 15 Okt): pada layar logis kecil
+        # (DPI Windows 125-150%) konten tengah tidak lagi memaksa jendela
+        # keluar dari layar — pengguna men-scroll kolom tengah, persis rail.
+        self._mid_inner = QtWidgets.QWidget()
+        self._lay_mid = QtWidgets.QVBoxLayout(self._mid_inner)
         self._lay_mid.setContentsMargins(0, 0, 0, 0)
         self._lay_mid.setSpacing(6)
+        self.col_mid = QtWidgets.QScrollArea()
+        self.col_mid.setWidgetResizable(True)
+        self.col_mid.setWidget(self._mid_inner)
+        self.col_mid.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.col_mid.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.col_right, self._lay_right = U.kolom_rel(340, 370)
         body.addWidget(self.col_left, 0)
         body.addWidget(self.col_mid, 1)
@@ -2262,6 +2322,27 @@ def _terapkan_tema(app, nama=None, skala=None):
         pass
 
 
+DESAIN_LEBAR, DESAIN_TINGGI = 1620, 1000    # ukuran jendela rancangan (px logis)
+
+
+def hitung_geometri_jendela(av_w, av_h, min_w, min_h,
+                            des_w=DESAIN_LEBAR, des_h=DESAIN_TINGGI):
+    """Geometri jendela agar selalu berada di dalam area kerja layar.
+
+    Return (w, h, dx, dy, longgar):
+    * w/h = min(max(desain, minimum-konten), area-kerja);
+    * dx/dy = offset tengah (0 bila mengisi penuh);
+    * longgar = minimum-konten melebihi area kerja → pemanggil boleh
+      melonggarkan setMinimumSize agar resize dihormati.
+    """
+    w = min(max(des_w, min_w), av_w)
+    h = min(max(des_h, min_h), av_h)
+    dx = 0 if w >= av_w else (av_w - w) // 2
+    dy = 0 if h >= av_h else (av_h - h) // 2
+    longgar = (min_w > av_w) or (min_h > av_h)
+    return w, h, dx, dy, longgar
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="DeepVertex Marine Technology \u2014 ROV console (ROV mode, ROV mode)")
@@ -2312,6 +2393,11 @@ def main():
     _terapkan_tema(app, getattr(args, "tema", None), getattr(args, "teks", None))
     w = RovConsole(args)
     w.show()
+    # Geometri SESUDAH show (minimum layout baru final di sini) + ulang sekali
+    # setelah timer tile/peta settle — fix 15 Okt utk layar kecil/DPI besar.
+    app.processEvents()
+    w._muatkan_ke_layar()
+    QtCore.QTimer.singleShot(1200, w._muatkan_ke_layar)
     if args.shot:
         def _ambil_shot():
             ok = w.grab().save(args.shot)
