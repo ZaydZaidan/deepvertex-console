@@ -125,7 +125,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.12"    # versi aplikasi (session.json + update checker)
+__version__ = "1.0.13"    # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -2496,6 +2496,10 @@ def main():
         _pesan_upd = _upd2.cek_hasil_update(__version__)
         if _pesan_upd:
             w._catat(_pesan_upd)
+        _dihapus = _upd2.bersihkan_update_lama(__version__)
+        if _dihapus:
+            w._catat("update: removed superseded installer(s): %s"
+                     % ", ".join(_dihapus))
         _setup_tertunda = _upd2.ada_setup_tertunda()
         if _setup_tertunda:
             w._catat("An update installer is already downloaded — finish it "

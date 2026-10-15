@@ -18,6 +18,7 @@ the UI can be reviewed without waiting for an actual release.
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import tarfile
@@ -282,16 +283,59 @@ def cek_hasil_update(versi_sekarang):
     return None
 
 
+def _setup_versi(nama):
+    """Versi dari nama `setup-<versi>.exe`, atau None (termasuk legacy)."""
+    m = re.match(r"setup-(.+)\.exe$", nama, re.I)
+    return parse_version(m.group(1)) if m else None
+
+
 def ada_setup_tertunda():
-    """Path installer yang sudah terunduh tapi belum terpasang (jalan
-    pemulihan Help ▸ Finish pending update), atau None."""
-    p = os.path.join(_dir_update(), "setup-baru.exe")
+    """Path installer tertunda (terunduh, belum terpasang), atau None.
+
+    Format baru (v1.0.13+): `setup-<versi>.exe`; legacy `setup-baru.exe`
+    tetap dikenali supaya unduhan lama bisa diselesaikan manual.
+    """
+    d = _dir_update()
+    terbaik = None
     try:
-        if os.path.isfile(p) and os.path.getsize(p) > 50 * 1024 * 1024:
-            return p
+        for nama in sorted(os.listdir(d)):
+            p = os.path.join(d, nama)
+            try:
+                if not (os.path.isfile(p) and
+                        os.path.getsize(p) > 50 * 1024 * 1024):
+                    continue
+            except OSError:
+                continue
+            if nama.lower() == "setup-baru.exe" or _setup_versi(nama):
+                terbaik = p
+    except OSError:
+        return None
+    return terbaik
+
+
+def bersihkan_update_lama(versi_sekarang):
+    """Hapus installer USANG di folder update (versi <= terpasang).
+
+    Permintaan pemilik 15 Okt: file hasil unduhan update tidak boleh menumpuk
+    di storage. Return daftar nama yang dihapus (untuk log notifikasi).
+    """
+    d = _dir_update()
+    dihapus = []
+    try:
+        for nama in sorted(os.listdir(d)):
+            v = _setup_versi(nama)
+            if v is None or v > parse_version(versi_sekarang):
+                continue
+            p = os.path.join(d, nama)
+            try:
+                if os.path.getsize(p) > 50 * 1024 * 1024:
+                    os.remove(p)
+                    dihapus.append(nama)
+            except OSError:
+                pass
     except OSError:
         pass
-    return None
+    return dihapus
 
 
 def _tulis_sh(tar_path, dir_instalasi, pid=None, target=""):
@@ -549,8 +593,11 @@ def _tanya_lalu_terapkan(w, info, v_lokal):
         return
     nama = os.path.basename(str(info.get("url_aset") or "")).lower()
     setup = "setup" in nama
+    _tgt = str(info.get("tag", "")).lstrip("vV") or "new"
+    # v1.0.13: nama payload SUDAH BERVERSI supaya pembersih otomatis tahu
+    # bahwa installer lama (versi <= terpasang) usang dan boleh dihapus.
     dest = os.path.join(_dir_update(),
-                        "setup-baru.exe" if setup else "baru.exe")
+                        ("setup-%s.exe" % _tgt) if setup else "baru.exe")
 
     ok, err = _unduh_dengan_progres(w, info["url_aset"], dest)
     if err:

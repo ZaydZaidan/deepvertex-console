@@ -889,6 +889,29 @@ def main():
         print("[51] setup tertunda GAGAL:", repr(exc))
         lulus = False
 
+    # [52] updater: auto-bersih installer USANG (versi <= terpasang) —
+    # kebijakan storage dari pemilik 15 Okt.
+    try:
+        import paths as _P52
+        import updater as _U52
+        p52 = os.path.join(_P52.data_dir(), "update")
+        os.makedirs(p52, exist_ok=True)
+        lama = os.path.join(p52, "setup-0.9.9.exe")
+        baru = os.path.join(p52, "setup-99.0.0.exe")
+        for f in (lama, baru):
+            with open(f, "wb") as fh:
+                fh.truncate(60 * 1024 * 1024)          # sparse
+        dih = _U52.bersihkan_update_lama("1.0.13")
+        ok52 = ("setup-0.9.9.exe" in dih and not os.path.exists(lama)
+                and os.path.exists(baru))
+        ok52 = ok52 and (_U52.ada_setup_tertunda() == baru)
+        os.remove(baru)
+        print("[52] auto-bersih installer usang:", ok52)
+        lulus &= bool(ok52)
+    except Exception as exc:                               # noqa: BLE001
+        print("[52] auto-bersih GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

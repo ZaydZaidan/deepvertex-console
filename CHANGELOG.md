@@ -4,6 +4,19 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.13] — 2026-10-15
+
+### Added
+- **Automatic storage cleanup for update files (owner policy):** the
+  downloaded installer is now saved with its version in the name
+  (`setup-<version>.exe`) and, at every start, the console deletes
+  installers older than the running version — downloads can no longer
+  pile up and eat storage. (After a successful install the apply script
+  already deletes the payload.) Test [52].
+- Supersedes the unannounced v1.0.12 — same post-download stall fixes
+  (Content-Length cap, complete-file tolerance, auto-continue notice,
+  Help ▸ Finish pending update), plus this cleanup.
+
 ## [1.0.12] — 2026-10-15
 
 ### Fixed
