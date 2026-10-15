@@ -45,7 +45,13 @@ CUSTOM_FILENAME = "layout_custom.json"
 
 
 def custom_path(app_dir: str) -> str:
-    return os.path.join(app_dir, "saved", CUSTOM_FILENAME)
+    """Lokasi layout_custom.json — folder data user (paths.py); fallback lama
+    <app>/saved bila modul paths tidak tersedia."""
+    try:
+        import paths
+        return os.path.join(paths.saved_dir(), CUSTOM_FILENAME)
+    except Exception:                                      # noqa: BLE001
+        return os.path.join(app_dir, "saved", CUSTOM_FILENAME)
 
 
 def _truncate(text: str, n: int = 22) -> str:
@@ -127,13 +133,31 @@ def theme_px(v: int) -> int:
 # ------------------------------------------------------- pure spec editing
 def move_into_spec(spec, floats, key, rail, index):
     """Pure edit: add `key` into rail `rail` at `index`, removing it from
-    wherever it currently lives (rails, mid stack, floating map)."""
+    wherever it currently lives (rails, mid stack, floating map).
+
+    `index` dihitung pada daftar SEBELUM pemindahan; kalau key tadinya ada
+    DI ATAS titik sisip pada daftar yang sama, indeks digeser -1 setelah
+    penghapusan (fix 15 Okt: sebelumnya "pindah ke bawah" mendarat di ujung).
+    """
     spec = {k: (list(v) if isinstance(v, list) else v) for k, v in spec.items()}
     floats = dict(floats or {})
+    cur_idx = None
+    if rail in ("left", "right"):
+        for i, x in enumerate(spec.get(rail, [])):
+            if _key_of(x) == key:
+                cur_idx = i
+                break
+    elif rail == "mid":
+        for i, it in enumerate(spec.get("mid", [])):
+            if _key_of(it) == key:
+                cur_idx = i
+                break
     for r in ("left", "right"):
         spec[r] = [x for x in spec.get(r, []) if _key_of(x) != key]
     spec["mid"] = [it for it in spec.get("mid", []) if _key_of(it) != key]
     floats.pop(key, None)
+    if cur_idx is not None and cur_idx < index:
+        index -= 1
     if rail in ("left", "right"):
         lst = spec.setdefault(rail, [])
         lst.insert(min(len(lst), max(0, index)), key)

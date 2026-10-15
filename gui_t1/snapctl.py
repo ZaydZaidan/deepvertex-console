@@ -271,19 +271,30 @@ class SnapController(QtCore.QObject):
         gl = con.col_left.geometry()
         gr = con.col_right.geometry()
         mid_w = gr.x() - gl.right()
-        if loc.x() <= gl.right() + mid_w * 0.30:
-            return ("rail", "left")
-        if loc.x() >= gr.x() - mid_w * 0.30:
-            return ("rail", "right")
+        di_kiri = loc.x() <= gl.right() + mid_w * 0.30
+        di_kanan = loc.x() >= gr.x() - mid_w * 0.30
+        # Panel DULU (fix 15 Okt — laporan pemilik "tak bisa pindah ke ATAS"):
+        # dulu zona rel dicek lebih dahulu sehingga drop di panel rel SELALU
+        # "tambah ke ujung rel" (efeknya cuma bisa turun). Sekarang pita
+        # atas/bawah panel berlaku JUGA untuk panel di rel; pita tengah
+        # panel-rel = tetap "tambah ke ujung rel".
         hit = self._panel_at(loc)
-        if hit is None:
+        if hit is not None:
+            key, prect = hit
+            frac = (loc.y() - prect.y()) / max(1.0, prect.height())
+            if frac < _RATIO_SPLIT_TOP:
+                return ("above", key)
+            if frac > _RATIO_SPLIT_BOTTOM:
+                return ("below", key)
+            if di_kiri:
+                return ("rail", "left")
+            if di_kanan:
+                return ("rail", "right")
             return ("end",)
-        key, prect = hit
-        frac = (loc.y() - prect.y()) / max(1.0, prect.height())
-        if frac < _RATIO_SPLIT_TOP:
-            return ("above", key)
-        if frac > _RATIO_SPLIT_BOTTOM:
-            return ("below", key)
+        if di_kiri:
+            return ("rail", "left")
+        if di_kanan:
+            return ("rail", "right")
         return ("end",)
 
     def _panel_at(self, loc):

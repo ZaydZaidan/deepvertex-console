@@ -51,9 +51,16 @@ def _judul_dialog(d, judul):
     d.setWindowTitle(judul)
 
 
-# Folder khusus APLIKASI untuk berkas simpanan (profil failsafe, dump parameter).
-PASTA_SIMPAN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saved")
-os.makedirs(PASTA_SIMPAN, exist_ok=True)
+# Folder berkas simpanan (profil failsafe, dump parameter) — di folder data
+# user (paths.py; Windows %LOCALAPPDATA%, Linux ~/.config); fallback lama
+# <app>/saved.
+try:
+    import paths as _paths
+    PASTA_SIMPAN = _paths.saved_dir()
+except Exception:                                          # noqa: BLE001
+    PASTA_SIMPAN = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "saved")
+    os.makedirs(PASTA_SIMPAN, exist_ok=True)
 
 
 class SimpleCalDialog(QtWidgets.QDialog):
@@ -433,7 +440,7 @@ class ParamBrowser(QtWidgets.QWidget):
         self.tabel.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tabel.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         v.addWidget(self.tabel, 1)
-        _hp = QtWidgets.QLabel("save/load → saved/  (inside the app folder)")
+        _hp = QtWidgets.QLabel("save/load → saved/  (user data folder)")
         _hp.setObjectName("Faint")
         _hp.setToolTip(PASTA_SIMPAN)
         v.addWidget(_hp)
@@ -626,7 +633,7 @@ class FailsafePanel(QtWidgets.QWidget):
         self.lbl.setObjectName("MicroLabel")
         self.lbl.setWordWrap(True)
         v.addWidget(self.lbl)
-        _hint = QtWidgets.QLabel("save/load → saved/  (inside the app folder)")
+        _hint = QtWidgets.QLabel("save/load → saved/  (user data folder)")
         _hint.setObjectName("Faint")
         _hint.setWordWrap(True)
         _hint.setToolTip("Files are written to and read from:\n%s" % PASTA_SIMPAN)

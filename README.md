@@ -80,33 +80,37 @@ console is built around that.
 | Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
 | Controller | Sony DualShock 4 (USB) |
 
-## Downloads (v1.0.4)
+## Downloads (v1.0.5)
 
 Available on the release page:
-<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.4>
+<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.5>
 
 | Platform | Artifact | For |
 |---|---|---|
-| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.4-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
-| **Windows** | `DeepVertexMarineConsole.exe` | Windows desktop (MAVLink telemetry, panels, parameters, recorder — scope note below) |
+| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.5-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
+| **Windows — installer (recommended)** | `DeepVertexMarineConsole-Setup-1.0.5.exe` | Shows the End-User Terms (“I accept”), lets you choose the install folder, creates Start Menu entry + uninstaller |
+| **Windows — portable** | `DeepVertexMarineConsole.exe` | One-file portable build, same app without shortcuts/uninstaller |
 
 ### A. Install on Ubuntu / other Linux (terminal)
 
 ```bash
 # 1) Download & extract
-wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.4/deepvertex-console-v1.0.4-linux.tar.gz
-tar xzf deepvertex-console-v1.0.4-linux.tar.gz
-cd deepvertex-console-1.0.4
+wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.5/deepvertex-console-v1.0.5-linux.tar.gz
+tar xzf deepvertex-console-v1.0.5-linux.tar.gz
+cd deepvertex-console-1.0.5
 
-# 2) One-time topside install (builds .venv: PySide6, evdev, pymavlink,
-#    numpy; apt deps: python3-gi + GStreamer tools/plugins; pip fallback)
+# 2) One-time install: shows the End-User Terms (type "agree"), then asks
+#    WHERE to install (default: ~/DeepVertexMarineConsole) and builds the
+#    runtime there (.venv: PySide6, evdev, pymavlink, numpy).
 ./install/install_topside.sh
+#    non-interactive (CI/automation):
+#    ./install/install_topside.sh --yes --dir="$HOME/DeepVertexMarineConsole"
 
 # 3) Launch (robot on the tether, BlueOS at 192.168.2.2)
-./gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
+~/DeepVertexMarineConsole/gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
 
-# Optional launcher installed for future sessions (add ~/.bashrc):
-echo 'alias deepvertexrov="'$(pwd)'/gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765 --tema ink --teks 1.2"' >> ~/.bashrc
+# Optional launcher for future sessions (add ~/.bashrc):
+echo 'alias deepvertexrov="'$HOME'/DeepVertexMarineConsole/gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765 --tema ink --teks 1.2"' >> ~/.bashrc
 source ~/.bashrc && deepvertexrov        # == same console, one word
 ```
 
@@ -115,16 +119,27 @@ needs** into `gui_t1/.venv` — you do not need a system-wide Python install;
 `--mavlink`, `--outdir`, `--preset`, `--nama-sesi`, see `run_console_real.sh
 --help` for the full option list.
 
-### B. Install on Windows (.EXE)
+### B. Install on Windows
 
-1. Download **`DeepVertexMarineConsole.exe`** from the release page.
-2. Double-click it (no installer — one-file portable). It connects to the
-   MAVLink feed (`udpin:0.0.0.0:14550` by default) and opens the console.
-3. Optional for **camera recording**: install the
+**Recommended — installer:** download
+**`DeepVertexMarineConsole-Setup-1.0.5.exe`** and run it. It shows the
+End-User Terms (you must accept to continue), offers the install folder (a
+default is pre-filled — change it if you like), installs per-user (no admin
+required) and creates a Start Menu entry, an optional desktop shortcut and an
+uninstaller.
+
+**Portable alternative:** `DeepVertexMarineConsole.exe` — the same app as a
+single file: double-click and go (no shortcuts/uninstaller).
+
+Both builds:
+
+1. The console connects to the MAVLink feed (`udpin:0.0.0.0:14550` by default)
+   and opens the console window.
+2. Optional for **camera recording**: install the
    [GStreamer runtime](https://gstreamer.freedesktop.org/download/)
    (*runtime MSI + the matching "devel" pack*), then make sure its `bin`
    folder is on PATH — `gst-launch-1.0` must resolve in a terminal.
-4. The gamepad teleop side is Linux-only for now (evdev); the EXE shows an
+3. The gamepad teleop side is Linux-only for now (evdev); the EXE shows an
    honest "not available on this platform" instead of breaking (**recording,
    telemetry and all panels stay usable**).
 
@@ -136,24 +151,36 @@ Terminal option list (works for both): `--help` shows `--mavlink`,
 use, no redistribution/modification, commercial use needs written permission:
 founders@deepvertex.tech).
 
+### Keeping it up to date
+
+Both platforms check GitHub Releases **each time the console starts** (needs
+internet; offline = silent). When a newer release exists, a popup shows the
+version + release notes with two choices: **Update now** — the console
+downloads the right artifact and applies it (Windows swaps the .EXE; Linux
+updates the source tree, keeping `.venv`) and restarts itself — or **Nanti**
+(skip for now). Opt out per run: `--no-update` or `DV_NO_UPDATE=1`.
+
+Where your files live (settings, logs, captures — and what updates/
+uninstalls never touch): [docs/data-and-paths.md](docs/data-and-paths.md).
+
 Use terminal equivalents on Windows:
 
 ```powershell
 # from PowerShell
-Invoke-WebRequest -Uri "https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.1/DeepVertexMarineConsole.exe" -OutFile "DeepVertexMarineConsole.exe"
+Invoke-WebRequest -Uri "https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.5/DeepVertexMarineConsole.exe" -OutFile "DeepVertexMarineConsole.exe"
 .\DeepVertexMarineConsole.exe           # console starts
 .\DeepVertexMarineConsole.exe --help    # option list (session dir, ports…)
 ```
 
 Windows scope note: the .EXE runs MAVLink telemetry, camera **recording** &
-snapshots (with the GStreamer runtime), parameter/preflight panels and capture
-management — live **video preview** and the **gamepad** are Linux-side
-(evdev/PyGObject) until a Windows-native reader ships. **Tested on a real
-Windows laptop (Win10 19045, 1920x1080 at 150% display scale): the window is
-fitted to the screen, the UI renders at the app's own text scale (the OS
-display scale is deliberately ignored — 1:1 physical pixels), the
-notifications log is themed, the session folder (`~/DeepVertex-ROV-Captures/
-<ts>_<name>`, session.json) is created and the process stays stable.**
+snapshots (with the GStreamer runtime), parameter/preflight panels, capture
+management and the full organize/layout system — the same application, the
+same pixel-for-pixel rendering (the OS display scale is deliberately ignored)
+and the same 47-check suite as Linux. Live **video preview** and the
+**gamepad** are Linux-side (PyGObject/evdev) for now. **Tested on a real
+Windows laptop (Win10 19045, 1920x1080 at 150% display scale)** — the full
+Windows/Linux 1:1 feature audit lives in
+[docs/platform-parity.md](docs/platform-parity.md).
 `DeepVMDebug.exe` is the console-mode build for troubleshooting (it prints the
 full stack on error). Sources remain buildable everywhere (this repository).
 

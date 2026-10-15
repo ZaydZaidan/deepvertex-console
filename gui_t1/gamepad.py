@@ -93,9 +93,14 @@ class Gamepad(QtCore.QObject):
         self._timer.timeout.connect(self._tick)
 
         # preset pad BERNAMA (permintaan pemilik 13 Okt): muat preset aktif dari
-        # gamepad_presets.json bila ada (mapping custom user).
-        self.presets_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         "gamepad_presets.json")
+        # gamepad_presets.json (folder data user — paths.py; fallback lama app).
+        try:
+            import paths as _paths
+            self.presets_path = _paths.aset_json("gamepad_presets.json")
+        except Exception:                              # noqa: BLE001
+            self.presets_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "gamepad_presets.json")
         try:
             with open(self.presets_path, encoding="utf-8") as f:
                 _data = json.load(f)

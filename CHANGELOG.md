@@ -4,6 +4,46 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.5] — 2026-10-15
+
+### Added
+- **Update checker + one-click auto-update** (both platforms): at every start
+  the console checks the GitHub Releases API (online; offline = silent) and —
+  when a newer release exists — shows a themed popup with the release notes,
+  a link to the release page and an optional **Update now**. Updating
+  downloads the right artifact per platform, then swaps the EXE (Windows) or
+  the source tree keeping `.venv` and user data (Linux), relaunching itself.
+  Opt-out: `--no-update` / `DV_NO_UPDATE=1`.
+- **Windows installer** (`DeepVertexMarineConsole-Setup-<ver>.exe`, Inno
+  Setup): mandatory “I accept” End-User Terms page, install folder page with
+  a sensible default (user-changeable), per-user install by default, Start
+  Menu entry + optional desktop shortcut + uninstaller.
+- **Linux installer rework**: explicit ToS acceptance (type `agree`), asks
+  for the install folder (default `~/DeepVertexMarineConsole`), copies the
+  sources there, then builds the venv; `--yes` / `--dir=` / `--dry-run` for
+  automation; CI runs a dry-run check of the whole flow.
+- **Tidy per-OS data layout** (`paths.py`, docs/data-and-paths.md): settings
+  live in `~/.config/deepvertex-console` (Linux) /
+  `%LOCALAPPDATA%\DeepVertexMarineConsole` (Windows); a rolling
+  `logs/console.log` mirrors the notifications panel; legacy `<app>/saved`
+  files migrate automatically once; captures stay in
+  `~/DeepVertex-ROV-Captures` (never touched by updates).
+- New regression checks: [46] dragging a panel ABOVE a neighbour inside a
+  rail + ordering off-by-one regression; [47] update-checker version
+  parsing / asset selection / offline behaviour + data-folder resolution.
+
+### Fixed
+- **Organize drag: panels can move UP again** (owner report: “only
+  downwards”). “Above/below” drop bands now work over rail panels too
+  (top/bottom bands of the hovered panel); the middle band of a rail panel
+  still appends to that rail; moving an item downwards inserts it exactly
+  below the target instead of landing at the end of the list.
+
+### Changed
+- `session.json` records `versi` from a single `__version__` constant.
+- README: installer downloads, update-checker and data-location sections;
+  `docs/platform-parity.md` documents the Windows/Linux 1:1 audit.
+
 ## [1.0.4] — 2026-10-15
 
 ### Fixed

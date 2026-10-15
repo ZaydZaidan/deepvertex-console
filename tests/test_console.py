@@ -23,6 +23,9 @@ from PySide6 import QtCore, QtWidgets    # noqa: E402
 SCRATCH = os.path.expanduser("~/.hermes/cache/scratch/t1test")
 os.makedirs(SCRATCH, exist_ok=True)
 STATS = os.path.join(SCRATCH, "fv_stats.json")
+# Data user uji -> scratch (deterministik, tidak menyentuh ~/.config / AppData)
+os.environ.setdefault("DV_NO_UPDATE", "1")
+os.environ.setdefault("DV_DATA_DIR", os.path.join(SCRATCH, "data"))
 
 
 def sumber(port):
@@ -41,12 +44,40 @@ def baca_stats():
         return {}
 
 
+def titik_rel_app(w):
+    """Titik (x, y) di pita TENGAH panel rel-kiri yang PASTI terlihat —
+    zona 'tambah ke ujung rel' (dipakai uji drag; deterministik)."""
+    geo = w.col_left.geometry()
+    cands = [k for k in w._active_spec.get("left", []) if k in w.P]
+    pilih = None
+    for k in cands:
+        p = w.P[k]
+        if p.isWindow():
+            continue
+        tl = p.mapTo(w, QtCore.QPoint(0, 0))
+        if tl.y() < geo.top() + 4 or tl.y() + p.height() > geo.bottom() - 4:
+            continue
+        if p.height() < 60:
+            continue
+        pilih = (k, tl, p)
+        break
+    if pilih is None:                      # cadangan: panel pertama apa pun
+        p = w.P[cands[0]]
+        pilih = (cands[0], p.mapTo(w, QtCore.QPoint(0, 0)), p)
+    _k, tl, p = pilih
+    return (tl.x() + 18, tl.y() + int(p.height() * 0.5))
+
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     try:
         os.remove(STATS)
     except OSError:
         pass
+    _dd = os.environ.get("DV_DATA_DIR")
+    if _dd:                                # data uji selalu mulai bersih
+        import shutil
+        shutil.rmtree(_dd, ignore_errors=True)
     srcs = [sumber(p) for p in (5620, 5621, 5622)]
     fake = subprocess.Popen([sys.executable, os.path.join(HERE, "fake_vehicle.py"),
                              "--endpoint", "udpout:127.0.0.1:14560", "--secs", "90",
@@ -455,9 +486,9 @@ def main():
         w._apply_preset("pilot-focus"); jalan(0.1)
         before = [k for k in w._active_spec.get("left", [])]
         w.snap.simulate_begin("notif")
-        kind36 = w.snap.simulate_move_to(20, 200)
+        kind36 = w.snap.simulate_move_to(*titik_rel_app(w))
         ok36 = (kind36 == ("rail", "left"))
-        w.snap.simulate_drop(20, 200); jalan(0.2)
+        w.snap.simulate_drop(*titik_rel_app(w)); jalan(0.2)
         after = list(w._active_spec.get("left", []))
         ok36 = ok36 and after[:len(before)] == before and \
             w._asal_of("notif") == ["left", len(after) - 1] and \
@@ -524,10 +555,14 @@ def main():
         w.snap.simulate_drop(w.width() + 300, 0); jalan(0.2)
         ok38 = w.P["teleop"].isWindow() and w.P["teleop"].isVisible()
         w.snap.simulate_begin("teleop")
-        w.snap.simulate_drop(20, 400); jalan(0.2)       # tarik ke rel kiri
+        w.snap.simulate_drop(*titik_rel_app(w)); jalan(0.2)       # tarik ke rel kiri
         ok38 = ok38 and (not w.P["teleop"].isWindow())
-        ok38 = ok38 and (w._asal_of("teleop") == ["left", len(w._active_spec
-                           .get("left", [])) - 1])
+        _asal38 = w._asal_of("teleop") or [None]
+        ok38 = ok38 and (_asal38[0] == "left")
+        if not ok38:
+            print("[38] DETAIL iswin=%r vis=%r asal=%r left=%r"
+                  % (w.P["teleop"].isWindow(), w.P["teleop"].isVisible(),
+                     w._asal_of("teleop"), w._active_spec.get("left", [])))
         print("[38] pop-out floating + re-dock:", ok38)
         lulus &= bool(ok38)
     except Exception as exc:                               # noqa: BLE001
@@ -539,8 +574,8 @@ def main():
     # [39] persistensi layout CUSTOM (saved/layout_custom.json) + reload
     try:
         w.snap.simulate_begin("teleop")
-        w.snap.simulate_move_to(20, 200)
-        w.snap.simulate_drop(20, 200); jalan(0.2)
+        w.snap.simulate_move_to(*titik_rel_app(w))
+        w.snap.simulate_drop(*titik_rel_app(w)); jalan(0.2)
         path = w._tata_json()
         ok39 = os.path.isfile(path)
         data = json.load(open(path, encoding="utf-8"))
@@ -565,7 +600,7 @@ def main():
         w._apply_preset("setup"); jalan(0.1)
         spec0 = json.dumps(w._active_spec, sort_keys=True)
         w.snap.simulate_begin("raw")
-        w.snap.simulate_move_to(20, 200)
+        w.snap.simulate_move_to(*titik_rel_app(w))
         w.snap.simulate_cancel(); jalan(0.1)
         ok40 = (json.dumps(w._active_spec, sort_keys=True) == spec0) and \
             (not w.P["raw"].isWindow())
@@ -574,7 +609,7 @@ def main():
         w.snap.simulate_drop(w.width() + 300, 0); jalan(0.2)
         ok40 = ok40 and w.P["raw"].isWindow()
         w.snap.simulate_begin("raw")
-        w.snap.simulate_drop(20, 200); jalan(0.2)       # dock kanan dulu? kiri
+        w.snap.simulate_drop(*titik_rel_app(w)); jalan(0.2)       # dock kanan dulu? kiri
         ok40 = ok40 and (not w.P["raw"].isWindow())
         w.snap.simulate_begin("raw")
         w.snap.simulate_move_to(w.width() + 300, 0)
@@ -665,6 +700,70 @@ def main():
         lulus &= bool(ok45)
     except Exception as exc:                               # noqa: BLE001
         print("[45] muat-layar GAGAL:", repr(exc))
+        lulus = False
+
+    # [46] drag panel ke ATAS tetangganya (laporan pemilik 15 Okt: dulu hanya
+    # bisa "turun"); + regresi off-by-one urutan (pindah ke bawah = sisip
+    # TEPAT di bawah target, bukan di ujung daftar).
+    try:
+        import laysnap as _LS
+        s2, _ = _LS.move_into_spec({"left": ["a", "b", "c", "d"], "right": []},
+                                   {}, "a", "left", 3)     # a -> bawah c
+        ok46 = (s2["left"] == ["b", "c", "a", "d"])
+        s3, _ = _LS.move_into_spec({"left": ["a", "b", "c", "d"], "right": []},
+                                   {}, "d", "left", 1)     # d -> atas b
+        ok46 = ok46 and (s3["left"] == ["a", "d", "b", "c"])
+        w._tata_forget()
+        w._apply_preset("pilot-focus"); jalan(0.15)
+        left0 = [k for k in w._active_spec.get("left", [])]
+        atas = left0[0]
+        pindah = left0[1] if len(left0) > 1 else None
+        if pindah is not None:
+            pa = w.P[atas]
+            tla = pa.mapTo(w, QtCore.QPoint(0, 0))
+            pt = QtCore.QPoint(tla.x() + 18, tla.y() + int(pa.height() * 0.15))
+            w.snap.simulate_begin(pindah)
+            k46 = w.snap.simulate_move_to(pt.x(), pt.y())
+            ok46 = ok46 and (k46 == ("above", atas))
+            w.snap.simulate_drop(pt.x(), pt.y()); jalan(0.2)
+            left1 = [k for k in w._active_spec.get("left", [])]
+            ok46 = ok46 and (left1.index(pindah) + 1 == left1.index(atas))
+        print("[46] drag ke ATAS tetangga rel (zona above + urutan turun):", ok46)
+        lulus &= bool(ok46)
+    except Exception as exc:                               # noqa: BLE001
+        print("[46] drag ke atas GAGAL:", repr(exc))
+        lulus = False
+    finally:
+        w.snap.simulate_cancel()
+        w._tata_forget()
+
+    # [47] update-checker: parse/banding versi, pilih aset per-platform,
+    # offline aman; paths.py — folder data user mengikuti DV_DATA_DIR.
+    try:
+        import paths as _P
+        import updater as _U
+        ok47 = (_U.parse_version("v1.2.3") == (1, 2, 3) and
+                _U.parse_version("1.0.10") > _U.parse_version("1.0.9") and
+                _U.parse_version("garbage") == (0, 0, 0))
+        ok47 = ok47 and _U.is_newer("v1.0.6", "1.0.5") and \
+            (not _U.is_newer("v1.0.5", "1.0.5")) and \
+            (not _U.is_newer("v1.0.4", "1.0.5"))
+        aset = {"DeepVertexMarineConsole.exe": "https://x/exe",
+                "DeepVertexMarineConsole-Setup-1.0.6.exe": "https://x/setup",
+                "deepvertex-console-v1.0.6-linux.tar.gz": "https://x/tar"}
+        ok47 = ok47 and (_U.aset_url_untuk_platform(aset) in aset.values())
+        _simpan = _U.API_LATEST
+        try:
+            _U.API_LATEST = "http://127.0.0.1:9/tidak-ada"   # port tertutup
+            ok47 = ok47 and (_U.cek_update("1.0.5", timeout=1) is None)
+        finally:
+            _U.API_LATEST = _simpan
+        ok47 = ok47 and (_P.saved_dir() ==
+                         os.path.join(os.environ["DV_DATA_DIR"], "saved"))
+        print("[47] update-checker + paths data user:", ok47)
+        lulus &= bool(ok47)
+    except Exception as exc:                               # noqa: BLE001
+        print("[47] update-checker GAGAL:", repr(exc))
         lulus = False
 
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)

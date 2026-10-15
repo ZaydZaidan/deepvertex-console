@@ -1,4 +1,4 @@
-DeepVertex Marine Technology Console — End-User Terms (v1.0.4)
+DeepVertex Marine Technology Console — End-User Terms (v1.0.5)
 ===============================================================
 
 Thank you for downloading the DeepVertex Marine Technology Console. This

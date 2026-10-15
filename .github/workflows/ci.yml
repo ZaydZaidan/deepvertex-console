@@ -31,6 +31,9 @@ jobs:
         run: |
           python3 -m py_compile gui_t1/*.py onboard/raw_agent.py tests/*.py
 
+      - name: Installer dry-run (terms gate + target dir + plan)
+        run: bash install/install_topside.sh --dry-run --yes --dir="$RUNNER_TEMP/dv-dry"
+
       - name: Start RAW agent (test mode)
         run: |
           python3 onboard/raw_agent.py --test --port 8791 &
@@ -105,12 +108,24 @@ jobs:
             gui_t1/windows_entry.py
           ls dist
 
+      - name: Build installer (Inno Setup — license page + folder page)
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress | Out-Null
+          $terms = Get-Content -Raw docs/END-USER-TERMS.txt
+          Set-Content -Path install/windows/license_win.txt -Value $terms -Encoding UTF8
+          $ver = "$env:GITHUB_REF_NAME" -replace '^v', ''
+          if (-not $ver -or $ver -eq "main") { $ver = "0.0.0" }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=$ver install\windows\deepvertex.iss
+          Get-ChildItem dist\DeepVertexMarineConsole-Setup-*.exe | ForEach-Object { $_.Name + "  " + $_.Length }
+
       - uses: actions/upload-artifact@v4
         with:
           name: DeepVertexMarineConsole-windows-exe
           path: |
             dist/DeepVertexMarineConsole.exe
             dist/DeepVMDebug.exe
+            dist/DeepVertexMarineConsole-Setup-*.exe
 
       - name: Attach to the release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
@@ -120,4 +135,5 @@ jobs:
         run: |
           gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVertexMarineConsole.exe --clobber
           gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVMDebug.exe --clobber
+          gh release upload "${env:GITHUB_REF_NAME}" (Get-ChildItem dist/DeepVertexMarineConsole-Setup-*.exe).FullName --clobber
 

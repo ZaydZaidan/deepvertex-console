@@ -125,6 +125,9 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
+__version__ = "1.0.5"    # versi aplikasi (session.json + update checker)
+
+
 class RovConsole(QtWidgets.QMainWindow):
     PRESET_BAWAAN = "pilot-focus"
     NAMA_PRESET = {"pilot-focus": "Pilot Focus", "mapping": "Mapping",
@@ -312,8 +315,17 @@ class RovConsole(QtWidgets.QMainWindow):
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
                        "raw_agent": args.raw_agent,
-                       "h264parse": h264parse_tersedia(), "versi": "1.0.4"}, f,
+                       "h264parse": h264parse_tersedia(), "versi": __version__}, f,
                       indent=2, ensure_ascii=False)
+        # Data user rapi (paths.py): migrasi sekali dari <app>/saved lama.
+        try:
+            import paths as _paths
+            _mig = _paths.migrate_legacy()
+            if _mig:
+                self._catat("data: migrasi %d berkas lama -> %s"
+                            % (len(_mig), _paths.saved_dir()))
+        except Exception:                              # noqa: BLE001
+            pass
         self._apply_preset(self._preset)
         # Chrome-style organize windows: snap controller + restore saved
         # Custom arrangement on a plain start-up (no --preset given).
@@ -2120,6 +2132,15 @@ class RovConsole(QtWidgets.QMainWindow):
             self.log.appendPlainText(time.strftime("[%H:%M:%S] ") + str(teks))
         except Exception:                                  # noqa: BLE001
             pass
+        # log file rapi (paths.py): data_dir()/logs/console.log (rotasi ringan)
+        try:
+            import paths as _paths
+            _paths.putar_log()
+            with open(_paths.file_log(), "a", encoding="utf-8") as f:
+                f.write("%s [%s] %s\n" % (time.strftime("%Y-%m-%d"),
+                                          time.strftime("%H:%M:%S"), teks))
+        except Exception:                                  # noqa: BLE001
+            pass
 
     # ================================================================ tutup
     def _sync_tiles(self):
@@ -2383,6 +2404,8 @@ def main():
     ap.add_argument("--teks", type=float, default=1.2, metavar="SKALA",
                     help="skala ukuran teks (1.0/1.2/1.4) utk keterbacaan di lapangan")
     ap.add_argument("--no-pad", action="store_true", help="do not enable gamepad teleop")
+    ap.add_argument("--no-update", action="store_true",
+                    help="jangan cek update rilis GitHub saat mulai (otomasi)")
     ap.add_argument("--shot", default=None, help="save a window screenshot to PATH (UI testing)")
     ap.add_argument("--shot-after", type=float, default=6.0, help="seconds before the screenshot")
     args = ap.parse_args()
@@ -2411,6 +2434,16 @@ def main():
     app.processEvents()
     w._muatkan_ke_layar()
     QtCore.QTimer.singleShot(1200, w._muatkan_ke_layar)
+    # Cek update rilis GitHub (online; popup = pilihan user; offline = diam).
+    if not getattr(args, "no_update", False) and \
+            os.environ.get("DV_NO_UPDATE") != "1":
+        def _cek_upd():
+            try:
+                import updater as _upd
+                _upd.periksa_di_latar(w, __version__)
+            except Exception:                              # noqa: BLE001
+                pass
+        QtCore.QTimer.singleShot(1800, _cek_upd)
     if args.shot:
         def _ambil_shot():
             ok = w.grab().save(args.shot)

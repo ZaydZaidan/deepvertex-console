@@ -492,9 +492,13 @@ class PadMapDialog(QtWidgets.QDialog):
     # ------------------------------------------------------------------ preset
     @property
     def path(self):
-        return getattr(self.gamepad, "presets_path",
-                       os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                    "gamepad_presets.json"))
+        try:
+            import paths as _paths
+            _def = _paths.aset_json("gamepad_presets.json")
+        except Exception:                                  # noqa: BLE001
+            _def = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "gamepad_presets.json")
+        return getattr(self.gamepad, "presets_path", _def)
 
     def _baca_file(self):
         try:
