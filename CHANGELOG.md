@@ -4,6 +4,19 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.4] — 2026-10-15
+
+### Fixed
+- **Display-scale opt-out now actually effective on Windows.** v1.0.3 pinned
+  `QT_SCREEN_SCALE_FACTORS=1`, which Qt does not honour as an override of the
+  Windows platform DPI (it is a per-screen factor list applied by screen name).
+  The supported opt-out is `QT_ENABLE_HIGHDPI_SCALING=0` (+ `QT_FONT_DPI=96`);
+  the console now pins those before the QApplication is created — widgets
+  render 1:1 in physical pixels regardless of the Windows 125/150 % display
+  scale, while staying Per-Monitor-V2 aware (no blurry OS stretching).
+- The startup notification log now reports the detected device pixel ratio and
+  work area (`tampilan: dpr=…`) for field diagnostics.
+
 ## [1.0.3] — 2026-10-15
 
 ### Fixed

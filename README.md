@@ -80,23 +80,23 @@ console is built around that.
 | Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
 | Controller | Sony DualShock 4 (USB) |
 
-## Downloads (v1.0.3)
+## Downloads (v1.0.4)
 
 Available on the release page:
-<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.3>
+<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.4>
 
 | Platform | Artifact | For |
 |---|---|---|
-| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.3-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
+| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.4-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
 | **Windows** | `DeepVertexMarineConsole.exe` | Windows desktop (MAVLink telemetry, panels, parameters, recorder — scope note below) |
 
 ### A. Install on Ubuntu / other Linux (terminal)
 
 ```bash
 # 1) Download & extract
-wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.3/deepvertex-console-v1.0.3-linux.tar.gz
-tar xzf deepvertex-console-v1.0.3-linux.tar.gz
-cd deepvertex-console-1.0.3
+wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.4/deepvertex-console-v1.0.4-linux.tar.gz
+tar xzf deepvertex-console-v1.0.4-linux.tar.gz
+cd deepvertex-console-1.0.4
 
 # 2) One-time topside install (builds .venv: PySide6, evdev, pymavlink,
 #    numpy; apt deps: python3-gi + GStreamer tools/plugins; pip fallback)

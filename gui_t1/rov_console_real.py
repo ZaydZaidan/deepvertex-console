@@ -312,7 +312,7 @@ class RovConsole(QtWidgets.QMainWindow):
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
                        "raw_agent": args.raw_agent,
-                       "h264parse": h264parse_tersedia(), "versi": "1.0.3"}, f,
+                       "h264parse": h264parse_tersedia(), "versi": "1.0.4"}, f,
                       indent=2, ensure_ascii=False)
         self._apply_preset(self._preset)
         # Chrome-style organize windows: snap controller + restore saved
@@ -340,6 +340,12 @@ class RovConsole(QtWidgets.QMainWindow):
         if scr is None:
             return
         av = scr.availableGeometry()
+        # diagnostik lapangan: catat apa yang SEBENARNYA dilihat Qt (dpr!)
+        if not getattr(self, "_muat_logged", False):
+            self._muat_logged = True
+            self._catat("tampilan: dpr=%.2f · area %dx%d (%s)"
+                        % (scr.devicePixelRatio(), av.width(), av.height(),
+                           QtWidgets.QApplication.platformName()))
         app = QtWidgets.QApplication.instance()
         # tangga skala: pakai skala sekarang; bila minimum konten melebihi
         # layar, turunkan bertahap (rail & tengah scrollable — umumnya cukup
@@ -2348,6 +2354,8 @@ def main():
     # scaling tampilan OS (Windows 125/150%) — kanvas aplikasi selalu 1:1 px
     # fisik; skala UI diatur aplikasi sendiri (--teks / menu Appearance) dan
     # jendela dimuatkan ke area kerja oleh _muatkan_ke_layar().
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "0")
+    os.environ.setdefault("QT_FONT_DPI", "96")
     os.environ.setdefault("QT_SCREEN_SCALE_FACTORS", "1")
     ap = argparse.ArgumentParser(
         description="DeepVertex Marine Technology \u2014 ROV console (ROV mode, ROV mode)")
