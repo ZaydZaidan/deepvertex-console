@@ -478,6 +478,11 @@ QHeaderView::section { background: $head; color: $ink_dim; border: 0;
                        border-right: 1px solid $line; padding: 3px 6px; font-size: 10px; }
 QTableWidget, QTreeWidget, QListWidget { background: $panel; color: $ink;
                                          gridline-color: $line; border: 1px solid $line; }
+/* Log notifikasi: widget ini dulu TANPA rule (di Linux tampak gelap karena palet
+   tema GNOME; di Windows jadi putih 255,255,255 + teks terang = tak terbaca —
+   laporan owner 15 Okt). Beri gaya eksplisit lintas-platform. */
+QPlainTextEdit { background: $field; color: $ink; border: 1px solid $line;
+                 border-radius: 6px; padding: 4px 6px; }
 QProgressBar { background: $field; border: 1px solid $line; color: $ink; text-align: center; }
 QProgressBar::chunk { background: $accent; }
 

@@ -312,7 +312,7 @@ class RovConsole(QtWidgets.QMainWindow):
                        "streams": {n: getattr(args, "port_" + n.replace(" ", "_"), d)
                                    for n, _j, d in STREAM_DEF},
                        "raw_agent": args.raw_agent,
-                       "h264parse": h264parse_tersedia(), "versi": "1.0.2"}, f,
+                       "h264parse": h264parse_tersedia(), "versi": "1.0.3"}, f,
                       indent=2, ensure_ascii=False)
         self._apply_preset(self._preset)
         # Chrome-style organize windows: snap controller + restore saved
@@ -2344,6 +2344,11 @@ def hitung_geometri_jendela(av_w, av_h, min_w, min_h,
 
 
 def main():
+    # Skala DeepVertex berdiri SENDIRI (instruksi pemilik, 15 Okt): ablasi
+    # scaling tampilan OS (Windows 125/150%) — kanvas aplikasi selalu 1:1 px
+    # fisik; skala UI diatur aplikasi sendiri (--teks / menu Appearance) dan
+    # jendela dimuatkan ke area kerja oleh _muatkan_ke_layar().
+    os.environ.setdefault("QT_SCREEN_SCALE_FACTORS", "1")
     ap = argparse.ArgumentParser(
         description="DeepVertex Marine Technology \u2014 ROV console (ROV mode, ROV mode)")
     ap.add_argument("--mavlink", default="udpin:0.0.0.0:14550",

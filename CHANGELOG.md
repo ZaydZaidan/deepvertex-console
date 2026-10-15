@@ -4,6 +4,22 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.3] — 2026-10-15
+
+### Fixed
+- **The app no longer inherits the OS display scale** (owner-directed fix):
+  on Windows with 125–150 % display scaling the logical canvas shrank, the
+  centre column got squeezed between the rails and needed horizontal
+  scrolling. The console now pins `QT_SCREEN_SCALE_FACTORS=1` before the
+  QApplication is created — the UI renders 1:1 in physical pixels and is
+  scaled ONLY by the app's own text scale (`--teks` 1.0/1.2/1.4, View ▸
+  Appearance), matching the documentation pixel-for-pixel. Window fitting
+  stays as the safety net for genuinely small screens.
+- **NOTIFICATIONS log styled explicitly** (new `QPlainTextEdit` QSS rule):
+  the log widget had no stylesheet rule at all — it looked dark on Linux only
+  because the desktop (GNOME) palette leaked into the app, and rendered
+  white-on-white (unreadable) on Windows.
+
 ## [1.0.2] — 2026-10-15
 
 ### Fixed
