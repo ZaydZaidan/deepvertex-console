@@ -4,6 +4,28 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.16] — 2026-10-15
+
+### Fixed
+- **Telemetry was blocked by Windows Firewall BLOCK rules** (owner report:
+  one-click all-green but LINK never up, while packet captures on the same
+  machine showed a perfect MAVLink stream). Root cause: a Windows Defender
+  prompt that had been denied left TWO inbound **Block** rules for the exe
+  on the Public profile — block rules override any allow rule, so the app
+  never received. Fixes:
+  * one-click now DETECTS block rules and launches an elevated fixer
+    (UAC): removes `*deepvertex*` Block rules + re-ensures the UDP 14550
+    allow, then re-checks the link;
+  * new **“Fix Windows Firewall (UAC)”** button in the Connection dialog;
+  * test [54].
+- **“The network path was not found” on Save & Restart**: the relaunch
+  used a giant `cmd /c "…&…"` one-liner whose quotes Qt mangles; it is now
+  a proper `restart.bat` (the proven updater pattern) launched as a single
+  short argument.
+- **Update popups could hide each other** (owner report): the update
+  dialog is explicitly closed, the progress dialog destroyed, and the
+  final “Download complete” box is raised + stays-on-top.
+
 ## [1.0.15] — 2026-10-15
 
 ### Added

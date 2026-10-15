@@ -932,6 +932,18 @@ def main():
         print("[53] robotops BlueOS API GAGAL:", repr(exc))
         lulus = False
 
+    # [54] koneksi: skrip pemulihan firewall (isi benar; murni).
+    try:
+        import koneksi as _K54
+        sk = _K54.skrip_fix_firewall()
+        ok54 = ("Remove-NetFirewallRule" in sk and "deepvertex" in sk
+                and "14550" in sk and "Block" in sk)
+        print("[54] firewall fix script (isi):", ok54)
+        lulus &= bool(ok54)
+    except Exception as exc:                               # noqa: BLE001
+        print("[54] firewall fix GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

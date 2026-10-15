@@ -503,7 +503,12 @@ def _diskusikan_update(w, info, v_lokal):
     b_upd.clicked.connect(d.accept)
     bawah.addWidget(b_upd)
     v.addLayout(bawah)
-    return bool(d.exec())
+    hasil = bool(d.exec())
+    try:
+        d.close()                          # pastikan dialog benar-benar turun
+    except Exception:                                      # noqa: BLE001
+        pass
+    return hasil
 
 
 def _unduh_dengan_progres(w, url, dest):
@@ -567,6 +572,11 @@ def _unduh_dengan_progres(w, url, dest):
         QtWidgets.QApplication.processEvents()
         th.wait(40)
     prog.close()
+    try:
+        prog.deleteLater()
+    except Exception:                                      # noqa: BLE001
+        pass
+    QtWidgets.QApplication.processEvents()
     # File lengkap di disk = unduhan SUKSES, walau thread melaporkan timeout
     # di ekor (koneksi keep-alive) atau user menekan Cancel tepat setelah
     # byte terakhir — jangan buang hasil yang sudah utuh (kasus pemilik 15 Okt).
@@ -637,6 +647,9 @@ def _tanya_lalu_terapkan(w, info, v_lokal):
         QtWidgets.QMessageBox.Ok, w)
     QtCore.QTimer.singleShot(12000, kotak.accept)   # lanjut otomatis 12 dtk —
                                                     # apply TIDAK bergantung klik
+    kotak.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, True)
+    kotak.raise_()
+    kotak.activateWindow()
     kotak.exec()
     QtWidgets.QApplication.instance().quit()
 

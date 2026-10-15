@@ -208,6 +208,23 @@ def uji(host, port_video=5600, raw_url="", timeout=1.5):
 
 
 # ------------------------------------------------------------------ dialog
+def skrip_fix_firewall():
+    """Isi skrip .ps1 pemulihan firewall (fungsi murni, diuji [54]).
+
+    Masalah nyata (15 Okt): prompt Windows Defender yang pernah ditolak
+    meninggalkan aturan BLOCK untuk exe kita — aturan BLOCK mengalahkan
+    aturan allow apa pun, sehingga telemetri tak pernah masuk. Skrip ini
+    (dijalankan lewat UAC) menghapus blok itu + memastikan allow UDP 14550.
+    """
+    return (
+        "Get-NetFirewallRule | Where-Object { $_.DisplayName -like "
+        "\"*deepvertex*\" -and $_.Action -eq \"Block\" } | "
+        "Remove-NetFirewallRule -ErrorAction SilentlyContinue\r\n"
+        "netsh advfirewall firewall add rule name=\"DeepVertex MAVLink "
+        "UDP In\" dir=in action=allow protocol=UDP localport=14550 | "
+        "Out-Null\r\n")
+
+
 def buat_dialog(console):
     """Dialog pengaturan koneksi (menu: Connection…). Dibuat on-demand."""
     import sys
@@ -282,6 +299,55 @@ def buat_dialog(console):
     baris_oc.addWidget(lbl_oc, 1)
     v.addLayout(baris_oc)
 
+    def _perbaiki_firewall(silent=False):
+        """Deteksi aturan BLOCK utk aplikasi ini; perbaiki via UAC (Windows)."""
+        if os.name != "nt":
+            return "firewall check is Windows-only"
+        import subprocess
+        ps = ("$b = @(Get-NetFirewallRule | Where-Object { "
+              "$_.DisplayName -like '*deepvertex*' -and $_.Action -eq "
+              "'Block' }); if ($b.Count -gt 0) { 'BLOCKS=' + $b.Count } else "
+              "{ 'clean' }")
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                               capture_output=True, text=True, timeout=20)
+            out = (r.stdout or "").strip()
+        except Exception as exc:                           # noqa: BLE001
+            return "firewall check failed: %s" % exc
+        if "clean" in out:
+            return ""                                     # tidak ada blok
+        # tulis skrip + jalankan lewat UAC
+        try:
+            import paths
+            d = os.path.join(paths.data_dir(), "update")
+            os.makedirs(d, exist_ok=True)
+            p = os.path.join(d, "fix_firewall.ps1")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(skrip_fix_firewall())
+            QtCore.QProcess.startDetached(
+                "powershell",
+                ["-NoProfile", "-Command",
+                 "Start-Process powershell -Verb RunAs -ArgumentList "
+                 "'-NoProfile','-ExecutionPolicy','Bypass','-File','%s'" % p])
+            return ("blocked firewall rules detected (%s) — fix launched "
+                    "(click YES on the UAC prompt)" % out)
+        except Exception as exc:                           # noqa: BLE001
+            return "firewall fix failed: %s" % exc
+
+    b_fw = QtWidgets.QPushButton("Fix Windows Firewall (UAC)")
+    b_fw.setObjectName("BtnTiny")
+    b_fw.setVisible(os.name == "nt")
+
+    def _klik_fw():
+        lbl_oc.setText("checking firewall …")
+        QtWidgets.QApplication.processEvents()
+        msg = _perbaiki_firewall() or "firewall is clean (no block rules)"
+        lbl_oc.setText(msg)
+        console._catat("firewall helper: " + msg)
+
+    b_fw.clicked.connect(_klik_fw)
+    baris_oc.addWidget(b_fw)
+
     def _oneclick():
         c = tarik()
         host = c["host"] or "192.168.2.2"
@@ -313,16 +379,19 @@ def buat_dialog(console):
                     # 3) pastikan endpoint MAVLink -> laptop ini
                     ok, msg = robotops.blueos_pastikan_endpoint(host, ip, 14550)
                     langkah.append(("✓ " if ok else "✗ ") + msg)
-                    # 4) verifikasi telemetri
-                    if ok and robotops.tunggu_link(getattr(console, "bridge", None), 8):
+                    # 4) verifikasi telemetri (ikut cek/pulihkan firewall)
+                    if ok and robotops.tunggu_link(console.bridge, 8):
                         langkah.append("✓ MAVLink telemetry flowing (LINK up)")
                     elif ok:
-                        langkah.append("… LINK not up yet — if it stays "
-                                       "“wait”: allow UDP 14550 in Windows "
-                                       "Firewall (Admin CMD: netsh advfirewall "
-                                       "firewall add rule name=\"DeepVertex "
-                                       "MAVLink UDP In\" dir=in action=allow "
-                                       "protocol=UDP localport=14550)")
+                        pesan_fw = _perbaiki_firewall()
+                        if pesan_fw:
+                            langkah.append("… " + pesan_fw)
+                        if robotops.tunggu_link(console.bridge, 8):
+                            langkah.append("✓ MAVLink telemetry flowing (LINK up)")
+                        else:
+                            langkah.append("… LINK not up yet — press “Fix "
+                                           "Windows Firewall” above and check "
+                                           "the notifications")
                     # 5) RAW agent (bila kredensial SSH terisi)
                     if c["ssh_user"] and c["ssh_pass"]:
                         ok2, msg2 = robotops.start_agent(
@@ -596,22 +665,32 @@ def buat_dialog(console):
         console._catat("connection: saved — restarting the console")
 
         def _lahirkan():
-            # v1.0.10: relaunch DITUNDA ±4 dtk. Bug 15 Okt: folder ekstraksi
-            # onefile = _MEI<hex-PID>; PID Windows cepat didaur ulang, jadi
-            # instance baru dapat PID bekas instance lama → ekstrak ke folder
-            # yang SEDANG dihapus oleh bootloader lama → crash
-            # "numpy\_core tidak ditemukan". Jeda = biar pembersihan selesai.
-            # (Pop env PyInstaller = higiene tambahan; hasil uji: bukan faktor
-            #  penentu di build ini, tapi aman.)
+            # v1.0.16: relaunch via restart.bat (pola terbukti dari updater).
+            # Bug 15 Okt: cmd /c "<mega-string dengan tanda kutip>&" dari
+            # QProcess.startDetached ter-mangle Qt → cmd salah-parse →
+            # "The network path was not found". Bat = satu argumen pendek.
+            # Jeda ±4 dtk: biar pembersihan _MEI instance lama selesai dulu.
             for k in ("_MEIPASS2", "_PYI_APPLICATION_HOME_DIR",
                       "_PYI_ARCHIVE_FILE", "_PYI_PARENT_PROCESS_LEVEL",
                       "_PYI_SPLASH_IPC"):
                 os.environ.pop(k, None)
             if os.name == "nt":
-                arg = " ".join('"%s"' % a if " " in a else a for a in args2)
-                baris = ('ping -n 5 127.0.0.1 >nul & start "" "%s" %s'
-                         % (prog, arg))
-                QtCore.QProcess.startDetached("cmd", ["/c", baris])
+                try:
+                    import paths
+                    d = os.path.join(paths.data_dir(), "update")
+                    os.makedirs(d, exist_ok=True)
+                    bat = os.path.join(d, "restart.bat")
+                    arg = " ".join('"%s"' % a if " " in a else a
+                                   for a in args2)
+                    with open(bat, "w", encoding="utf-8") as f:
+                        f.write("@echo off\r\n"
+                                "ping -n 5 127.0.0.1 >nul\r\n"
+                                "start \"\" \"%s\" %s\r\n"
+                                "del /q \"%%~f0\" >nul 2>nul\r\n"
+                                % (prog, arg))
+                    QtCore.QProcess.startDetached("cmd.exe", ["/c", bat])
+                except Exception:                          # noqa: BLE001
+                    QtCore.QProcess.startDetached(prog, args2)
             else:
                 QtCore.QProcess.startDetached(prog, args2)
             console.close()
