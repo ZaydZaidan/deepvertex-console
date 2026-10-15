@@ -85,6 +85,7 @@ jobs:
             --windowed `
             --icon gui_t1/ikon/deepvertex-app-icon.ico `
             --add-data "gui_t1/ikon;ikon" `
+            --collect-all pymavlink `
             --paths gui_t1 `
             gui_t1/windows_entry.py
           ls dist
@@ -97,6 +98,7 @@ jobs:
             --onefile `
             --icon gui_t1/ikon/deepvertex-app-icon.ico `
             --add-data "gui_t1/ikon;ikon" `
+            --collect-all pymavlink `
             --paths gui_t1 `
             gui_t1/windows_entry.py
           ls dist
