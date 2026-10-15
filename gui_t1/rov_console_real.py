@@ -1892,8 +1892,12 @@ class RovConsole(QtWidgets.QMainWindow):
     def _update_disk(self):
         import shutil
         try:
-            du = shutil.disk_usage(self.sesi)
-            free_mb = du.free / 1e6
+            # OVERRable utk uji/CI (deterministik): override menggantikan
+            # shutil.disk_usage() — semua jalur guard tetap asli.
+            _ov = getattr(self, "_disk_free_mb_override", None)
+            du_free = (shutil.disk_usage(self.sesi).free / 1e6
+                       if _ov is None else float(_ov))
+            free_mb = du_free
             self._disk_free_mb = free_mb
             now = time.time()
             if self._disk_prev is not None and self._rec_aktif:

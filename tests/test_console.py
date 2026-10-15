@@ -380,14 +380,18 @@ def main():
 
     # [29] estimasi storage + margin pengaman + blokir REC/SNAP saat penuh
     try:
-        w._disk_free_mb = 900.0
-        w._disk_blok = True
+        # Deterministik: override disk-free via SEAM resmi (uji _update_disk
+        # bermuka-muka dengan disk kecil; timer tidak menimpa flag lagi).
+        w._disk_free_mb_override = 900.0
+        w._update_disk()
+        jalan(0.3)
+        ok_pre29 = w._disk_blok and w._disk_free_mb == 900.0
         komp = os.path.join(w.sesi, "compressed")
         sebelum = set(os.listdir(komp))
         w._snap("front")
         jalan(1.2)
         logtxt = w.log.toPlainText()
-        ok29 = (set(os.listdir(komp)) == sebelum)
+        ok29 = ok_pre29 and (set(os.listdir(komp)) == sebelum)
         ok29 = ok29 and ("SNAP blocked \u2014 topside storage full" in logtxt)
         w.btn_rec["front"].setChecked(True)        # compressed → harus ditolak
         jalan(1.2)
@@ -402,6 +406,7 @@ def main():
         ok29 = ok29 and (est29 is not None and abs(est29 - 15.0) < 0.6)
         w._disk_free_mb = None
         w._disk_blok = False
+        w._disk_free_mb_override = None
         w._safety_check(dict(w.bridge.state, link=True))
         print("[29] estimasi & blokir storage:", ok29)
         lulus &= bool(ok29)
