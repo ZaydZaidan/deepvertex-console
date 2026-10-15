@@ -4,6 +4,28 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.0.8] — 2026-10-15
+
+### Fixed
+- **"Save & Restart" left two consoles running.** The connection dialog's
+  modal loop kept the old instance alive while the new one started (both
+  fought over the same session/ports — reported by the owner). The dialog
+  now closes first; the old instance exits cleanly before the new one takes
+  over (verified: single process, correct connection args, clean exit).
+- **Connection test rebuilt to match reality** (owner report "can't connect
+  although SSH to BlueOS is open"): rows are now SSH/BlueOS (TCP 22), BlueOS
+  web (HTTP 80/8080), MAVLink (informational — the console *listens* on
+  14550 and the dialog now shows the exact laptop IP BlueOS must send to),
+  and RAW agent (with the command to start it on the robot). The old "video
+  port" row wrongly probed a TCP server that never exists — video is UDP
+  sent TO the laptop.
+- Language sweep round 2 — "CHECKLIST PRE-DIVE (prosedur…)" → "(Blue
+  Robotics procedure)"; third automated pass over all modules is clean.
+
+### Changed
+- Offline MAVLink message no longer says "waiting for SITL" on a real robot:
+  now "waiting for a MAVLink source (robot or SITL)".
+
 ## [1.0.7] — 2026-10-15
 
 ### Fixed

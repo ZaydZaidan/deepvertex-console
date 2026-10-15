@@ -784,7 +784,7 @@ class PreflightPanel(QtWidgets.QWidget):
         v.addWidget(self.lbl_status)
 
         # ---- checklist manual
-        t = QtWidgets.QLabel("CHECKLIST PRE-DIVE (prosedur Blue Robotics):")
+        t = QtWidgets.QLabel("CHECKLIST PRE-DIVE (Blue Robotics procedure):")
         t.setObjectName("MicroLabel")
         v.addWidget(t)
         for key, teks in CHECKLIST_PREDIVE:

@@ -277,7 +277,8 @@ class MavBridge(QtCore.QObject):
                 if self._stream(url):
                     return
                 self.sig_status.emit(f"no telemetry at {url}")
-            self.sig_status.emit("MAVLink not connected — waiting for SITL (retry in 5 s)")
+            self.sig_status.emit("MAVLink not connected — waiting for a MAVLink "
+                                 "source (robot or SITL; retry in 5 s)")
             for _ in range(10):
                 if self._stop.is_set():
                     return

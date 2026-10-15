@@ -148,29 +148,60 @@ def args_terapan(cfg, argv):
 
 # ------------------------------------------------------------------ ujicoba
 def uji(host, port_video=5600, raw_url="", timeout=1.5):
-    """Uji sambungan cepat; return dict {'ping','video','raw'} berisi pesan."""
+    """Quick connection test; returns {"ssh","web","mavlink","raw"} messages.
+
+    * ssh : TCP 22 (BlueOS/companion open?)
+    * web : HTTP on port 80/8080 (BlueOS web UI alive?)
+    * mavlink : informational — the console LISTENS on its MAVLink endpoint;
+      we compute which local IP the robot would see, so it can be configured
+      in BlueOS (video ports behave the same: UDP sent TO this laptop).
+    * raw : GET <raw_url>/status (onboard RAW agent running?)
+    """
     hasil = {}
-    # ping = resolusi + TCP ke port video
-    try:
-        s = socket.create_connection((host, int(port_video)), timeout=timeout)
-        s.close()
-        hasil["video"] = "OK — %s:%d accepts TCP" % (host, port_video)
-    except Exception as exc:                               # noqa: BLE001
-        hasil["video"] = "FAILED — %s:%d (%s)" % (host, port_video, exc)
     try:
         s = socket.create_connection((host, 22), timeout=timeout)
         s.close()
-        hasil["ssh"] = "OK — %s:22 (BlueOS/SSH open)" % host
+        hasil["ssh"] = "OK — %s:22 open (BlueOS/SSH)" % host
     except Exception as exc:                               # noqa: BLE001
         hasil["ssh"] = "not open — %s:22 (%s)" % (host, exc)
+    for porta in (80, 8080):
+        try:
+            req = urllib.request.Request("http://%s:%d/" % (host, porta),
+                                         headers={"User-Agent": "dv-connection"})
+            with urllib.request.urlopen(req, timeout=timeout + 0.5) as r:
+                hasil["web"] = "OK — BlueOS web answers on :%d (HTTP %d)" % (
+                    porta, r.status)
+            break
+        except urllib.error.HTTPError as exc:              # answered (302/401…)
+            hasil["web"] = "OK — BlueOS web answers on :%d (HTTP %d)" % (
+                porta, exc.code)
+            break
+        except Exception as exc:                           # noqa: BLE001
+            hasil.setdefault("web", None)
+            hasil["web"] = "no web answer on :80/:8080 (%s)" % exc
+    # MAVLink: console listens (UDP in); show the local IP the robot must use.
+    ip_lokal = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((host, 14550))                           # no packets sent
+        ip_lokal = s.getsockname()[0]
+        s.close()
+    except Exception:                                      # noqa: BLE001
+        pass
+    hasil["mavlink"] = ("console listens on 0.0.0.0:14550 — in BlueOS add a "
+                        "MAVLink UDP client to %s:14550 (video: UDP to this "
+                        "laptop, ports 5600 front / 5601 L / 5602 R)"
+                        % (ip_lokal or "<this laptop IP>"))
     if raw_url:
         try:
             req = urllib.request.Request(raw_url.rstrip("/") + "/status",
-                                         headers={"User-Agent": "dv-koneksi"})
+                                         headers={"User-Agent": "dv-connection"})
             with urllib.request.urlopen(req, timeout=timeout + 1.0) as r:
                 hasil["raw"] = "OK — RAW agent responded (HTTP %d)" % r.status
         except Exception as exc:                           # noqa: BLE001
-            hasil["raw"] = "FAILED — %s (%s)" % (raw_url, exc)
+            hasil["raw"] = ("no RAW agent — %s (%s). Start it on the robot: "
+                            "python3 onboard/raw_agent.py --port 8765"
+                            % (raw_url, exc))
     return hasil
 
 
@@ -363,10 +394,11 @@ def buat_dialog(console):
     # ---- 3) uji koneksi
     v.addWidget(QtWidgets.QLabel("<b>3. Test connection</b>"))
     hasil_lbl = {}
-    for k, tag in (("ssh", "SSH/BlueOS"), ("video", "Video port"),
-                   ("raw", "RAW agent")):
+    for k, tag in (("ssh", "SSH / BlueOS"), ("web", "BlueOS web"),
+                   ("mavlink", "MAVLink"), ("raw", "RAW agent")):
         lb = QtWidgets.QLabel("—")
         lb.setObjectName("Faint")
+        lb.setWordWrap(True)
         baris2 = QtWidgets.QHBoxLayout()
         t = QtWidgets.QLabel(tag)
         t.setFixedWidth(96)
@@ -381,11 +413,15 @@ def buat_dialog(console):
         hasil_lbl["ssh"].setText("testing %s …" % host)
         QtWidgets.QApplication.processEvents()
         h = uji(host, c["front_port"], c["raw_agent"])
-        for k in ("ssh", "video", "raw"):
-            hasil_lbl[k].setText(h.get(k, "—"))
-            hasil_lbl[k].setStyleSheet(
-                "color:#5CC98F;" if h.get(k, "").startswith("OK")
-                else "color:#E8804A;")
+        for k in ("ssh", "web", "mavlink", "raw"):
+            msg = h.get(k, "—")
+            hasil_lbl[k].setText(msg)
+            if msg.startswith("OK"):
+                hasil_lbl[k].setStyleSheet("color:#5CC98F;")
+            elif k == "mavlink":
+                hasil_lbl[k].setStyleSheet("")       # informational
+            else:
+                hasil_lbl[k].setStyleSheet("color:#E8804A;")
 
     b_uji = QtWidgets.QPushButton("Test now")
     b_uji.clicked.connect(_uji)
@@ -412,12 +448,20 @@ def buat_dialog(console):
             return
         argv_baru = args_terapan(c, sys.argv)
         if getattr(sys, "frozen", False):
-            QtCore.QProcess.startDetached(sys.executable, argv_baru)
+            prog, args2 = sys.executable, argv_baru
         else:
-            QtCore.QProcess.startDetached(sys.executable,
-                                          [sys.argv[0]] + argv_baru)
+            prog, args2 = sys.executable, [sys.argv[0]] + argv_baru
         console._catat("connection: saved — restarting the console")
-        console.close()
+
+        def _lahirkan():
+            QtCore.QProcess.startDetached(prog, args2)
+            console.close()
+
+        # PENTING (bug 15 Okt): dialog modal HARUS ditutup SEBELUM console
+        # ditutup — kalau tidak, loop modal menahan proses lama hidup dan
+        # muncul DUA instance konsol yang berebut port/sesi.
+        d.accept()
+        QtCore.QTimer.singleShot(150, _lahirkan)
 
     b_simpan.clicked.connect(_simpan_restart)
     _isi_iface()
