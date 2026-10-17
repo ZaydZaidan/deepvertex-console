@@ -80,6 +80,20 @@ console is built around that.
 | Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
 | Controller | Sony DualShock 4 (USB) |
 
+## Windows: camera video shows "waiting for stream"?
+
+Windows blocks incoming UDP unless allowed. The application needs inbound UDP on
+**ports 5600-5602** (camera video) and **14550** (MAVLink). If telemetry works but
+the camera tiles stay black, add the rule once in an admin PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "DeepVertex Video UDP In" -Direction Inbound `
+  -Protocol UDP -LocalPort 5600-5602 -Action Allow -Profile Any
+```
+
+(The MAVLink port rule is normally created by the app's earlier setup; video ports
+are not covered by Windows' defaults — this is a Windows behaviour, not the robot.)
+
 ## Downloads (v1.0.17)
 
 Available on the release page:
