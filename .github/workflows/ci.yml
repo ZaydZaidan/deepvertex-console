@@ -133,7 +133,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVertexMarineConsole.exe --clobber
-          gh release upload "${env:GITHUB_REF_NAME}" dist/DeepVMDebug.exe --clobber
+          # Portable/debug EXE sengaja TIDAK diunggah ke rilis (kebijakan pemilik):
+          # rilis = Setup installer + tar Linux saja. Artefak CI tetap ada utk debug.
           gh release upload "${env:GITHUB_REF_NAME}" (Get-ChildItem dist/DeepVertexMarineConsole-Setup-*.exe).FullName --clobber
 
