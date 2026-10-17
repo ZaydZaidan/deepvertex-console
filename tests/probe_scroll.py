@@ -85,6 +85,44 @@ def main():
     w.grab().save(shot3)
     print("screenshot pilot-bawah:", shot3)
 
+    # ---- sweep ukuran jendela (proxy device/OS): rel kanan tanpa klip-H
+    print("== sweep ukuran (dinamis, device/OS berbeda) ==")
+    klip_total = []
+    for (ww, hh) in ((1280, 800), (1366, 768), (1440, 900), (1620, 1000),
+                     (1854, 1011)):
+        w.resize(ww, hh)
+        jalan(0.9)
+        klip = []
+        for s in w.findChildren(QtWidgets.QScrollArea):
+            vb = s.verticalScrollBar()
+            vp = s.viewport().width()
+            dalam = s.widget()
+            minw = dalam.minimumSizeHint().width() if dalam else 0
+            if minw > vp + 2:
+                ttl = "?"
+                for ch in dalam.findChildren(
+                        QtWidgets.QWidget,
+                        options=QtCore.Qt.FindDirectChildrenOnly):
+                    if ch.isVisible() and ch.minimumSizeHint().width() > vp + 2:
+                        try:
+                            lab = ch.findChild(QtWidgets.QLabel, "PanelTitle")
+                            ttl = lab.text() if lab is not None else \
+                                ch.__class__.__name__
+                        except Exception:                   # noqa: BLE001
+                            ttl = ch.__class__.__name__
+                        break
+                klip.append("%s minW=%d>vpW=%d" % (ttl, minw, vp))
+        t58 = w.P["cam_front"].tile
+        asp = getattr(t58, "_aspect", 16.0 / 9.0)
+        pakai = t58.width() <= int(max(1, t58.height() - 18) * asp) + 3
+        tidak_jepit = t58.height() >= t58.heightForWidth(t58.width()) - 6
+        print("  %dx%d -> rel:%s | tile:%s" %
+              (ww, hh, "OK" if not klip else "KLIP %s" % klip,
+               "PENUH+FIT" if (pakai and tidak_jepit)
+               else ("BORDER" if not pakai else "TERJEPIT")))
+        klip_total.extend(["%dx%d %s" % (ww, hh, k) for k in klip])
+    print("SWEEP:", "SEMUA OK" if not klip_total else klip_total)
+
     pf = w.P["failsafe"]
     btns = [b for b in pf.findChildren(QtWidgets.QPushButton)
             if b.text().startswith("APPLY RECOMMENDED")]

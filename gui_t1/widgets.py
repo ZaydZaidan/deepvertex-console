@@ -83,7 +83,7 @@ class Panel(QtWidgets.QFrame):
         self.body_layout = QtWidgets.QVBoxLayout(self.body)
         self.body_layout.setContentsMargins(theme.px(12), theme.px(10),
                                             theme.px(12), theme.px(12))
-        self.body_layout.setSpacing(6)
+        self.body_layout.setSpacing(9)     # spasi lega (rasa 1.5 — 17 Okt)
 
         outer.addWidget(head)
         outer.addWidget(self.body, 1)
@@ -992,6 +992,58 @@ class TrajectoryPlot(QtWidgets.QWidget):
             p.drawText(QRectF(x, area.bottom() + 16, w, 12), Qt.AlignLeft | Qt.AlignVCenter, txt)
             x += w
         p.end()
+
+
+class BarPersen(QtWidgets.QWidget):
+    """Bar persentase 0..100 mengisi dari KIRI (battery / storage) + level.
+
+    Permintaan pemilik 17 Okt: data persen tampil VISUAL + angkanya.
+    API: setValue(0..100), setWarna("#RRGGBB" | None = accent tema), value().
+    """
+
+    def __init__(self, tinggi=8, parent=None):
+        super().__init__(parent)
+        self._v = 0.0
+        self._warna = None
+        self.setFixedHeight(theme.px(tinggi))
+        self.setMinimumWidth(60)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                           QtWidgets.QSizePolicy.Fixed)
+
+    def setValue(self, v):
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            f = 0.0
+        f = max(0.0, min(100.0, f))
+        if abs(f - self._v) > 0.01:
+            self._v = f
+            self.update()
+
+    def setWarna(self, hexw):
+        if hexw != self._warna:
+            self._warna = hexw
+            self.update()
+
+    def value(self):
+        return self._v
+
+    def paintEvent(self, _ev):                          # noqa: N802 (Qt)
+        p = QtGui.QPainter(self)
+        try:
+            p.setRenderHint(QtGui.QPainter.Antialiasing)
+            wd, ht = self.width(), self.height()
+            r = ht / 2.0
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QColor(255, 255, 255, 22))
+            p.drawRoundedRect(0, 0, wd, ht, r, r)
+            if self._v > 0:
+                p.setBrush(QtGui.QColor(self._warna) if self._warna
+                           else theme.warna("accent"))
+                lebar = min(wd, max(int(ht), int(wd * (self._v / 100.0))))
+                p.drawRoundedRect(0, 0, lebar, ht, r, r)
+        finally:
+            p.end()
 
 
 class BarTengah(QtWidgets.QWidget):

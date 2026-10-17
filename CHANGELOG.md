@@ -4,6 +4,48 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.0] — 2026-10-17
+
+### Added
+- **Official laptop-side network setup (Connection dialog)**: one button sets
+  the tether adapter to the official BlueRobotics static address
+  (192.168.2.1 / 255.255.255.0) per OS (Linux `nmcli` live, Windows `netsh`
+  via UAC helper, macOS `networksetup`), with a built-in **Verify** (adapter
+  address + robot reachability) and **Save (no restart)** — restarting is not
+  needed for network changes. Manual per-OS steps (official guide) stay one
+  click away as a fallback.
+- **Camera ON/OFF now controls the ROBOT**: turning a camera OFF stops its
+  video stream inside BlueOS (frees the Pi's CPU/USB); ON re-creates it with
+  the saved settings. (The old one-click/SSH robot path was removed — policy:
+  official flow only, robot stays factory-clean.)
+- **Front camera RAW capture** (snap + chunked recording) via the onboard
+  agent, which now uses `v4l2-ctl` (the BlueOS host has no gst-launch):
+  verified live on the robot (chunk rollover + sha256 download check).
+- **RAW panel rework**: per-file checkboxes, SELECT ALL, and bulk
+  TRANSFER/DELETE (delete asks first); duplicate camera-record buttons and
+  duplicated disk info removed (single source: CAPTURE panel).
+- **REC/SNAP feedback animations** in CAPTURE: the REC button pulses red while
+  recording (compressed or robot-RAW), SNAP flashes green ~0.3 s — both return
+  to normal instantly when done.
+- **Dual battery bars** (ArduPilot remaining + LiPo estimate, 14.8 V = 0%),
+  storage % bars (topside + robot) and a robot-storage RAW-time estimate.
+- **Sensor log per session, topside only**: `sensors.csv` at 10 Hz (volt,
+  current, battery, depth, water temp, pressure, attitude, EKF, …) inside the
+  session folder — no extra load on the robot.
+- **Mission map**: manual anchor input (COORDS… dialog) AND anchor persistence
+  (next session starts from the last anchor); Indonesia tile-cache tool
+  (`tools/cache_peta_indonesia.py`).
+
+### Changed
+- Front camera panel fits the camera resolution (full-bleed, no black bars;
+  ratio read live from each frame — modular for any camera/robot).
+- Font/spacing pass for a calmer layout (“1.5” feel); wheel guard: scrolling
+  over sliders/dropdowns/spin boxes no longer changes values unless the
+  control was clicked first.
+- Header chips trimmed to LINK + EKF (REC/FS chips removed — single-source
+  info); PRE-FLIGHT text status line removed entirely (ghost source).
+- Full suite extended to check #64 — green on Linux.
+
 ## [1.0.17] — 2026-10-15
 
 ### Fixed

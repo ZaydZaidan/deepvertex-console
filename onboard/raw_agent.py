@@ -10,6 +10,7 @@ Protokol HTTP (JSON):
   GET  /status                -> status service, disk, capture aktif
   POST /capture/start         -> {"cam": "left"|"right"|"front"|"both", "chunk_mb": 1024}
   POST /capture/stop          -> {"cam": ...}
+  POST /snap                  -> {"cam": ...}  one uncompressed frame
   GET  /files                 -> daftar chunk (path relatif, ukuran, mtime)
   GET  /sha256/<path>         -> sha256 file (dihitung streaming, di-cache)
   GET  /download/<path>       -> unduh file (streaming)
@@ -38,7 +39,7 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
 
-VERSI = "1.0.0"
+VERSI = "1.1.0"
 NAMA_SERVICE = "deepvertex-raw-agent"
 
 ARGS = None
@@ -52,6 +53,11 @@ SHA_CACHE = {}         # path relatif -> sha256
 # --------------------------------------------------------------------------- #
 def _now_tag():
     return time.strftime("%Y%m%d_%H%M%S")
+
+
+def _dir_total_mb(path):
+    st = os.statvfs(path)
+    return (st.f_blocks * st.f_frsize) // (1024 * 1024)
 
 
 def _dir_free_mb(path):
@@ -120,31 +126,130 @@ def _gst_cmd(cam, dir_sesi):
     return ["gst-launch-1.0", "-q"] + src + ["!"] + caps + ["!"] + out
 
 
+def _perekam():
+    """Backend perekam: gst-launch (desktop/mock) atau v4l2-ctl (host robot)."""
+    if shutil.which("gst-launch-1.0"):
+        return "gst"
+    if shutil.which("v4l2-ctl"):
+        return "v4l2"
+    return None
+
+
+def _dev_cam(cam):
+    return {"left": ARGS.device_left, "right": ARGS.device_right,
+            "front": getattr(ARGS, "device_front", None)}.get(cam)
+
+
+def _dims(cam):
+    if cam == "front":
+        return ARGS.front_width, ARGS.front_height
+    return ARGS.width, ARGS.height
+
+
+def _v4l2_chunk_cmd(cam, path, frames):
+    w, h = _dims(cam)
+    dev = _dev_cam(cam)
+    if not dev:
+        raise RuntimeError("device %s not set (--device-%s)" % (cam, cam))
+    return ["v4l2-ctl", "-d", dev,
+            "--set-fmt-video=width=%d,height=%d,pixelformat=YUYV" % (w, h),
+            "--stream-mmap", "--stream-to=%s" % path,
+            "--stream-count=%d" % frames]
+
+
+def _v4l2_snap_cmd(cam, path):
+    """Satu frame YUYV (snapshot RAW) via v4l2-ctl."""
+    return _v4l2_chunk_cmd(cam, path, 1)
+
+
+def _aktif(ent):
+    if not isinstance(ent, dict):
+        return False
+    if ent.get("mode") == "v4l2":
+        th = ent.get("thread")
+        return bool(th and th.is_alive())
+    p = ent.get("proc")
+    return bool(p and p.poll() is None)
+
+
+def _loop_v4l2(cam, ent):
+    """Perekam loop v4l2-ctl: satu file per chunk (ganti multifilesink)."""
+    w, h = _dims(cam)
+    frames = max(1, (ARGS.chunk_mb * 1024 * 1024) // (w * h * 2))
+    i = 1
+    while not ent["stop"].is_set():
+        path = os.path.join(ent["dir"], "chunk_%05d.yuv" % i)
+        try:
+            cmd = _v4l2_chunk_cmd(cam, path, frames)
+        except Exception as exc:                            # noqa: BLE001
+            ent["fatal"] = str(exc)
+            return
+        p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.PIPE, text=True)
+        ent["proc"] = p
+        _o, err = p.communicate()
+        if err:
+            ent["err"].extend(err.strip().splitlines()[-4:])
+        if ent["stop"].is_set():
+            return
+        if p.returncode not in (0, -15) and not os.path.exists(path):
+            ent["fatal"] = (err or "v4l2-ctl exit %s" % p.returncode)[-260:]
+            return
+        i += 1
+
+
 def capture_start(cam, chunk_mb=None):
     with LOCK:
-        if cam in CAPTURES and CAPTURES[cam]["proc"].poll() is None:
+        ent0 = CAPTURES.get(cam)
+        if ent0 and _aktif(ent0):
             return {"ok": False, "error": "capture %s is already active" % cam}
         if chunk_mb:
             ARGS.chunk_mb = int(chunk_mb)
         sesi = "%s_%s" % (cam, _now_tag())
         dir_sesi = os.path.join(ARGS.dir, sesi)
         os.makedirs(dir_sesi, exist_ok=True)
-        cmd = _gst_cmd(cam, dir_sesi)
         log_err = deque(maxlen=200)
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                                text=True)
-        def _baca_err(p=proc, buf=log_err):
-            for baris in p.stderr:
-                buf.append(baris.rstrip())
-        threading.Thread(target=_baca_err, daemon=True).start()
-        CAPTURES[cam] = {"session": sesi, "dir": dir_sesi, "proc": proc,
-                         "started": time.time(), "err": log_err,
-                         "cmd": " ".join(cmd)}
-        time.sleep(0.4)
-        if proc.poll() is not None:
-            err = "\n".join(list(log_err)[-4:]) or "gst-launch exited (exit=%s)" % proc.returncode
+        if ARGS.test or _perekam() == "gst":
+            cmd = _gst_cmd(cam, dir_sesi)
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.PIPE, text=True)
+
+            def _baca_err(p=proc, buf=log_err):
+                for baris in p.stderr:
+                    buf.append(baris.rstrip())
+            threading.Thread(target=_baca_err, daemon=True).start()
+            CAPTURES[cam] = {"mode": "gst", "session": sesi,
+                             "dir": dir_sesi, "proc": proc,
+                             "started": time.time(), "err": log_err,
+                             "cmd": " ".join(cmd)}
+            time.sleep(0.4)
+            if proc.poll() is not None:
+                err = ("\n".join(list(log_err)[-4:]) or
+                       "gst-launch exited (exit=%s)" % proc.returncode)
+                CAPTURES.pop(cam, None)
+                return {"ok": False, "error": err}
+            return {"ok": True, "session": sesi, "chunk_mb": ARGS.chunk_mb}
+        # host robot (tanpa gst): loop v4l2-ctl
+        if _perekam() is None:
+            return {"ok": False, "error": "no recorder backend (need "
+                    "gst-launch-1.0 or v4l2-ctl)"}
+        ent = {"mode": "v4l2", "session": sesi, "dir": dir_sesi,
+               "proc": None, "started": time.time(), "err": log_err,
+               "stop": threading.Event(), "fatal": None,
+               "cmd": "v4l2-ctl loop (chunk %d MB)" % ARGS.chunk_mb}
+        CAPTURES[cam] = ent
+        t = threading.Thread(target=_loop_v4l2, args=(cam, ent), daemon=True)
+        t.start()
+        ent["thread"] = t
+        time.sleep(1.5)
+        if ent.get("fatal"):
             CAPTURES.pop(cam, None)
-            return {"ok": False, "error": err}
+            return {"ok": False, "error": ent["fatal"]}
+        if not _aktif(ent) and not [f for f in os.listdir(dir_sesi)
+                                    if f.endswith(".yuv")]:
+            CAPTURES.pop(cam, None)
+            return {"ok": False, "error": "v4l2-ctl not running / no data "
+                    "(device busy? is the MCM streaming the same camera?)"}
         return {"ok": True, "session": sesi, "chunk_mb": ARGS.chunk_mb}
 
 
@@ -153,6 +258,26 @@ def capture_stop(cam):
         ent = CAPTURES.pop(cam, None)
     if not ent:
         return {"ok": False, "error": "no active capture for %s" % cam}
+    if ent.get("mode") == "v4l2":
+        try:
+            ent["stop"].set()
+        except Exception:                                   # noqa: BLE001
+            pass
+        p = ent.get("proc")
+        if p is not None and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(timeout=4)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        th = ent.get("thread")
+        if th is not None:
+            th.join(timeout=5)
+        files = [f for f in sorted(os.listdir(ent["dir"]))
+                 if f.endswith(".yuv")]
+        return {"ok": True, "session": ent["session"],
+                "bytes": sum(os.path.getsize(os.path.join(ent["dir"], f))
+                              for f in files), "files": len(files)}
     proc = ent["proc"]
     if proc.poll() is None:
         proc.terminate()                      # RAW: file chunk tak butuh EOS
@@ -179,6 +304,65 @@ def capture_stop(cam):
         json.dump(manifest, f, indent=2, ensure_ascii=False)
     return {"ok": True, "session": ent["session"],
             "bytes": sum(f["size"] for f in files), "files": len(files)}
+
+
+def snap_once(cam):
+    """Satu frame RAW (YUY2) → <dir>/snaps/*.yuv (muncul di /files)."""
+    if cam == "front":
+        w, h = ARGS.front_width, ARGS.front_height
+    else:
+        w, h = ARGS.width, ARGS.height
+    d = os.path.join(ARGS.dir, "snaps")
+    os.makedirs(d, exist_ok=True)
+    nama = "snap_%s_%s.yuv" % (cam, _now_tag())
+    path = os.path.join(d, nama)
+    if ARGS.test:
+        src = ["videotestsrc", "num-buffers=1", "is-live=false"]
+    else:
+        dev = {"left": ARGS.device_left, "right": ARGS.device_right,
+               "front": getattr(ARGS, "device_front", None)}.get(cam)
+        if not dev:
+            return {"ok": False, "error": "device %s not set" % cam}
+        src = ["v4l2src", "device=%s" % dev, "num-buffers=1", "io-mode=2"]
+    caps = ["video/x-raw,format=YUY2,width=%d,height=%d,framerate=%d/1"
+            % (w, h, ARGS.fps)]
+    cmd = (["gst-launch-1.0", "-q"] + src + ["!"] + caps + ["!"] +
+           ["filesink", "location=%s" % path])
+    try:
+        if not ARGS.test and _perekam() != "gst":
+            try:
+                cmd = _v4l2_snap_cmd(cam, path)
+            except Exception as exc:                        # noqa: BLE001
+                return {"ok": False, "error": str(exc)}
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   timeout=25)
+            except subprocess.TimeoutExpired:
+                return {"ok": False, "error": "snap timeout"}
+            if r.returncode != 0 or not os.path.exists(path):
+                return {"ok": False,
+                        "error": (r.stderr or "v4l2-ctl failed")[-300:]}
+        else:
+            src = (["videotestsrc", "num-buffers=1", "is-live=false"]
+                   if ARGS.test else
+                   ["v4l2src", "device=%s" % _dev_cam(cam),
+                    "num-buffers=1", "io-mode=2"])
+            caps = ["video/x-raw,format=YUY2,width=%d,height=%d,framerate=%d/1"
+                    % (w, h, ARGS.fps)]
+            cmd = (["gst-launch-1.0", "-q"] + src + ["!"] + caps + ["!"] +
+                   ["filesink", "location=%s" % path])
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   timeout=20)
+            except subprocess.TimeoutExpired:
+                return {"ok": False, "error": "snap timeout"}
+            if r.returncode != 0 or not os.path.exists(path):
+                return {"ok": False,
+                        "error": (r.stderr or "gst failed")[-300:]}
+        return {"ok": True, "file": os.path.relpath(path, ARGS.dir),
+                "size": os.path.getsize(path), "cam": cam}
+    except Exception as exc:                                # noqa: BLE001
+        return {"ok": False, "error": repr(exc)}
 
 
 def _disk_guard():
@@ -253,15 +437,16 @@ class Handler(BaseHTTPRequestHandler):
                     if proc is not None:
                         kap = (os.path.getsize(ent["dir"]) if os.path.isdir(ent["dir"]) else None)
                     caps[cam] = {"session": ent.get("session"),
-                                 "aktif": bool(proc and proc.poll() is None),
+                                 "aktif": _aktif(ent),
                                  "elapsed_s": round(time.time() - ent.get("started", time.time()), 1)
-                                 if proc else None,
+                                 if _aktif(ent) else None,
                                  "err_tail": list(ent.get("err", []))[-3:] or None}
                 disk_full = CAPTURES.pop("_disk_full", None) is not None if "_disk_full" in CAPTURES else False
             return self._json({"ok": True, "service": NAMA_SERVICE, "versi": VERSI,
                                "test": bool(ARGS.test), "dir": ARGS.dir,
                                "chunk_mb": ARGS.chunk_mb,
                                "disk_free_mb": _dir_free_mb(ARGS.dir),
+                               "disk_total_mb": _dir_total_mb(ARGS.dir),
                                "min_free_mb": ARGS.min_free_mb,
                                "disk_full_terakhir": disk_full,
                                "captures": caps})
@@ -308,7 +493,11 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/capture/start":
             cam = str(body.get("cam", "left"))
             cams = ["left", "right"] if cam == "both" else [cam]
-            hasil = {c: capture_start(c, body.get("chunk_mb")) for c in cams}
+            try:
+                hasil = {c: capture_start(c, body.get("chunk_mb"))
+                         for c in cams}
+            except Exception as exc:                        # noqa: BLE001
+                return self._json({"ok": False, "error": repr(exc)})
             return self._json({"ok": all(v.get("ok") for v in hasil.values()), "hasil": hasil})
 
         if p == "/capture/stop":
@@ -316,6 +505,12 @@ class Handler(BaseHTTPRequestHandler):
             cams = ["left", "right"] if cam == "both" else [cam]
             hasil = {c: capture_stop(c) for c in cams if c in CAPTURES}
             return self._json({"ok": bool(hasil), "hasil": hasil})
+
+        if p == "/snap":
+            try:
+                return self._json(snap_once(str(body.get("cam", "front"))))
+            except Exception as exc:                        # noqa: BLE001
+                return self._json({"ok": False, "error": repr(exc)})
 
         if p == "/delete":
             nama = body.get("names") or []

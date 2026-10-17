@@ -395,7 +395,8 @@ class PetaPanel(QtWidgets.QWidget):
         if len(sem) > 1:
             span = max(8.0, 2.2 * max(max(p[0] for p in sem) - min(p[0] for p in sem),
                                       max(p[1] for p in sem) - min(p[1] for p in sem)))
-        z = G.zoom_untuk_span(span, lat, lebar) + int(self._zoom_delta)
+        z = max(1, min(22, G.zoom_untuk_span(span, lat, lebar)
+                         + int(self._zoom_delta)))
         # PENTING (26 Sep, keluhan "misi 10x10 m cuma tampak garis"): zoom TAMPILAN tidak lagi
         # dibatasi penyedia. Kalau pemilik zoom lebih dalam daripada citra yang tersedia, panel
         # tetap memperbesar UBIN ZOOM TERDALAM yang benar-benar punya citra — persis perilaku
@@ -994,7 +995,10 @@ class PetaPanel(QtWidgets.QWidget):
 
     def zoom(self, langkah):
         """langkah: +1 = menjauh (lebih luas), -1 = mendekat."""
-        self._zoom_delta = max(-5, min(6, self._zoom_delta + langkah))
+        # Zoom-out DIPERLUAS (permintaan pemilik 17 Okt: ingin bisa melihat
+        # seluruh Indonesia — ubin z0-8 Indonesia sudah di-cache oleh
+        # tools/cache_peta_indonesia.py sehingga instan walau tanpa jaringan).
+        self._zoom_delta = max(-20, min(6, self._zoom_delta + langkah))
         self.update()
 
     def _geser_meter(self, dx_piksel, dy_piksel):

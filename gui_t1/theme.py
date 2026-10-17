@@ -16,7 +16,7 @@ Prinsip (sengaja menghindari "AI slop"):
   - Jarak mengikuti grid 8 px; kepadatan informasi tinggi seperti panel instrumen.
 
 Nilai hex & rasio kontrasnya diambil dari rancangan terukur
-(`ROVGUI_REDESIGN/palet_dvx.py` + `MOCKUP_FINAL.html`); JANGAN diubah tanpa mengukur
+(`Desain/GUI Console ROV/scripts/palet_dvx.py` + `mockup/MOCKUP_FINAL.html`); JANGAN diubah tanpa mengukur
 ulang — skrip pengukurnya ada di berekas uji kontras (`Progress/tools/uji_kontras_gui.py`).
 
 Kompatibilitas: nama token LAMA (BG, PANEL, ACCENT, TEXT_DIM, ...) tetap bisa dipakai
@@ -557,7 +557,16 @@ def qss(nama=None):
     """Stylesheet penuh untuk palet `nama` (bawaan: palet aktif)."""
     t = nilai(nama)
     t["font"] = keluarga()
-    out = _QSS.substitute(t) + "\n" + Template(_aturan_peran()).substitute(t)
+    out = (_QSS.substitute(t) + "\n" + Template(_aturan_peran()).substitute(t)
+           + "\n" + """
+/* spasi lega (rasa 1.5 — permintaan pemilik 17 Okt): beri udara antar baris */
+QLabel { padding-top: 1px; padding-bottom: 2px; }
+QCheckBox { padding-top: 2px; padding-bottom: 2px; }
+QRadioButton { padding-top: 2px; padding-bottom: 2px; }
+QComboBox { padding-top: 2px; padding-bottom: 2px; }
+QAbstractSpinBox { padding-top: 2px; padding-bottom: 2px; }
+QPlainTextEdit { padding: 3px; }
+""")
     if SKALA != 1.0:
         # SEMUA ukuran px di QSS ikut SKALA (font, padding, radius, min-height, lebar
         # scrollbar) — proporsi tetap utuh di 100/120/140% (audit grid 13 Okt).

@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GUI = os.path.join(HERE, "..", "gui_t1")
 sys.path.insert(0, GUI)
 
-from PySide6 import QtCore, QtWidgets    # noqa: E402
+from PySide6 import QtCore, QtGui, QtWidgets    # noqa: E402
 
 SCRATCH = os.path.expanduser("~/.hermes/cache/scratch/t1test")
 os.makedirs(SCRATCH, exist_ok=True)
@@ -517,8 +517,11 @@ def main():
         w._apply_custom(); jalan(0.1)
         peta = w.P["peta"]
         tl = peta.mapTo(w, QtCore.QPoint(0, 0))
+        # 0.2 + clamp: zona 'above/below' = PITA atas/bawah panel (tengah
+        # panel = 'end'); kamera kini FIT rasio → titik harus di pita & terlihat.
         pt = QtCore.QPoint(tl.x() + peta.width() // 2,
-                           tl.y() + int(peta.height() * 0.85))
+                           min(tl.y() + int(peta.height() * 0.2),
+                               w.height() - 60))
         w.snap.simulate_begin("raw")
         kind37 = w.snap.simulate_move_to(pt.x(), pt.y())
         ok37 = kind37[0] in ("below", "above") and kind37[1] == "peta"
@@ -532,7 +535,8 @@ def main():
         w.snap.simulate_begin("raw")
         tf = w.P["cam_front"]; tl2 = tf.mapTo(w, QtCore.QPoint(0, 0))
         pt2 = QtCore.QPoint(tl2.x() + tf.width() // 2,
-                            tl2.y() + int(tf.height() * 0.85))
+                            min(tl2.y() + int(tf.height() * 0.2),
+                                w.height() - 60))
         kind37b = w.snap.simulate_move_to(pt2.x(), pt2.y())
         ok37 = ok37 and kind37b[0] in ("below", "above") and \
             kind37b[1] == "cam_front"
@@ -661,8 +665,8 @@ def main():
         c4f, p4f = rc._lipo_pct(16.86)
         c2, p2 = rc._lipo_pct(7.9)
         c2e, p2e = rc._lipo_pct(7.0)
-        ok43 = (c4 == 4 and 55 <= p4 <= 65) and (c4f == 4 and p4f == 100) and \
-            (c2 == 2 and 55 <= p2 <= 80) and (c2e == 2 and p2e <= 10)
+        ok43 = (c4 == 4 and 25 <= p4 <= 45) and (c4f == 4 and p4f == 100) and \
+            (c2 == 2 and 40 <= p2 <= 60) and (c2e == 2 and p2e <= 10)
         print("[43] estimasi LiPo (4S 15.47 = %d%%, 16.86 = %d%%, 2S 7.9 = %d%%):"
               % (p4, p4f, p2), ok43)
         lulus &= bool(ok43)
@@ -846,7 +850,8 @@ def main():
         print("[49] gamepad SDL GAGAL:", repr(exc))
         lulus = False
 
-    # [50] robotops: perintah start/cari agent + field SSH robot di koneksi.
+    # [50] robotops: perintah start/cari agent + simpan/muat koneksi
+    # (desain "jalur resmi": tanpa field SSH / tombol one-click).
     try:
         import koneksi as _K50
         import robotops as _RO
@@ -858,13 +863,13 @@ def main():
         ok50 = ok50 and (_RO.agent_status("127.0.0.1", 1, timeout=0.3)
                          in (True, False))
         c50 = _K50.preset("blueos")
-        ok50 = ok50 and c50.get("ssh_user") == "pi" and "agent_path" in c50
-        ok50 = ok50 and _K50.save(dict(c50, host="10.1.1.1", ssh_user="u1",
-                                       ssh_pass="x",
-                                       agent_path="/a/raw_agent.py"))
-        ok50 = ok50 and ((_K50.load() or {}).get("ssh_user") == "u1") and \
-            ((_K50.load() or {}).get("agent_path") == "/a/raw_agent.py")
-        print("[50] robotops + robot SSH config:", ok50)
+        ok50 = ok50 and c50.get("host") == "192.168.2.2" \
+            and "raw_agent" in c50 and "ssh_user" not in c50
+        ok50 = ok50 and _K50.save(dict(c50, host="10.1.1.1",
+                                       raw_agent="http://10.1.1.1:8765"))
+        ok50 = ok50 and ((_K50.load() or {}).get("host") == "10.1.1.1") and \
+            ((_K50.load() or {}).get("raw_agent") == "http://10.1.1.1:8765")
+        print("[50] robotops + koneksi simpan/muat:", ok50)
         lulus &= bool(ok50)
     except Exception as exc:                               # noqa: BLE001
         print("[50] robotops GAGAL:", repr(exc))
@@ -942,6 +947,335 @@ def main():
         lulus &= bool(ok54)
     except Exception as exc:                               # noqa: BLE001
         print("[54] firewall fix GAGAL:", repr(exc))
+        lulus = False
+
+    # [55] network setup resmi BlueRobotics (fungsi murni): langkah per-OS +
+    # parse verifikasi + default subnet 192.168.2.1/24 (laptop-side saja).
+    try:
+        import koneksi as _K55
+        s_nt = _K55.network_steps("nt", "Ethernet 3")
+        s_lin = _K55.network_steps("posix", "enx001122")
+        s_mac = _K55.network_steps("darwin", "USB 10/100 LAN")
+        ok55 = ("netsh" in s_nt["apply"][0]
+                and "static 192.168.2.1 255.255.255.0" in s_nt["apply"][0])
+        join_lin = " ".join(s_lin["apply"])
+        ok55 = ok55 and ("nmcli con mod" in join_lin
+                         and "enx001122" in join_lin
+                         and "ipv4.never-default" in join_lin)
+        ok55 = ok55 and ("networksetup -setmanual" in s_mac["apply"][0]
+                         and "192.168.2.1 255.255.255.0" in s_mac["apply"][0])
+        ok55 = ok55 and 'Control Panel' in s_nt["manual"] \
+            and 'System Settings' in s_mac["manual"]
+        ok55 = ok55 and _K55.parse_verify(
+            "nt", "IP Address:                           192.168.2.1\n"
+                  "Subnet Prefix:                         192.168.2.0/24")
+        ok55 = ok55 and not _K55.parse_verify("nt", "IP Address: 10.0.0.5")
+        ok55 = ok55 and _K55.parse_verify("posix",
+                                          "enx0  UP  192.168.2.1/24  brd -")
+        ok55 = ok55 and not _K55.parse_verify("posix", "inet 10.0.0.5/24 brd")
+        ok55 = ok55 and _K55.SUBNET_DEFAULT == "192.168.2.1/24"
+        print("[55] network setup resmi (langkah per-OS + verifikasi):", ok55)
+        lulus &= bool(ok55)
+    except Exception as exc:                               # noqa: BLE001
+        print("[55] network setup GAGAL:", repr(exc))
+        lulus = False
+
+    # [56] wheel guard: roda-scroll di atas combo yang TAK fokus tidak
+    # mengubah nilai, tapi menggulir area (scroll "nyambung" ke halaman).
+    try:
+        import wheelguard as _WG56
+        _WG56.pasang(QtWidgets.QApplication.instance())
+        area56 = QtWidgets.QScrollArea()
+        area56.setFixedSize(240, 160)
+        isi56 = QtWidgets.QWidget()
+        lay56 = QtWidgets.QVBoxLayout(isi56)
+        cb56 = QtWidgets.QComboBox()
+        cb56.addItems(["A", "B", "C"])
+        lay56.addWidget(cb56)
+        sp56 = QtWidgets.QSpinBox()          # tanpa popup: uji klik-dulu bersih
+        sp56.setRange(0, 1000)
+        sp56.setValue(100)
+        lay56.addWidget(sp56)
+        for _i in range(30):
+            lay56.addWidget(QtWidgets.QLabel("filler %d" % _i))
+        area56.setWidget(isi56)
+        area56.show()
+        jalan(0.3)
+        cb56.clearFocus()
+        jalan(0.1)
+        idx0 = cb56.currentIndex()
+        sb56 = area56.verticalScrollBar()
+        sb0 = sb56.value()
+        ev56 = QtGui.QWheelEvent(
+            QtCore.QPointF(10, 10), QtCore.QPointF(10, 10),
+            QtCore.QPoint(0, 0), QtCore.QPoint(0, -120),
+            QtCore.Qt.MouseButton.NoButton,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+            QtCore.Qt.ScrollPhase.NoScrollPhase, False)
+        QtWidgets.QApplication.sendEvent(cb56, ev56)
+        jalan(0.15)
+        ok56a = (cb56.currentIndex() == idx0)
+        ok56b = (sb56.value() > sb0)
+
+        def _wheel56():
+            return QtGui.QWheelEvent(
+                QtCore.QPointF(5, 5), QtCore.QPointF(5, 5),
+                QtCore.QPoint(0, 0), QtCore.QPoint(0, -120),
+                QtCore.Qt.MouseButton.NoButton,
+                QtCore.Qt.KeyboardModifier.NoModifier,
+                QtCore.Qt.ScrollPhase.NoScrollPhase, False)
+        prz = QtGui.QMouseEvent(
+            QtCore.QEvent.Type.MouseButtonPress,
+            QtCore.QPointF(5, 5), QtCore.QPointF(5, 5),
+            QtCore.Qt.MouseButton.LeftButton,
+            QtCore.Qt.MouseButton.LeftButton,
+            QtCore.Qt.KeyboardModifier.NoModifier)
+        QtWidgets.QApplication.sendEvent(sp56, prz)      # klik spinbox dulu
+        QtWidgets.QApplication.sendEvent(sp56, _wheel56())
+        jalan(0.1)
+        ok56c = (sp56.value() != 100)                  # dipencet -> roda boleh
+        val_after = sp56.value()
+        QtWidgets.QApplication.sendEvent(
+            sp56, QtCore.QEvent(QtCore.QEvent.Type.Leave))
+        QtWidgets.QApplication.sendEvent(sp56, _wheel56())
+        jalan(0.1)
+        ok56d = (sp56.value() == val_after)            # keluar -> nonaktif lagi
+        ok56 = ok56a and ok56b and ok56c and ok56d
+        area56.close()
+        print("   [56] nilai-tetap=%s scroll-naik=%s klik-dulu=%s "
+              "keluar-nonaktif=%s" % (ok56a, ok56b, ok56c, ok56d))
+        print("[56] wheel guard (scroll di combo tak mengubah nilai):", ok56)
+        lulus &= bool(ok56)
+    except Exception as exc:                               # noqa: BLE001
+        print("[56] wheel guard GAGAL:", repr(exc))
+        lulus = False
+
+    # [57] kamera ON/OFF (preview) — hemat CPU: player stop/start + tile off.
+    try:
+        w._toggle_cam("front", False)
+        jalan(0.7)
+        s1 = (getattr(w, "cam_aktif", {}).get("front") is False)
+        s2 = (not w.btn_rec["front"].isEnabled())
+        s3 = (not w.btn_snap["front"].isEnabled())
+        s3b = w.btn_cam["front"].text() == "OFF"
+        w._toggle_cam("front", True)
+        jalan(0.6)
+        s4 = (w.cam_aktif.get("front") is True)
+        s5 = w.btn_rec["front"].isEnabled()
+        s6 = w.btn_snap["front"].isEnabled()
+        s6b = w.btn_cam["front"].text() == "ON"
+        try:
+            import mcm as _M57
+            ok57m = hasattr(w, "mcm") and \
+                (_M57.KAM_STREAM.get("front") == "UDP Stream 0")
+        except Exception:                                   # noqa: BLE001
+            ok57m = False
+        ok57 = s1 and s2 and s3 and s3b and s4 and s5 and s6 and s6b and ok57m
+        print("   [57] sub: off=%s rec_off=%s snap_off=%s lbl_off=%s on=%s "
+              "rec_on=%s snap_on=%s lbl_on=%s"
+              % (s1, s2, s3, s3b, s4, s5, s6, s6b))
+        print("[57] kamera ON/OFF (preview hemat CPU):", ok57)
+        lulus &= bool(ok57)
+    except Exception as exc:                               # noqa: BLE001
+        print("[57] kamera ON/OFF GAGAL:", repr(exc))
+        lulus = False
+
+    # [58] panel tengah = rasio kamera front (tanpa border hitam/letterbox).
+    try:
+        jalan(0.9)
+        t58 = w.P["cam_front"].tile
+        asp58 = getattr(t58, "_aspect", 16.0 / 9.0)
+        ph58 = max(1, t58.height() - 18)
+        ideal58 = t58.heightForWidth(t58.width())
+        ok58 = (t58.width() <= int(ph58 * asp58) + 3) and \
+            (t58.height() >= ideal58 - 6)
+        print("   [58] tile %dx%d asp=%.3f ideal-h=%d"
+              % (t58.width(), t58.height(), asp58, ideal58))
+        print("[58] panel tengah fit resolusi (tanpa border):", ok58)
+        lulus &= bool(ok58)
+    except Exception as exc:                               # noqa: BLE001
+        print("[58] panel tengah rasio GAGAL:", repr(exc))
+        lulus = False
+
+    # [59] bar persen (battery/storage) + teks % di sampingnya.
+    try:
+        import widgets as _W59
+        ok59 = hasattr(_W59, "BarPersen")
+        if ok59:
+            b59 = _W59.BarPersen(tinggi=8)
+            b59.setValue(120)
+            b59.grab()
+            ok59 = ok59 and abs(b59.value() - 100.0) < 0.01
+            b59.setValue(-5)
+            ok59 = ok59 and abs(b59.value() - 0.0) < 0.01
+            b59.setValue(57.5)
+            ok59 = ok59 and abs(b59.value() - 57.5) < 0.01
+            b59.setWarna("#5CC98F")
+            b59.grab()
+        ok59 = ok59 and all(hasattr(w, n) for n in
+                            ("bar_batt", "lbl_batt_pct", "bar_lipo",
+                             "lbl_lipo_pct", "bar_disk", "lbl_disk_pct",
+                             "bar_disk_pi", "lbl_disk_pi_pct"))
+        w._disk_free_mb_override = 12345.0
+        w._update_disk()
+        ok59 = ok59 and ("%" in w.lbl_disk_pct.text())
+        ok59 = ok59 and (0.0 <= w.bar_disk.value() <= 100.0)
+        w._disk_free_mb_override = None
+        print("   [59] pct-topside=%r" % w.lbl_disk_pct.text())
+        print("[59] bar persen battery/storage + teks %:", ok59)
+        lulus &= bool(ok59)
+    except Exception as exc:                               # noqa: BLE001
+        print("[59] bar persen GAGAL:", repr(exc))
+        lulus = False
+
+    # [60] tinggi panel kamera STABIL antar siklus sync (anti-ratchet:
+    # bug 17 Okt — min-height ikut mengukur slack → panel turun terus).
+    try:
+        jalan(1.2)
+        h0 = w.P["cam_front"].height()
+        jalan(2.2)
+        h1 = w.P["cam_front"].height()
+        ok60 = abs(h1 - h0) <= 3
+        print("   [60] panel h0=%d h1=%d" % (h0, h1))
+        print("[60] tinggi panel kamera stabil (anti-ratchet):", ok60)
+        lulus &= bool(ok60)
+    except Exception as exc:                               # noqa: BLE001
+        print("[60] stabil GAGAL:", repr(exc))
+        lulus = False
+
+    # [61] input anchor manual: tombol COORDS… + jalur set anchor typed.
+    try:
+        from PySide6 import QtWidgets as _Q61
+        tombol61 = [b.text() for b in w.P["peta"].findChildren(_Q61.QPushButton)]
+        ok61 = any("COORDS" in t for t in tombol61)
+        a0 = dict(w.peta.anchor)
+        w._anchor_dipilih(-6.123456, 106.654321)
+        ok61 = ok61 and abs(float(w.peta.anchor["lat"]) + 6.123456) < 1e-4 and \
+            abs(float(w.peta.anchor["lon"]) - 106.654321) < 1e-4
+        w.peta.set_anchor(a0)
+        print("   [61] tombol=%r" % tombol61[:9])
+        print("[61] input anchor manual (COORDS\u2026):", ok61)
+        lulus &= bool(ok61)
+    except Exception as exc:                               # noqa: BLE001
+        print("[61] anchor manual GAGAL:", repr(exc))
+        lulus = False
+
+    # [62] mcm: payload NYALA/MATI stream robot (murni — bentuk pabrik).
+    try:
+        import mcm as _M62
+        ent = {"id": "x", "running": True,
+               "video_and_stream": {
+                   "name": "UDP Stream 0",
+                   "stream_information": {
+                       "endpoints": ["udp://192.168.2.1:5600"]},
+                   "video_source": {"Local": {
+                       "name": "H264 USB Camera: USB Camera",
+                       "device_path": "/dev/video2"}}}}
+        p62 = _M62.payload_dari_get(ent)
+        ok62 = (p62["name"] == "UDP Stream 0"
+                and p62["source"] == "/dev/video2"
+                and p62["stream_information"]["endpoints"]
+                == ["udp://192.168.2.1:5600"])
+        p62b = _M62.payload_dari_get({})
+        ok62 = ok62 and p62b["source"] == "" and p62b["name"] == ""
+        ok62 = ok62 and _M62.KAM_STREAM == {"front": "UDP Stream 0",
+                                            "stereo L": "UDP Stream 1",
+                                            "stereo R": "UDP Stream 2"}
+        print("   [62] source=%r endpoint=%r" % (
+            p62["source"], p62["stream_information"]["endpoints"]))
+        print("[62] mcm payload NYALA/MATI stream robot:", ok62)
+        lulus &= bool(ok62)
+    except Exception as exc:                                # noqa: BLE001
+        print("[62] mcm payload GAGAL:", repr(exc))
+        lulus = False
+
+    # [63] animasi REC/SNAP capture + panel RAW tanpa duplikat & checkbox.
+    try:
+        ok63 = True
+        w._toggle_rec("front", True)
+        jalan(0.4)
+        ok63 = ok63 and ("background" in w.btn_rec["front"].styleSheet())
+        ok63 = ok63 and w._anim_timer.isActive()
+        w._toggle_rec("front", False)
+        jalan(0.3)
+        ok63 = ok63 and (w.btn_rec["front"].styleSheet() == "")
+        ok63 = ok63 and (not w._anim_timer.isActive())
+        w._snap("front")
+        jalan(0.1)
+        ok63 = ok63 and ("background" in w.btn_snap["front"].styleSheet())
+        jalan(0.5)
+        ok63 = ok63 and (w.btn_snap["front"].styleSheet() == "")
+        rp = w.rawpanel
+        teks_btn = [b.text() for b in rp.findChildren(QtWidgets.QPushButton)]
+        ok63 = ok63 and not any(("RAW L" in t or "RAW F" in t or "STOP" in t)
+                                for t in teks_btn)
+        ok63 = ok63 and any("SELECT ALL" in t for t in teks_btn)
+        ok63 = ok63 and hasattr(rp, "sp_chunk")
+        print("   [63] tombol RAW: %r" % teks_btn[:8])
+        print("[63] animasi REC/SNAP + RAW tanpa duplikat:", ok63)
+        lulus &= bool(ok63)
+    except Exception as exc:                                # noqa: BLE001
+        print("[63] animasi/RAW GAGAL:", repr(exc))
+        lulus = False
+
+    # [64] anchor tersimpan antar-sesi + sensor log topside per sesi.
+    try:
+        ok64 = True
+        import paths as _P64
+        _f64 = _P64.aset_json("anchor.json")
+        _lama64 = None
+        try:
+            _lama64 = open(_f64, encoding="utf-8").read()
+        except OSError:
+            pass
+        w._anchor_dipilih(-6.234567, 107.765432)
+        try:
+            _baru64 = json.load(open(_f64, encoding="utf-8"))
+            ok64 = ok64 and abs(float(_baru64["lat"]) + 6.234567) < 1e-4 and \
+                abs(float(_baru64["lon"]) - 107.765432) < 1e-4
+        except Exception as exc:                            # noqa: BLE001
+            ok64 = False
+            print("   [64] baca anchor.json gagal:", repr(exc))
+        if _lama64 is None:
+            try:
+                os.remove(_f64)
+            except OSError:
+                pass
+        else:
+            open(_f64, "w", encoding="utf-8").write(_lama64)
+        _sl = os.path.join(w.sesi, "sensors.csv")
+        ok64 = ok64 and os.path.exists(_sl)
+        if ok64:
+            with open(_sl, encoding="utf-8") as _ff:
+                baris64 = _ff.read().strip().splitlines()
+            ok64 = (len(baris64) >= 3 and "volt_v" in baris64[0]
+                    and "roll_deg" in baris64[0])
+            print("   [64] sensors.csv: %d baris | header ok=%s"
+                  % (len(baris64), "volt_v" in baris64[0]))
+        print("[64] anchor tersimpan + sensor log topside:", ok64)
+        lulus &= bool(ok64)
+    except Exception as exc:                                # noqa: BLE001
+        print("[64] anchor/log GAGAL:", repr(exc))
+        lulus = False
+
+    # [65] peta: anchor TIDAK melompat (view dipatok ke titik) + zoom-out luas.
+    try:
+        w._anchor_dipilih(-6.111111, 106.222222)
+        ok65 = (w.peta._pusat_bebas is not None
+                and abs(w.peta._pusat_bebas[0] + 6.111111) < 1e-4
+                and abs(w.peta._pusat_bebas[1] - 106.222222) < 1e-4)
+        ok65 = ok65 and (w.peta.ikuti is False)
+        w.peta.zoom(-30)
+        ok65 = ok65 and (w.peta._zoom_delta == -20)
+        w.peta.zoom(30)
+        ok65 = ok65 and (w.peta._zoom_delta == 6)
+        w.peta.grab()                       # smoke-paint di zoom-out ekstrem
+        print("   [65] pusat=%r delta=%d" % (w.peta._pusat_bebas,
+                                              w.peta._zoom_delta))
+        print("[65] peta: anchor tak melompat + zoom-out luas:", ok65)
+        lulus &= bool(ok65)
+    except Exception as exc:                                # noqa: BLE001
+        print("[65] peta GAGAL:", repr(exc))
         lulus = False
 
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)

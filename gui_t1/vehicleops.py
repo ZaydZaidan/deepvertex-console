@@ -778,11 +778,6 @@ class PreflightPanel(QtWidgets.QWidget):
             self.chip_bar_s.tambah(c)
         v.addWidget(self.chip_bar_s)
 
-        self.lbl_status = QtWidgets.QLabel("waiting for data …")
-        self.lbl_status.setObjectName("MicroLabel")
-        self.lbl_status.setWordWrap(True)
-        v.addWidget(self.lbl_status)
-
         # ---- checklist manual
         t = QtWidgets.QLabel("CHECKLIST PRE-DIVE (Blue Robotics procedure):")
         t.setObjectName("MicroLabel")
@@ -954,11 +949,7 @@ class PreflightPanel(QtWidgets.QWidget):
             self.chip_bar_s.sesuaikan()
         except Exception:                                  # noqa: BLE001
             pass
-        kurang = [k for k, c in self.cb.items() if not c.isChecked()]
-        siap = (s.get("link") and v is not None and v >= 12.5 and "leak" not in txt)
-        if siap and not kurang:
-            self.lbl_status.setText("STATUS: READY TO DIVE ✓ (checklist complete)")
-        elif siap:
-            self.lbl_status.setText("STATUS: system OK — %d checklist items not ticked" % len(kurang))
-        else:
-            self.lbl_status.setText("STATUS: NOT READY — check the red/amber chips above")
+        # Baris teks status DIHAPUS TOTAL (ghost berulang — permintaan
+        # pemilik 17 Okt: "tulisan yang suka jadi ghost itu apus aja").
+        # Informasi siap/tidak-siap sudah ada di chip + checklist di atasnya.
+        self.update()

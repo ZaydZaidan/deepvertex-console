@@ -77,6 +77,10 @@ class RawClient(QtCore.QObject):
     def stop(self, cam):
         self._async("stop", "POST", "/capture/stop", body={"cam": cam})
 
+    def snap(self, cam):
+        """Satu frame RAW di robot (muncul di /files → transfer)."""
+        self._async("snap", "POST", "/snap", body={"cam": cam})
+
     def files(self):
         self._async("files", "GET", "/files")
 
@@ -136,45 +140,19 @@ class RawPanel(QtWidgets.QWidget):
         self.lbl_disk.setObjectName("Faint")
         lay.addWidget(self.lbl_disk)
 
-        # Baris 1: pilih kamera RAW. Baris 2: STOP + ukuran chunk.
-        # (audit 13 Okt: satu baris panjang = minW 602 px > viewport rel 442 = TERKLIP;
-        #  dipecah dua baris supaya panel muat utuh di rel kanan.)
-        row = QtWidgets.QHBoxLayout()
-        row.setSpacing(6)
-        self.btn = {}
-        for key, txt, tip, cam in (
-                ("L", "RAW L", "start RAW recording — stereo LEFT (B0495C)", "left"),
-                ("R", "RAW R", "start RAW recording — stereo RIGHT (B0495C)", "right"),
-                ("both", "L+R", "start RAW recording — both stereo cameras", "both"),
-                ("front", "RAW F", "start RAW recording — FRONT camera "
-                 "(uncompressed, ≤640×480 over USB2)", "front")):
-            b = QtWidgets.QPushButton(txt)
-            b.setObjectName("BtnTiny")
-            b.setToolTip(tip)
-            b.clicked.connect(lambda _, k=key: self.client.start(k, self.sp_chunk.value()))
-            row.addWidget(b)
-            self.btn[key] = b
-        row.addStretch(1)
-        lay.addLayout(row)
-
+        # Start/stop rekam RAW = panel CAPTURE (REC + mode RAW) — TIDAK ada
+        # tombol rekam di sini supaya tidak ada informasi ganda (permintaan
+        # pemilik 17 Okt). Yang tersisa = ukuran chunk (dipakai jalur REC itu).
         row1b = QtWidgets.QHBoxLayout()
         row1b.setSpacing(6)
-        b = QtWidgets.QPushButton("STOP")
-        b.setObjectName("BtnTiny")
-        b.setToolTip("stop ALL RAW recording (every camera)")
-        b.clicked.connect(lambda: self.client.stop("both"))
-        row1b.addWidget(b)
-        b = QtWidgets.QPushButton("STOP F")
-        b.setObjectName("BtnTiny")
-        b.setToolTip("stop RAW recording on the FRONT camera")
-        b.clicked.connect(lambda: self.client.stop("front"))
-        row1b.addWidget(b)
         self.sp_chunk = QtWidgets.QSpinBox()
         self.sp_chunk.setRange(64, 8192)
         self.sp_chunk.setValue(1024)
         self.sp_chunk.setSuffix(" MB/chunk")
         self.sp_chunk.setFixedWidth(theme.px(118))
-        self.sp_chunk.setToolTip("chunk size for the RAW files written on the Pi")
+        self.sp_chunk.setToolTip("chunk size for the RAW files written on the Pi — "
+                                 "recording start/stop lives in CAPTURE "
+                                 "(REC button + RAW mode)")
         row1b.addWidget(self.sp_chunk)
         row1b.addStretch(1)
         lay.addLayout(row1b)
@@ -195,17 +173,25 @@ class RawPanel(QtWidgets.QWidget):
         b.setObjectName("BtnTiny")
         b.clicked.connect(self.client.files)
         row2.addWidget(b)
-        b = QtWidgets.QPushButton("TRANSFER ►")
-        b.setObjectName("BtnTiny")
-        b.setToolTip("download the selected chunks into this session's raw/ folder "
-                     "+ sha256 verify")
-        b.clicked.connect(self._transfer)
-        row2.addWidget(b)
-        b = QtWidgets.QPushButton("DELETE ✓")
-        b.setObjectName("BtnTiny")
-        b.setToolTip("delete on the Pi ALL files already verified on the laptop")
+        self.b_all = QtWidgets.QPushButton("SELECT ALL")
+        self.b_all.setObjectName("BtnTiny")
+        self.b_all.setToolTip("tick every file in the list")
+        self.b_all.clicked.connect(self._pilih_semua)
+        row2.addWidget(self.b_all)
+        self.b_tr = QtWidgets.QPushButton("TRANSFER ►")
+        self.b_tr.setObjectName("BtnTiny")
+        self.b_tr.setToolTip("download the TICKED chunks into this session's raw/ "
+                             "folder + sha256 verify")
+        self.b_tr.clicked.connect(self._transfer)
+        self.b_tr.setEnabled(False)
+        row2.addWidget(self.b_tr)
+        self.b_del = QtWidgets.QPushButton("DELETE")
+        self.b_del.setObjectName("BtnTiny")
+        self.b_del.setToolTip("delete the TICKED files on the Pi (asks first)")
+        self.b_del.setEnabled(False)
+        self.b_del.clicked.connect(self._hapus)
         b.clicked.connect(self._hapus)
-        row2.addWidget(b)
+        row2.addWidget(self.b_del)
         row2.addStretch(1)
         lay.addLayout(row2)
         self.prog = QtWidgets.QLabel("")
@@ -214,6 +200,7 @@ class RawPanel(QtWidgets.QWidget):
         lay.addWidget(self.prog)
 
         # wiring
+        self.list.itemChanged.connect(self._daftar_berubah)
         self.client.sig_result.connect(self._hasil)
         self.client.sig_progress.connect(
             lambda nama, frac: self.prog.setText(f"{nama}: {frac * 100:.0f}%"))
@@ -224,21 +211,55 @@ class RawPanel(QtWidgets.QWidget):
         self.client.files()          # muat daftar chunk langsung (isi panel sejak awal)
 
     # ------------------------------------------------------------------ aksi
+    def _checked_rels(self):
+        out = []
+        for i in range(self.list.count()):
+            it = self.list.item(i)
+            if it.checkState() == QtCore.Qt.CheckState.Checked:
+                rel = it.data(QtCore.Qt.ItemDataRole.UserRole)
+                if rel:
+                    out.append(rel)
+        return out
+
+    def _daftar_berubah(self, *_a):
+        n = len(self._checked_rels())
+        self.b_tr.setText("TRANSFER ► (%d)" % n if n else "TRANSFER ►")
+        self.b_del.setText("DELETE (%d)" % n if n else "DELETE")
+        self.b_tr.setEnabled(n > 0)
+        self.b_del.setEnabled(n > 0)
+
+    def _pilih_semua(self):
+        for i in range(self.list.count()):
+            self.list.item(i).setCheckState(QtCore.Qt.CheckState.Checked)
+        self._daftar_berubah()
+
     def _transfer(self):
-        items = self.list.selectedItems()
-        if not items:
-            self.prog.setText("select a file in the list first")
+        rels = self._checked_rels()
+        if not rels:
+            self.prog.setText("tick a file in the list first (or SELECT ALL)")
             return
-        for it in items:
-            self.client.transfer(it.data(QtCore.Qt.ItemDataRole.UserRole), self.outdir)
+        for rel in rels:
+            self.client.transfer(rel, self.outdir)
+        self.prog.setText("transferring %d file(s) → raw/ …" % len(rels))
 
     def _hapus(self):
-        if not self.verified:
-            self.prog.setText("no verified files to delete yet")
+        rels = self._checked_rels()
+        if not rels:
+            self.prog.setText("tick a file in the list first")
             return
-        names = list(self.verified.keys())
-        self.prog.setText(f"deleting {len(names)} verified files on the Pi …")
-        self.client.delete(names)
+        total = sum(self.files_info.get(r, 0) for r in rels)
+        pratinjau = "\n".join(rels[:8]) + ("\n…" if len(rels) > 8 else "")
+        jawab = QtWidgets.QMessageBox.question(
+            self, "Delete on the robot",
+            "Delete %d file(s) (%.1f MB) on the Pi?\n\n%s"
+            % (len(rels), total / 1e6, pratinjau),
+            QtWidgets.QMessageBox.StandardButton.Yes |
+            QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No)
+        if jawab != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+        self.prog.setText("deleting %d file(s) on the Pi …" % len(rels))
+        self.client.delete(rels)
 
     # ------------------------------------------------------------------ hasil
     def _hasil(self, tag, d):
@@ -274,10 +295,9 @@ class RawPanel(QtWidgets.QWidget):
                         if est is not None else
                         (" · measuring RAW rate…" if aktif else
                          " · start RAW to see time left"))
-                self.lbl_disk.setText(f"Pi free: {fr if fr is not None else '?'} MB "
-                                      f"(auto-stop at {d.get('min_free_mb', '?')} MB){ekor} "
-                                      f"— Pi dir {d.get('dir', '?')}  →  transfer pulls "
-                                      f"into this session's raw/")
+                # disk/free Pi = panel CAPTURE (hindari informasi ganda);
+                # di sini hanya estimasi LAJU RAW terukur saat merekam.
+                self.lbl_disk.setText(ekor.strip(" ·") if aktif else "")
             else:
                 self.lbl.setText("RAW agent unreachable")
                 self.lbl.setToolTip(str(d.get("error", "")))
@@ -285,12 +305,18 @@ class RawPanel(QtWidgets.QWidget):
             if d.get("ok"):
                 self.files_info = {f["path"]: f["size"] for f in d.get("files", [])}
                 self.list.clear()
+                self.list.blockSignals(True)
                 for rel, size in sorted(self.files_info.items()):
                     it = QtWidgets.QListWidgetItem(f"{rel}   ({size / 1e6:.1f} MB)")
                     it.setData(QtCore.Qt.ItemDataRole.UserRole, rel)
+                    it.setFlags(it.flags() |
+                                QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+                    it.setCheckState(QtCore.Qt.CheckState.Unchecked)
                     if rel in self.verified:
                         it.setText(it.text() + "  ✓ verified")
                     self.list.addItem(it)
+                self.list.blockSignals(False)
+                self._daftar_berubah()
             else:
                 self.prog.setText(f"listing files failed: {d.get('error', '')[:90]}")
         elif tag in ("start", "stop"):

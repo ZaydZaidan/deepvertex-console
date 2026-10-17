@@ -66,24 +66,17 @@ _LIPO_ANCHORS = ((4.20, 100), (4.05, 88), (3.95, 72), (3.90, 62), (3.85, 54),
 
 
 def _lipo_pct(v):
-    """(cell count, SoC percent) from pack voltage; None when no signal."""
+    """(cell count, SoC percent) from pack voltage; None when no signal.
+
+    Linear 3.70 V/cell (14.8 V pada 4S) = 0% s/d 4.20 V/cell = 100% —
+    batas bawah DITETAPKAN PEMILIK 17 Okt (dulu kurva anchor; minimum = 14.8 V).
+    """
     if not v or v < 2.0:
         return None
     cells = max(2, min(6, int(round(v / 3.75)) or 2))
     vcell = v / float(cells)
-    if vcell >= 4.20:
-        return (cells, 100)
-    if vcell <= 3.30:
-        return (cells, 0)
-    lo = hi = None
-    for a, b in zip(_LIPO_ANCHORS, _LIPO_ANCHORS[1:]):
-        if a[0] >= vcell >= b[0]:
-            lo, hi = a, b
-            break
-    if lo is None:
-        return (cells, None)
-    f = (vcell - hi[0]) / (lo[0] - hi[0])
-    return (cells, int(round(hi[1] + f * (lo[1] - hi[1]))))
+    pct = int(round((vcell - 3.70) / (4.20 - 3.70) * 100.0))
+    return (cells, max(0, min(100, pct)))
 
 
 # Margin pengaman storage (permintaan pemilik 13 Okt):
@@ -116,6 +109,7 @@ def _buat_dir_sesi(root, nama=""):
         compressed/   video .mkv + snapshot .png (jalur stream BlueOS)
         raw/          chunk RAW hasil transfer dari Pi (arsip utuh, per kamera)
         mavlink.tlog  /  session_start.json / session_end.json
+        sensors.csv   (topside sensor log, 10 Hz — robot tak dibebani)
     """
     os.makedirs(root, exist_ok=True)
     d = os.path.join(root, "%s_%s" % (time.strftime("%Y%m%d_%H%M%S"),
@@ -125,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.0.17"    # versi aplikasi (session.json + update checker)
+__version__ = "1.1.0"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -232,6 +226,14 @@ class RovConsole(QtWidgets.QMainWindow):
         if _tlog != "off":
             self.bridge.tlog_path = (os.path.join(self.sesi, "mavlink.tlog")
                                      if _tlog == "auto" else _tlog)
+        # sensor log topside (kehendak pemilik 17 Okt): lengkap, di laptop saja
+        try:
+            import toplog
+            self.sensorlog = toplog.SensorLog(
+                os.path.join(self.sesi, "sensors.csv"))
+        except Exception as exc:                            # noqa: BLE001
+            self.sensorlog = None
+            self._catat("sensor log off: %r" % exc)
         self.bridge.sig_vehicle.connect(self._vehicle)
         self.bridge.sig_attitude.connect(self._attitude)
         self.bridge.sig_text.connect(self._text)
@@ -242,11 +244,14 @@ class RovConsole(QtWidgets.QMainWindow):
 
         # ---------------- layanan ----------------
         self.players = {}
+        self.tile_kam = {}
+        self.cam_aktif = {}
         for nama, _judul, port in STREAM_DEF:
             port = getattr(args, "port_" + nama.replace(" ", "_"), port)
             p = StreamPlayer(nama, port)
             key = {"front": "cam_front", "stereo L": "cam_left",
                    "stereo R": "cam_right"}[nama]
+            self.tile_kam[nama] = self.P[key].tile
             p.sig_frame.connect(self.P[key].tile.set_qimage)
             p.sig_status.connect(self._catat)
             p.sig_error.connect(self._catat)
@@ -279,9 +284,28 @@ class RovConsole(QtWidgets.QMainWindow):
         self._peta_timer.start(200)
 
         self.rawpanel = self.P["raw"].panel_raw
+        try:
+            import mcm as _mcm_mod
+            _ra = (getattr(self.args, "raw_agent", "") or "").split("//")[-1]
+            _ra = _ra.split(":")[0] or "192.168.2.2"
+            self.mcm = _mcm_mod.McmClient(host=_ra)
+            self.mcm.sig_result.connect(self._mcm_pesan)
+        except Exception as exc:                            # noqa: BLE001
+            self.mcm = None
+            self._catat("mcm client init failed: %r" % exc)
         # status storage utk estimasi & guard (diisi oleh _update_disk)
         self._disk_free_mb = None
         self._disk_prev = None            # (t, free_mb)
+        # animasi REC (kehendak pemilik 17 Okt): kedip merah saat merekam.
+        self._rec_robot = set()           # kamera yang RAW-rec DI ROBOT
+        self._anim_fase = False
+        self._anim_timer = QtCore.QTimer(self)
+        self._anim_timer.timeout.connect(self._anim_tick)
+        # log sensor topside 10 Hz (lihat _log_tick)
+        self._att_last = (None, None, None)
+        self._log_timer = QtCore.QTimer(self)
+        self._log_timer.timeout.connect(self._log_tick)
+        self._log_timer.start(100)
         self._disk_rate_mbpm = 0.0        # laju tulis EMA (MB/menit)
         self._disk_blok = False
         self._rec_aktif = set()           # nama kamera yang sedang REC (compressed)
@@ -292,8 +316,8 @@ class RovConsole(QtWidgets.QMainWindow):
         self.pf.muat_ck()
         def _raw_pesan(tag, d):
             if tag == "status":
-                self._catat("RAW agent: %s" % ("OK, disk %s MB" % d.get("disk_free_mb")
-                                              if d.get("ok") else str(d.get("error"))[:80]))
+                self._catat("RAW agent: %s" % ("OK" if d.get("ok")
+                                             else str(d.get("error"))[:80]))
             elif tag == "files":
                 self._catat("RAW: %d chunk" % len(d.get("files", [])))
             else:
@@ -431,16 +455,15 @@ class RovConsole(QtWidgets.QMainWindow):
         self.chip_mode = W.Chip("mode")
         self.chip_arm = W.Chip("arm")
         self.chip_pad = W.Chip("pad")
-        self.chip_rec = W.Chip("rec")
-        self.chip_fs = W.Chip("fs")          # failsafe sedang aktif?
         self.chip_ekf = W.Chip("ekf")        # kesehatan EKF
-        # audit UI 13 Okt: chip MODE/ARM/PAD tidak lagi ditempel di baris chip —
-        # informasinya sudah dibawa BANNER BESAR (hindari duplikasi; sisa: LINK/REC/FS/EKF)
+        # Baris chip = INFORMASI TUNGGAL (permintaan pemilik 17 Okt): chip REC &
+        # FS DIHAPUS — REC sudah tampil di panel CAPTURE (tombol + animasi), FS
+        # tidak perlu chip; sisa: LINK & EKF (banner besar membawa MODE/ARM).
         for c, teks in ((self.chip_link, "wait"), (self.chip_mode, "—"),
-                        (self.chip_arm, "—"), (self.chip_pad, "off"), (self.chip_rec, "—"),
-                        (self.chip_fs, "—"), (self.chip_ekf, "—")):
+                        (self.chip_arm, "—"), (self.chip_pad, "off"),
+                        (self.chip_ekf, "—")):
             self._chip(c, "ink_faint", teks)
-        for c in (self.chip_link, self.chip_rec, self.chip_fs, self.chip_ekf):
+        for c in (self.chip_link, self.chip_ekf):
             self.chip_bar.tambah(c)
         # BANNER STATUS BESAR (permintaan pemilik 13 Okt): MODE & ARMED/DISARMED
         # harus langsung terbaca — pilot TIDAK boleh "buta" soal status kendaraan.
@@ -1048,15 +1071,33 @@ class RovConsole(QtWidgets.QMainWindow):
         for r in (self.ro_volt, self.ro_curr, self.ro_batt):
             row.addWidget(r, 1)
         p.body_layout.addLayout(row)
-        lbl_est = QtWidgets.QLabel("\u2014")
-        lbl_est.setObjectName("MicroLabel")
-        lbl_est.setWordWrap(True)
-        lbl_est.setToolTip("Percent shown by ArduPilot = ENERGY consumed since "
-                           "power-on / BATT_CAPACITY (not true state of "
-                           "charge). The estimate beside it uses the pack "
-                           "voltage (LiPo anchor curve, per cell).")
-        p.body_layout.addWidget(lbl_est)
-        self.lbl_batt_est = lbl_est
+
+        def _baris_batt(judul, tip):
+            r = QtWidgets.QHBoxLayout()
+            r.setSpacing(8)
+            t2 = QtWidgets.QLabel(judul)
+            t2.setObjectName("MicroLabel")
+            t2.setFixedWidth(theme.px(40))
+            bar = W.BarPersen(tinggi=10)
+            bar.setToolTip(tip)
+            pct = QtWidgets.QLabel("\u2014%")
+            pct.setObjectName("MicroLabel")
+            pct.setFixedWidth(theme.px(44))
+            pct.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight |
+                             QtCore.Qt.AlignmentFlag.AlignVCenter)
+            r.addWidget(t2)
+            r.addWidget(bar, 1)
+            r.addWidget(pct)
+            p.body_layout.addLayout(r)
+            return bar, pct
+        self.bar_batt, self.lbl_batt_pct = _baris_batt(
+            "ardu", "ArduPilot remaining = ENERGY consumed since power-on / "
+            "BATT_CAPACITY (not true state of charge). Green > 50% · amber "
+            "25-50% · red < 25%.")
+        self.bar_lipo, self.lbl_lipo_pct = _baris_batt(
+            "lipo", "LiPo estimate from pack voltage — 3.70 V/cell (14.8 V "
+            "on 4S) = 0% · 4.20 V/cell (16.8 V) = 100% (batas bawah "
+            "ditetapkan pemilik 17 Okt).")
         lbl_stop = QtWidgets.QLabel(
             "Surface by 14.6 V \u00b7 degrades below 14.0 V \u00b7 never "
             "rest under 13.6 V")
@@ -1291,6 +1332,7 @@ class RovConsole(QtWidgets.QMainWindow):
         grid.setSpacing(6)
         self.btn_rec = {}
         self.btn_snap = {}
+        self.btn_cam = {}
         self.cb_mode = {}
         for i, (nama, _j, _p) in enumerate(STREAM_DEF):
             lab = QtWidgets.QLabel(nama.upper())
@@ -1299,7 +1341,12 @@ class RovConsole(QtWidgets.QMainWindow):
             cb.addItems(["COMPRESSED", "RAW"])
             cb.setSizeAdjustPolicy(
                 QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-            cb.setMinimumContentsLength(10)
+            cb.setMinimumContentsLength(7)
+            cb.setMinimumWidth(56)
+            # DINAMIS: biarkan combo MENYUSUT (rel sempit / device & OS lain) —
+            # tanpa ini minW panel (470) > viewport rel (442) = isi terklip.
+            cb.setSizePolicy(QtWidgets.QSizePolicy.Ignored,
+                             cb.sizePolicy().verticalPolicy())
             cb.setToolTip("REC mode for this camera:\n"
                           "COMPRESSED = .mkv video through the BlueOS stream (small)\n"
                           "RAW = uncompressed frames via the onboard agent (big; "
@@ -1313,14 +1360,28 @@ class RovConsole(QtWidgets.QMainWindow):
             b1.toggled.connect(lambda on, n=nama: self._toggle_rec(n, on))
             b2 = QtWidgets.QPushButton("SNAP")
             b2.setObjectName("BtnTiny")
-            b2.setToolTip("quick photo → compressed/ folder (.png)")
+            b2.setToolTip("quick photo → compressed/ folder (.png)\n"
+                          "in RAW mode: one uncompressed frame is saved on "
+                          "the Pi (transfer it in the RAW panel → raw/)")
             b2.clicked.connect(lambda _, n=nama: self._snap(n))
+            b3 = QtWidgets.QPushButton("ON")
+            b3.setObjectName("BtnTiny")
+            b3.setCheckable(True)
+            b3.setChecked(True)
+            b3.setToolTip("camera ON/OFF ON THE ROBOT:\n"
+                          "OFF stops this camera's stream inside BlueOS "
+                          "(frees the Pi's CPU/USB); the preview follows.\n"
+                          "ON re-creates the stream with the SAME saved "
+                          "settings. RAW capture is unaffected.")
+            b3.toggled.connect(lambda on, n=nama: self._toggle_cam(n, on))
             grid.addWidget(lab, i, 0)
             grid.addWidget(cb, i, 1)
             grid.addWidget(b1, i, 2)
             grid.addWidget(b2, i, 3)
+            grid.addWidget(b3, i, 4)
             self.btn_rec[nama] = b1
             self.btn_snap[nama] = b2
+            self.btn_cam[nama] = b3
             self.cb_mode[nama] = cb
         p.body_layout.addLayout(grid)
         self.lbl_sesi = QtWidgets.QLabel("session: " + os.path.basename(self.sesi))
@@ -1337,17 +1398,51 @@ class RovConsole(QtWidgets.QMainWindow):
         row_sesi.addWidget(b_sesi)
         row_sesi.addStretch(1)
         p.body_layout.addLayout(row_sesi)
-        self.lbl_save = QtWidgets.QLabel("save: compressed/ (video+photo) · raw/ (transfer)")
+        self.lbl_save = QtWidgets.QLabel("save: compressed/ · raw/ · sensors.csv")
         self.lbl_save.setObjectName("Faint")
         self.lbl_save.setWordWrap(True)
         self.lbl_save.setToolTip(
             "Everything for this dive goes into\n%s\n"
             "  compressed/ ← .mkv + .png from the live streams\n"
-            "  raw/        ← uncompressed chunks transferred from the Pi" % self.sesi)
+            "  raw/        ← uncompressed chunks transferred from the Pi\n"
+            "  sensors.csv ← sensor log topside 10 Hz (volt/curr/depth/"
+            "attitude/…)" % self.sesi)
         p.body_layout.addWidget(self.lbl_save)
+        def _baris_disk(judul, tip):
+            r = QtWidgets.QHBoxLayout()
+            r.setSpacing(6)
+            t = QtWidgets.QLabel(judul)
+            t.setObjectName("MicroLabel")
+            t.setFixedWidth(theme.px(54))
+            bar = W.BarPersen(tinggi=8)
+            bar.setToolTip(tip)
+            pct = QtWidgets.QLabel("\u2014%")
+            pct.setObjectName("MicroLabel")
+            pct.setFixedWidth(theme.px(44))
+            pct.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight |
+                             QtCore.Qt.AlignmentFlag.AlignVCenter)
+            r.addWidget(t)
+            r.addWidget(bar, 1)
+            r.addWidget(pct)
+            p.body_layout.addLayout(r)
+            return bar, pct
+        self.bar_disk, self.lbl_disk_pct = _baris_disk(
+            "topside", "Free space on this laptop's capture disk (bar = % free).")
+        self.bar_disk_pi, self.lbl_disk_pi_pct = _baris_disk(
+            "robot", "Free space on the robot (Pi) RAW disk (bar = % free) — "
+            "the agent auto-stops below its min-free margin.")
         self.lbl_disk = QtWidgets.QLabel("disk topside: —")
         self.lbl_disk.setObjectName("Faint")
         p.body_layout.addWidget(self.lbl_disk)
+        self.lbl_disk_pi = QtWidgets.QLabel("robot (Pi): —")
+        self.lbl_disk_pi.setObjectName("Faint")
+        self.lbl_disk_pi.setWordWrap(True)
+        self.lbl_disk_pi.setToolTip(
+            "Robot storage + RAW estimate (from the onboard agent).\n"
+            "Estimate uses the known FRONT raw rate (640×480 YUYV ≈ "
+            "0.62 GB/min); the stereo changes it once connected. The agent "
+            "auto-stops below its min-free margin.")
+        p.body_layout.addWidget(self.lbl_disk_pi)
         self.lbl_est = QtWidgets.QLabel("estimate: —")
         self.lbl_est.setObjectName("Faint")
         self.lbl_est.setWordWrap(True)
@@ -1404,8 +1499,21 @@ class RovConsole(QtWidgets.QMainWindow):
         self.peta = PetaPanel()
         # default: perairan Kepulauan Seribu (dekat dermaga Pulau Pramuka).
         # Operator mengganti titik anchor kapan saja lewat "TARUH ANCHOR" (klik peta).
-        self.peta.set_anchor({"lat": -5.7463, "lon": 106.6135, "heading_deg": 0.0,
-                              "sumber": "default  (Kepulauan Seribu)"})
+        _anchor = None
+        try:
+            import paths as _anch1
+            with open(_anch1.aset_json("anchor.json"), encoding="utf-8") as _f:
+                _anchor = json.load(_f)
+        except Exception:                                   # noqa: BLE001
+            _anchor = None
+        if not (isinstance(_anchor, dict) and "lat" in _anchor
+                and "lon" in _anchor):
+            _anchor = {"lat": -5.7463, "lon": 106.6135, "heading_deg": 0.0,
+                       "sumber": "default  (Kepulauan Seribu)"}
+        else:
+            _anchor = dict(_anchor)
+            _anchor["sumber"] = "saved  (sesi sebelumnya)"
+        self.peta.set_anchor(_anchor)
         self.peta.setMinimumHeight(220)
         self.peta.pin_dipilih.connect(self._anchor_dipilih)
         self.plot_misi = PlotMisi()
@@ -1421,8 +1529,7 @@ class RovConsole(QtWidgets.QMainWindow):
         self.stack_peta.addWidget(self.peta)
         self.stack_peta.addWidget(self.plot_misi)
         p.body_layout.addWidget(self.stack_peta, 1)
-        rowp = QtWidgets.QHBoxLayout()
-        rowp.setSpacing(6)
+        rowp = U.FlowBox(spacing=6)   # membungkus saat kolom sempit (dinamis)
         self.b_peta = QtWidgets.QPushButton("MAP")
         self.b_peta.setObjectName("BtnTiny")
         self.b_peta.setCheckable(True)
@@ -1442,6 +1549,11 @@ class RovConsole(QtWidgets.QMainWindow):
         b_iku.setObjectName("BtnTiny")
         b_iku.setToolTip("map view follows the estimated ROV position again")
         b_iku.clicked.connect(lambda: self.peta.pusatkan_ke_robot())
+        b_pos = QtWidgets.QPushButton("COORDS\u2026")
+        b_pos.setObjectName("BtnTiny")
+        b_pos.setToolTip("type the anchor latitude/longitude manually "
+                         "(custom position — same effect as dropping the pin)")
+        b_pos.clicked.connect(self._anchor_input)
         b_res = QtWidgets.QPushButton("RESET EST.")
         b_res.setObjectName("BtnTiny")
         b_res.setToolTip("zero the estimated position & track (start from here)")
@@ -1449,16 +1561,16 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_pose = QtWidgets.QLabel("N 0.0  E 0.0")
         self.lbl_pose.setObjectName("MicroLabel")
         _fm2 = QtGui.QFontMetrics(self.font())
-        for _b2 in (self.b_peta, self.b_ned, b_anc, b_iku, b_res):
+        for _b2 in (self.b_peta, self.b_ned, b_anc, b_pos, b_iku, b_res):
             _b2.setMinimumWidth(_fm2.horizontalAdvance(_b2.text()) + 18)
-        rowp.addWidget(self.b_peta)
-        rowp.addWidget(self.b_ned)
-        rowp.addWidget(b_anc)
-        rowp.addWidget(b_iku)
-        rowp.addWidget(b_res)
-        rowp.addWidget(self.lbl_pose)
-        rowp.addStretch(1)
-        p.body_layout.addLayout(rowp)
+        rowp.tambah(self.b_peta)
+        rowp.tambah(self.b_ned)
+        rowp.tambah(b_anc)
+        rowp.tambah(b_pos)
+        rowp.tambah(b_iku)
+        rowp.tambah(b_res)
+        rowp.tambah(self.lbl_pose)
+        p.body_layout.addWidget(rowp)
         P["peta"] = p
 
         # ---- preflight
@@ -1865,6 +1977,8 @@ class RovConsole(QtWidgets.QMainWindow):
                 return
             try:
                 self.rawpanel.client.start(kam, self.rawpanel.sp_chunk.value())
+                self._rec_robot.add(nama)
+                self._anim_mulai(nama)
                 self._catat("RAW REC %s (agent cam '%s') — files stay on the Pi; "
                             "transfer via RAW panel → raw/" % (nama, kam))
             except Exception as exc:                       # noqa: BLE001
@@ -1873,10 +1987,51 @@ class RovConsole(QtWidgets.QMainWindow):
         else:
             try:
                 self.rawpanel.client.stop(kam)
+                self._rec_robot.discard(nama)
+                self._anim_stop(nama)
                 self._catat("RAW REC %s stopped — pull the chunks in RAW CAPTURE → raw/"
                             % nama)
             except Exception as exc:                       # noqa: BLE001
                 self._catat("RAW stop %s failed: %r" % (nama, exc))
+
+    # ---------------------------------------------------------- animasi REC
+    @staticmethod
+    def _gaya_rec(fase):
+        if fase:
+            return ("QPushButton{background:#C22F26; color:#FFF3F1; "
+                    "border:1px solid #FF867A; font-weight:600;}")
+        return ("QPushButton{background:#6E1B16; color:#FFD9D3; "
+                "border:1px solid #C22F26;}")
+
+    def _anim_tick(self):
+        self._anim_fase = not self._anim_fase
+        for nama in list(self._rec_aktif) + list(self._rec_robot):
+            b = self.btn_rec.get(nama)
+            if b is not None:
+                b.setStyleSheet(self._gaya_rec(self._anim_fase))
+
+    def _anim_mulai(self, nama):
+        b = self.btn_rec.get(nama)
+        if b is not None:
+            b.setStyleSheet(self._gaya_rec(True))
+        if not self._anim_timer.isActive():
+            self._anim_fase = True
+            self._anim_timer.start(550)
+
+    def _anim_stop(self, nama):
+        b = self.btn_rec.get(nama)
+        if b is not None:
+            b.setStyleSheet("")          # INSTAN kembali normal saat selesai
+        if not self._rec_aktif and not self._rec_robot:
+            self._anim_timer.stop()
+            self._anim_fase = False
+
+    def _flash_snap(self, nama):
+        b2 = self.btn_snap.get(nama)
+        if b2 is not None:
+            b2.setStyleSheet("QPushButton{background:#2E7D5B; color:#EAFFF5; "
+                             "border:1px solid #5CC98F; font-weight:600;}")
+            QtCore.QTimer.singleShot(320, lambda bb=b2: bb.setStyleSheet(""))
 
     def _toggle_rec(self, nama, on):
         cb = self.cb_mode.get(nama)
@@ -1894,12 +2049,72 @@ class RovConsole(QtWidgets.QMainWindow):
                 nama.replace(" ", "_"), time.strftime("%H%M%S")))
             if p.start_record(path):
                 self._rec_aktif.add(nama)
+                self._anim_mulai(nama)
                 self.plot_misi.add_marker("rec")
             else:
                 self.btn_rec[nama].setChecked(False)
         else:
             p.stop_record()
             self._rec_aktif.discard(nama)
+            self._anim_stop(nama)
+
+    def _mcm_pesan(self, tag, d):
+        d = d or {}
+        if d.get("ok"):
+            self._catat("robot stream: %s %s" % (d.get("aksi", tag),
+                                                  d.get("nama", "")))
+        elif tag != "mcm_status":
+            self._catat("robot stream: %s" % d.get("error", "failed"))
+
+    def _toggle_cam(self, nama, on):
+        """Preview kamera ON/OFF (hemat CPU laptop; robot & RAW tetap jalan)."""
+        p = self.players.get(nama)
+        tile = self.tile_kam.get(nama)
+        try:
+            self.cam_aktif[nama] = bool(on)
+            # ROBOT-side (kehendak pemilik 17 Okt): ON/OFF = STREAM DI ROBOT
+            try:
+                if self.mcm is not None:
+                    if on:
+                        self.mcm.nyalakan(nama)
+                    else:
+                        self.mcm.matikan(nama)
+            except Exception as exc2:                       # noqa: BLE001
+                self._catat("robot stream %s: %r" % (nama, exc2))
+            if on:
+                if p is not None:
+                    p.start()
+                if tile is not None:
+                    tile.set_on()
+                self.btn_rec[nama].setEnabled(True)
+                self.btn_snap[nama].setEnabled(True)
+                self._catat("%s: camera ON — robot stream restarted "
+                            "(preview resumed)" % nama.upper())
+            else:
+                if p is not None:
+                    p.stop()
+                if tile is not None:
+                    tile.set_off("camera OFF — robot stream stopped "
+                                 "(Pi CPU saved)", title="CAMERA OFF")
+                cb = self.cb_mode.get(nama)
+                if cb is None or cb.currentText() != "RAW":
+                    b1 = self.btn_rec[nama]
+                    b1.blockSignals(True)
+                    b1.setChecked(False)
+                    b1.blockSignals(False)
+                    self._rec_aktif.discard(nama)
+                    self.btn_rec[nama].setEnabled(False)
+                # mode RAW: tombol REC tetap hidup (perekam ada di robot)
+                self.btn_snap[nama].setEnabled(False)
+                self._catat("%s: camera OFF — robot stream stopped "
+                            "(Pi freed)" % nama.upper())
+        except Exception as exc:                            # noqa: BLE001
+            self._catat("%s: camera toggle failed: %r" % (nama.upper(), exc))
+        b = self.btn_cam.get(nama) if hasattr(self, "btn_cam") else None
+        if b is not None:
+            b.blockSignals(True)
+            b.setText("ON" if on else "OFF")
+            b.blockSignals(False)
 
     def _ganti_nama_sesi_dialog(self):
         nama, ok = QtWidgets.QInputDialog.getText(
@@ -1975,6 +2190,18 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("pad action error: %r" % exc)
 
     def _snap(self, nama):
+        cb = self.cb_mode.get(nama)
+        if cb is not None and cb.currentText() == "RAW":
+            kam = self._RAW_KAM.get(nama, "front")
+            self._flash_snap(nama)
+            try:
+                self.rawpanel.client.snap(kam)
+                self._catat("RAW snapshot %s — one uncompressed frame is "
+                            "being saved on the Pi (agent cam '%s'); transfer "
+                            "it in the RAW panel → raw/" % (nama, kam))
+            except Exception as exc:                        # noqa: BLE001
+                self._catat("RAW snapshot %s failed: %r" % (nama, exc))
+            return
         if self._disk_blok:
             self._catat("SNAP blocked — topside storage full (< %d MB free). "
                         "Transfer/clean up first." % MIN_FREE_TOP_MB)
@@ -1983,6 +2210,7 @@ class RovConsole(QtWidgets.QMainWindow):
             nama.replace(" ", "_"), time.strftime("%H%M%S_")))
         ok = self.players[nama].snapshot(path)
         if ok:
+            self._flash_snap(nama)
             self.plot_misi.add_marker("snap")
         self._catat("snapshot %s → %s" % (nama, path if ok else "FAILED (no frame yet)"))
 
@@ -2034,6 +2262,45 @@ class RovConsole(QtWidgets.QMainWindow):
         else:
             self.lbl_disk.setText("disk topside: %.1f GB free (block below %.1f GB)"
                                   % (gb, MIN_FREE_TOP_MB / 1000.0))
+        # % + bar storage (topside & robot) — kehendak pemilik 17 Okt
+        try:
+            import shutil as _sh
+            _du = _sh.disk_usage(self.sesi)
+            _pct = 100.0 * _du.free / max(1, _du.total)
+            self.bar_disk.setValue(_pct)
+            self.lbl_disk_pct.setText("%.0f%%" % _pct)
+            self.bar_disk.setWarna("#E8804A" if _pct < 5 else
+                                   ("#E8C15C" if _pct < 15 else None))
+        except Exception:                                   # noqa: BLE001
+            pass
+        # robot (Pi) storage + estimasi RAW (kehendak pemilik 17 Okt)
+        try:
+            _st = getattr(self.rawpanel, "last_status", {}) or {}
+            _pi_free = _st.get("disk_free_mb")
+            _tot = _st.get("disk_total_mb")
+            if _pi_free is not None and _tot:
+                _pipct = 100.0 * float(_pi_free) / max(1.0, float(_tot))
+                self.bar_disk_pi.setValue(_pipct)
+                self.lbl_disk_pi_pct.setText("%.0f%%" % _pipct)
+                self.bar_disk_pi.setWarna("#E8804A" if _pipct < 5 else
+                                          ("#E8C15C" if _pipct < 15 else None))
+            else:
+                self.bar_disk_pi.setValue(0)
+                self.lbl_disk_pi_pct.setText("\u2014%")
+            if _pi_free is not None:
+                _pi_gb = float(_pi_free) / 1000.0
+                _menit = int(float(_pi_free) / 619.0)   # 640x480 YUYV ~0.619 GB/min
+                _jam, _mm = divmod(max(0, _menit), 60)
+                _ket = ("~%d h %02d m" % (_jam, _mm)) if _jam else ("~%d min" % _mm)
+                self.lbl_disk_pi.setText(
+                    "robot (Pi): %.1f GB free · RAW est %s" % (_pi_gb, _ket))
+                self.lbl_disk_pi.setStyleSheet(
+                    "color:#E8804A;"
+                    if _pi_free < float(_st.get("min_free_mb") or 0) else "")
+            else:
+                self.lbl_disk_pi.setText("robot (Pi): —  (agent offline?)")
+        except Exception:                                   # noqa: BLE001
+            pass
         est = self._est_menit(self._disk_free_mb, self._disk_rate_mbpm)
         snaps = int(max(0.0, (self._disk_free_mb or 0) - MIN_FREE_TOP_MB) / 2.5)
         if self._rec_aktif and est is not None:
@@ -2094,12 +2361,6 @@ class RovConsole(QtWidgets.QMainWindow):
             self._chip(self.chip_arm, "warn" if s.get("armed") else "ok",
                        "ARMED" if s.get("armed") else "DISARMED")
             self._gaya_banner(s.get("mode"), s.get("armed"))
-            txt_fs = (s.get("last_text") or "").lower()
-            if "failsafe" in txt_fs or "e-stop" in txt_fs or "estop" in txt_fs:
-                self._chip(self.chip_fs,
-                           "err" if s.get("last_text_sev", 6) <= 3 else "warn", "ACTIVE")
-            else:
-                self._chip(self.chip_fs, "ok", "—")
             ekf = s.get("ekf_ok")
             if ekf is True:
                 self._chip(self.chip_ekf, "ok", "ok")
@@ -2146,19 +2407,55 @@ class RovConsole(QtWidgets.QMainWindow):
             v = s.get("volt")
             lst = _lipo_pct(v)
             rem = s.get("remaining")
-            if lst is not None:
-                cells, soc = lst
-                self.lbl_batt_est.setText(
-                    "LiPo est %s%% \u00b7 Ardu remaining %s%%"
-                    % (("\u2014" if soc is None else soc),
-                       ("\u2014" if rem is None else rem)))
+            if rem is not None:
+                self.bar_batt.setValue(rem)
+                self.lbl_batt_pct.setText("%.0f%%" % rem)
+                _rm = float(rem)
+                self.bar_batt.setWarna("#E8804A" if _rm < 25 else
+                                       ("#E8C15C" if _rm < 50 else "#5CC98F"))
             else:
-                self.lbl_batt_est.setText("\u2014")
+                self.bar_batt.setValue(0)
+                self.lbl_batt_pct.setText("\u2014%")
+            if lst is not None:
+                _cells, soc = lst
+                self.bar_lipo.setValue(soc)
+                self.lbl_lipo_pct.setText("%d%%" % soc)
+                self.bar_lipo.setWarna("#E8804A" if soc < 25 else
+                                       ("#E8C15C" if soc < 50
+                                        else "#5CC98F"))
+            else:
+                self.bar_lipo.setValue(0)
+                self.lbl_lipo_pct.setText("\u2014%")
         except Exception:                                  # noqa: BLE001
             pass
 
     def _attitude(self, roll, pitch, _yaw):
+        self._att_last = (roll, pitch, _yaw)
         self.horizon.set_attitude(roll, pitch)
+
+    def _log_tick(self):
+        """Baris sensor 10 Hz → sensors.csv (topside; robot tak dibebani)."""
+        if getattr(self, "sensorlog", None) is None:
+            return
+        try:
+            s = self.bridge.state or {}
+            r, p, y = getattr(self, "_att_last", (None, None, None))
+            self.sensorlog.tulis({
+                "t_iso": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "t_unix": "%.3f" % time.time(),
+                "link": int(bool(s.get("link"))),
+                "mode": s.get("mode") or "",
+                "armed": int(bool(s.get("armed"))),
+                "volt_v": s.get("volt"), "curr_a": s.get("curr"),
+                "batt_pct": s.get("remaining"), "depth_m": s.get("depth"),
+                "water_c": s.get("temp"), "press_abs": s.get("press_abs"),
+                "roll_deg": r, "pitch_deg": p, "yaw_deg": y,
+                "ekf_ok": (None if s.get("ekf_ok") is None
+                           else int(bool(s.get("ekf_ok")))),
+                "sys_healthy": s.get("sys_healthy"), "msgs": s.get("msgs"),
+            })
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def _text(self, teks, sev):
         self._catat(("⚠ " if sev <= 4 else "") + teks)
@@ -2182,8 +2479,38 @@ class RovConsole(QtWidgets.QMainWindow):
     # ================================================================ tutup
     def _sync_tiles(self):
         try:
+            # kamera OFF = pesan tetap (frame telat tak boleh menghapusnya)
+            for nama, on in getattr(self, "cam_aktif", {}).items():
+                if on:
+                    continue
+                t = self.tile_kam.get(nama)
+                alasan = "camera OFF — robot stream stopped (Pi CPU saved)"
+                if t is not None and getattr(t, "_off", None) != alasan:
+                    t.set_off(alasan, title="CAMERA OFF")
             for k in ("cam_front", "cam_left", "cam_right"):
                 self.P[k].tile._sync_tinggi()
+            # panel TENGAH = FIT RESOLUSI kamera (kehendak pemilik 17 Okt):
+            # LEBAR penuh kolom + tinggi dikunci ke rasio frame ASLI
+            # (lebar/rasio) sehingga video tampak PENUH tanpa border. Bila
+            # kolom tidak cukup, KOLOM TENGAH yang menggulir — bukan kamera
+            # yang mengecil. Rasio dibaca live dari frame → modular untuk
+            # kamera/robot apa pun (4:3 / 16:10 / resolusi lain).
+            t = self.P["cam_front"].tile
+            if t.width() > 60 and t.parentWidget() is not None:
+                ideal = t.heightForWidth(t.width())          # +18 chrome
+                # chrome diukur HANYA saat tile penuh (tile == maximumHeight).
+                # Kalau tile terjepit, pakai nilai tersimpan — tanpa penjaga
+                # ini "slack" ikut terukur dan min-height RATCHET: panel
+                # tumbuh 4 px tiap tick → konten turun terus (laporan pemilik
+                # 17 Okt: "panel cam front turun-turun sendiri").
+                if abs(t.height() - t.maximumHeight()) <= 2:
+                    self._chrome_cam = self.P["cam_front"].height() - t.height()
+                chrome = getattr(self, "_chrome_cam", None)
+                if chrome is None:
+                    chrome = 40
+                butuh = ideal + max(0, chrome) + 2
+                if abs(self.P["cam_front"].minimumHeight() - butuh) > 3:
+                    self.P["cam_front"].setMinimumHeight(butuh)
         except Exception:                                  # noqa: BLE001
             pass
 
@@ -2297,13 +2624,59 @@ class RovConsole(QtWidgets.QMainWindow):
         self.peta.siapkan_pin()
         self._catat("map PIN mode: click a point on the map = local anchor (0,0)")
 
+    def _anchor_input(self):
+        """Input posisi anchor MANUAL (lat/lon) — kehendak pemilik 17 Okt."""
+        a = dict(getattr(self.peta, "anchor", {}) or {})
+        d = QtWidgets.QDialog(self)
+        d.setWindowTitle("Anchor position \u2014 custom")
+        form = QtWidgets.QFormLayout(d)
+        sp_lat = QtWidgets.QDoubleSpinBox()
+        sp_lat.setRange(-90.0, 90.0)
+        sp_lat.setDecimals(6)
+        sp_lat.setValue(float(a.get("lat", -5.7463)))
+        sp_lon = QtWidgets.QDoubleSpinBox()
+        sp_lon.setRange(-180.0, 180.0)
+        sp_lon.setDecimals(6)
+        sp_lon.setValue(float(a.get("lon", 106.6135)))
+        tip = QtWidgets.QLabel(
+            "Sets the local anchor (0,0) for the mission map \u2014 identical "
+            "to dropping the pin on the map, but typed by hand.\n"
+            "Current anchor: %.6f, %.6f (%s)" % (
+                float(a.get("lat", 0.0)), float(a.get("lon", 0.0)),
+                a.get("sumber", "\u2014")))
+        tip.setObjectName("MicroLabel")
+        tip.setWordWrap(True)
+        form.addRow("Latitude", sp_lat)
+        form.addRow("Longitude", sp_lon)
+        form.addRow(tip)
+        bb = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        bb.accepted.connect(d.accept)
+        bb.rejected.connect(d.reject)
+        form.addRow(bb)
+        if d.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            self._anchor_dipilih(sp_lat.value(), sp_lon.value())
+
     def _anchor_dipilih(self, lat, lon):
         a = dict(self.peta.anchor)
         a["lat"] = float(lat)
         a["lon"] = float(lon)
         a["sumber"] = "pin operator"
         self.peta.set_anchor(a)
-        self._catat("map anchor set: %.6f, %.6f" % (lat, lon))
+        # View TETAP di titik yang dipilih — jangan melompat mengikuti pose
+        # estimasi (laporan pemilik 17 Okt: "place anchor malah kepindah jauh").
+        try:
+            self.peta.pergi_ke(float(lat), float(lon), "anchor")
+        except Exception:                                   # noqa: BLE001
+            pass
+        try:
+            import paths as _anch2
+            with open(_anch2.aset_json("anchor.json"), "w",
+                      encoding="utf-8") as _f:
+                json.dump(a, _f, indent=2)
+        except Exception:                                   # noqa: BLE001
+            pass
+        self._catat("map anchor set: %.6f, %.6f (saved)" % (lat, lon))
 
     def _reset_estimasi(self):
         self.plot_misi.ancor()
@@ -2363,6 +2736,11 @@ class RovConsole(QtWidgets.QMainWindow):
         try:
             self.bridge.stop()
         except Exception:                                  # noqa: BLE001
+            pass
+        try:
+            if getattr(self, "sensorlog", None) is not None:
+                self.sensorlog.tutup()
+        except Exception:                                   # noqa: BLE001
             pass
         try:
             with open(os.path.join(self.sesi, "session_end.json"), "w",
@@ -2469,6 +2847,11 @@ def main():
     args.port_stereo_R = args.right_port
 
     app = QtWidgets.QApplication(sys.argv)
+    try:
+        import wheelguard
+        wheelguard.pasang(app)
+    except Exception:                                       # noqa: BLE001
+        pass
     # Identitas aplikasi (taskbar/dock): nama & app-id harus sama dgn
     # deepvertex-console.desktop supaya ikon & nama konsisten di GNOME.
     app.setApplicationName("DeepVertex Marine Technology Console")

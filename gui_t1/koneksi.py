@@ -26,7 +26,6 @@ PRESET = {
         "mavlink": "udpin:0.0.0.0:14550",
         "front_port": 5600, "left_port": 5601, "right_port": 5602,
         "raw_agent": "http://192.168.2.2:8765",
-        "ssh_user": "pi", "ssh_pass": "", "agent_path": "~/onboard/raw_agent.py",
     },
     "sitl": {
         "nama": "Simulation / SITL (local)",
@@ -34,12 +33,13 @@ PRESET = {
         "mavlink": "udpin:0.0.0.0:14550",
         "front_port": 5600, "left_port": 5601, "right_port": 5602,
         "raw_agent": "http://127.0.0.1:8765",
-        "ssh_user": "pi", "ssh_pass": "", "agent_path": "~/onboard/raw_agent.py",
     },
 }
 
-IP_SARAN = "192.168.2.50    (laptop) — do not use .2 (that is BlueOS)"
-SUBNET_DEFAULT = "192.168.2.50/24"
+IP_SARAN = "192.168.2.1 (laptop; official BlueRobotics tether setup)"
+SUBNET_DEFAULT = "192.168.2.1/24"
+NET_IP = "192.168.2.1"
+NET_MASK = "255.255.255.0"
 
 
 def preset(nama):
@@ -112,6 +112,68 @@ def perintah_ethernet(os_name, iface, ip=SUBNET_DEFAULT, dhcp=True):
                     "sudo nmcli con up '%s'" % iface]
     return {"cepat": cepat, "permanen": permanen,
             "catatan": "Needs sudo (the terminal will ask). Check: ip -br addr show %s" % iface}
+
+
+def network_steps(os_name, iface, ip=NET_IP, mask=NET_MASK):
+    """Langkah set-up network RESMI BlueRobotics (static IP) per OS — laptop saja.
+
+    Fungsi murni (diuji [55]); TIDAK menyentuh robot sama sekali. Resep:
+    https://bluerobotics.com/learn/bluerov2-software-setup/#network-setup
+    * Linux   : nmcli (NetworkManager) — jalan langsung, tanpa reboot.
+    * Windows : netsh (lewat UAC); Control Panel = fallback manual.
+    * macOS   : networksetup (lewat osascript admin).
+    """
+    if os_name == "nt":
+        nm = '"%s"' % iface
+        return {
+            "apply": ["netsh interface ip set address name=%s static %s %s"
+                      % (nm, ip, mask)],
+            "verify": ["netsh", "interface", "ip", "show", "address",
+                       "name=%s" % iface],
+            "manual": ("Windows: Control Panel (NOT the Settings app) > "
+                       "Network and Sharing Center > Change adapter settings > "
+                       "right-click the FXTI adapter (Realtek USB FE Family "
+                       "Controller) > Properties > Internet Protocol Version 4 "
+                       "(TCP/IPv4) > Properties > Use the following IP "
+                       "address: %s / %s") % (ip, mask),
+        }
+    if os_name == "darwin":
+        return {
+            "apply": ['networksetup -setmanual "%s" %s %s'
+                      % (iface, ip, mask)],
+            "verify": ["networksetup", "-getinfo", iface],
+            "manual": ("macOS: System Settings > Network > the FXTI adapter "
+                       "(USB 10/100 LAN) > Details... > TCP/IP > Configure "
+                       "IPv4: Manually > %s / %s") % (ip, mask),
+        }
+    con = "DeepVertex Robot Tether"
+    return {
+        "apply": [
+            "nmcli -t -f NAME,DEVICE con show   # find the profile bound to "
+            + iface,
+            "nmcli con add type ethernet ifname %s con-name '%s' 2>/dev/null "
+            "|| true" % (iface, con),
+            "nmcli con mod '%s' ipv4.method manual ipv4.addresses %s/24 "
+            "ipv4.gateway '' ipv4.never-default yes && nmcli con up '%s'"
+            % (con, ip, con)],
+        "verify": ["ip", "-4", "-br", "addr", "show", iface],
+        "manual": ("Linux: Settings > Network > “USB Ethernet” > gear "
+                   "icon > IPv4 tab > Manual > Address %s, Netmask %s, "
+                   "Gateway 0.0.0.0 > Apply") % (ip, mask),
+    }
+
+
+def parse_verify(os_name, teks, ip=NET_IP):
+    """True bila output baca-alamat per-OS menunjukkan IP target terpasang."""
+    t = str(teks or "")
+    if not t:
+        return False
+    if os_name == "nt":
+        for baris in t.splitlines():
+            if "IP Address" in baris and ip in baris:
+                return True
+        return False
+    return ip in t
 
 
 def args_terapan(cfg, argv):
@@ -266,149 +328,18 @@ def buat_dialog(console):
     for sp in (f_fr, f_l, f_r):
         sp.setRange(1, 65535)
     f_raw = QtWidgets.QLineEdit()
-    f_user = QtWidgets.QLineEdit()
-    f_passw = QtWidgets.QLineEdit()
-    f_passw.setEchoMode(QtWidgets.QLineEdit.Password)
-    f_path = QtWidgets.QLineEdit()
     form.addRow("Robot host (BlueOS)", f_host)
     form.addRow("MAVLink endpoint", f_mav)
     form.addRow("Video port — front", f_fr)
     form.addRow("Video port — stereo L", f_l)
     form.addRow("Video port — stereo R", f_r)
     form.addRow("RAW agent URL", f_raw)
-    form.addRow("Robot SSH user", f_user)
-    form.addRow("Robot SSH password", f_passw)
-    form.addRow("RAW agent path (on robot)", f_path)
     v.addLayout(form)
     v.addWidget(QtWidgets.QLabel(
-        "SSH fields power the one-click “Start RAW agent on the robot” — "
-        "fill them with the SAME user + password you use when you run "
-        "“ssh” to the robot from a terminal (BlueOS default user: pi). "
-        "Saved locally with the rest of the connection settings.\n"
-        "For auto-start at every boot, run once on the robot: "
-        "install/robot/install_agent_service.sh (kept in the repo)."))
-
-    # ---- tombol utama: SATU KLIK menyambungkan semuanya (permintaan pemilik)
-    b_oc = QtWidgets.QPushButton("Connect everything (one click)")
-    b_oc.setObjectName("BtnPrimary")
-    lbl_oc = QtWidgets.QLabel("")
-    lbl_oc.setObjectName("Faint")
-    lbl_oc.setWordWrap(True)
-    baris_oc = QtWidgets.QHBoxLayout()
-    baris_oc.addWidget(b_oc)
-    baris_oc.addWidget(lbl_oc, 1)
-    v.addLayout(baris_oc)
-
-    def _perbaiki_firewall(silent=False):
-        """Deteksi aturan BLOCK utk aplikasi ini; perbaiki via UAC (Windows)."""
-        if os.name != "nt":
-            return "firewall check is Windows-only"
-        import subprocess
-        ps = ("$b = @(Get-NetFirewallRule | Where-Object { "
-              "$_.DisplayName -like '*deepvertex*' -and $_.Action -eq "
-              "'Block' }); if ($b.Count -gt 0) { 'BLOCKS=' + $b.Count } else "
-              "{ 'clean' }")
-        try:
-            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
-                               capture_output=True, text=True, timeout=20)
-            out = (r.stdout or "").strip()
-        except Exception as exc:                           # noqa: BLE001
-            return "firewall check failed: %s" % exc
-        if "clean" in out:
-            return ""                                     # tidak ada blok
-        # tulis skrip + jalankan lewat UAC
-        try:
-            import paths
-            d = os.path.join(paths.data_dir(), "update")
-            os.makedirs(d, exist_ok=True)
-            p = os.path.join(d, "fix_firewall.ps1")
-            with open(p, "w", encoding="utf-8") as f:
-                f.write(skrip_fix_firewall())
-            QtCore.QProcess.startDetached(
-                "powershell",
-                ["-NoProfile", "-Command",
-                 "Start-Process powershell -Verb RunAs -ArgumentList "
-                 "'-NoProfile','-ExecutionPolicy','Bypass','-File','%s'" % p])
-            return ("blocked firewall rules detected (%s) — fix launched "
-                    "(click YES on the UAC prompt)" % out)
-        except Exception as exc:                           # noqa: BLE001
-            return "firewall fix failed: %s" % exc
-
-    b_fw = QtWidgets.QPushButton("Fix Windows Firewall (UAC)")
-    b_fw.setObjectName("BtnTiny")
-    b_fw.setVisible(os.name == "nt")
-
-    def _klik_fw():
-        lbl_oc.setText("checking firewall …")
-        QtWidgets.QApplication.processEvents()
-        msg = _perbaiki_firewall() or "firewall is clean (no block rules)"
-        lbl_oc.setText(msg)
-        console._catat("firewall helper: " + msg)
-
-    b_fw.clicked.connect(_klik_fw)
-    baris_oc.addWidget(b_fw)
-
-    def _oneclick():
-        c = tarik()
-        host = c["host"] or "192.168.2.2"
-        b_oc.setEnabled(False)
-        lbl_oc.setText("connecting …")
-        QtWidgets.QApplication.processEvents()
-        langkah = []
-        try:
-            import robotops
-            # 1) IP laptop di subnet robot
-            ip = robotops.ip_ke_robot(host)
-            if not ip:
-                langkah.append("✗ laptop IP not found — check the tether cable")
-            else:
-                langkah.append("✓ laptop IP %s" % ip)
-                # 2) BlueOS hidup?
-                hidup = False
-                try:
-                    with urllib.request.urlopen("http://%s/" % host,
-                                                timeout=4) as r:
-                        hidup = r.status < 500
-                except Exception:                          # noqa: BLE001
-                    hidup = False
-                if not hidup:
-                    langkah.append("✗ BlueOS not reachable at %s — check ROV "
-                                   "power/cable" % host)
-                else:
-                    langkah.append("✓ BlueOS alive")
-                    # 3) pastikan endpoint MAVLink -> laptop ini
-                    ok, msg = robotops.blueos_pastikan_endpoint(host, ip, 14550)
-                    langkah.append(("✓ " if ok else "✗ ") + msg)
-                    # 4) verifikasi telemetri (ikut cek/pulihkan firewall)
-                    if ok and robotops.tunggu_link(console.bridge, 8):
-                        langkah.append("✓ MAVLink telemetry flowing (LINK up)")
-                    elif ok:
-                        pesan_fw = _perbaiki_firewall()
-                        if pesan_fw:
-                            langkah.append("… " + pesan_fw)
-                        if robotops.tunggu_link(console.bridge, 8):
-                            langkah.append("✓ MAVLink telemetry flowing (LINK up)")
-                        else:
-                            langkah.append("… LINK not up yet — press “Fix "
-                                           "Windows Firewall” above and check "
-                                           "the notifications")
-                    # 5) RAW agent (bila kredensial SSH terisi)
-                    if c["ssh_user"] and c["ssh_pass"]:
-                        ok2, msg2 = robotops.start_agent(
-                            host, c["ssh_user"], c["ssh_pass"],
-                            c["agent_path"])
-                        langkah.append(("✓ " if ok2 else "✗ ") + "RAW: " + msg2)
-                    else:
-                        langkah.append("• RAW agent: fill the SSH fields "
-                                       "above to enable the one-click start")
-        except Exception as exc:                           # noqa: BLE001
-            langkah.append("✗ error: %s" % exc)
-        lbl_oc.setText("    ".join(langkah))
-        console._catat("one-click connect: " + " | ".join(langkah))
-        b_oc.setEnabled(True)
-        _uji()
-
-    b_oc.clicked.connect(_oneclick)
+        "Officially supported flow: set the laptop’s tether adapter to "
+        "192.168.2.1 (section 2 — nothing on the robot is changed), then use "
+        "the BlueOS web UI (192.168.2.2) for anything robot-side. RAW capture "
+        "is optional and needs the onboard agent (install script in the repo)."))
 
     def isi(c):
         f_host.setText(str(c.get("host", "")))
@@ -417,9 +348,6 @@ def buat_dialog(console):
         f_l.setValue(int(c.get("left_port", 5601)))
         f_r.setValue(int(c.get("right_port", 5602)))
         f_raw.setText(str(c.get("raw_agent", "")))
-        f_user.setText(str(c.get("ssh_user", "pi")))
-        f_passw.setText(str(c.get("ssh_pass", "")))
-        f_path.setText(str(c.get("agent_path", "~/onboard/raw_agent.py")))
 
     aktif = [cfg0.get("preset", "blueos") if cfg0.get("preset") in rb
              else "custom"]
@@ -428,9 +356,7 @@ def buat_dialog(console):
         return {"preset": aktif[0], "host": f_host.text().strip(),
                 "mavlink": f_mav.text().strip(),
                 "front_port": f_fr.value(), "left_port": f_l.value(),
-                "right_port": f_r.value(), "raw_agent": f_raw.text().strip(),
-                "ssh_user": f_user.text().strip(), "ssh_pass": f_passw.text(),
-                "agent_path": f_path.text().strip()}
+                "right_port": f_r.value(), "raw_agent": f_raw.text().strip()}
 
     def pilih(k, pakai_cfg=False):
         aktif[0] = k
@@ -445,32 +371,49 @@ def buat_dialog(console):
         b.toggled.connect(lambda on, k=k: on and pilih(k))
     pilih(aktif[0], pakai_cfg=True)
 
-    # ---- 2) jaringan ethernet
+    # ---- 2) network setup (laptop saja — resep resmi BlueRobotics)
     v.addWidget(QtWidgets.QLabel(
-        "<b>2. Ethernet / tether network</b> — connect the tether cable, then "
-        "use the robot subnet (BlueOS: 192.168.2.x)."))
+        "<b>2. Robot network (laptop side)</b> — connect the tether cable, "
+        "then give the laptop adapter the official address "
+        "<b>192.168.2.1</b>. The robot itself is never modified."))
     eg = QtWidgets.QGridLayout()
     c_if = QtWidgets.QComboBox()
     c_if.setMinimumWidth(320)
     info_if = QtWidgets.QLabel("")
     info_if.setWordWrap(True)
     eg.addWidget(QtWidgets.QLabel("Interface"), 0, 0)
-    eg.addWidget(c_if, 0, 1, 1, 3)
-    eg.addWidget(info_if, 1, 1, 1, 3)
-    ch_dhcp = QtWidgets.QCheckBox("Use DHCP (recommended for most BlueOS rigs)")
-    ch_dhcp.setChecked(True)
-    eg.addWidget(ch_dhcp, 2, 1, 1, 3)
+    eg.addWidget(c_if, 0, 1, 1, 4)
+    eg.addWidget(info_if, 1, 1, 1, 4)
+    ch_dhcp = QtWidgets.QCheckBox(
+        "Use DHCP instead (rare — only if the robot runs a DHCP server)")
+    ch_dhcp.setChecked(False)
+    eg.addWidget(ch_dhcp, 2, 1, 1, 4)
     eg.addWidget(QtWidgets.QLabel("Static IP"), 3, 0)
     f_ip = QtWidgets.QLineEdit(SUBNET_DEFAULT)
     eg.addWidget(f_ip, 3, 1)
-    b_copy = QtWidgets.QPushButton("Copy command")
-    b_apply = QtWidgets.QPushButton("Apply (admin)…")
-    eg.addWidget(b_copy, 3, 2)
-    eg.addWidget(b_apply, 3, 3)
+    b_net = QtWidgets.QPushButton("Set up network (official recipe)")
+    b_net.setObjectName("BtnPrimary")
+    b_man = QtWidgets.QPushButton("Manual steps…")
+    eg.addWidget(b_net, 3, 2, 1, 2)
+    eg.addWidget(b_man, 3, 4)
+    lbl_net = QtWidgets.QLabel("")
+    lbl_net.setObjectName("Faint")
+    lbl_net.setWordWrap(True)
+    eg.addWidget(lbl_net, 4, 1, 1, 4)
+    b_copy = QtWidgets.QPushButton("Copy commands")
+    b_copy.setObjectName("BtnTiny")
+    b_vrf = QtWidgets.QPushButton("Verify")
+    b_vrf.setObjectName("BtnTiny")
+    baris_v = QtWidgets.QHBoxLayout()
+    baris_v.addWidget(b_copy)
+    baris_v.addWidget(b_vrf)
+    baris_v.addStretch(1)
+    eg.addWidget(QtWidgets.QLabel("Fallback"), 5, 0)
+    eg.addLayout(baris_v, 5, 1, 1, 4)
     perintah_txt = QtWidgets.QPlainTextEdit()
     perintah_txt.setReadOnly(True)
     perintah_txt.setMaximumHeight(84)
-    eg.addWidget(perintah_txt, 4, 0, 1, 4)
+    eg.addWidget(perintah_txt, 6, 0, 1, 5)
     v.addLayout(eg)
 
     def _iface_sekarang():
@@ -485,7 +428,9 @@ def buat_dialog(console):
                               f_ip.text().strip() or SUBNET_DEFAULT,
                               dhcp=ch_dhcp.isChecked())
         perintah_txt.setPlainText("# %s\n%s" % (p["catatan"],
-                                                "\n".join(p["cepat"])))
+                                                "\n".join(p["cara"] if
+                                                           "cara" in p else
+                                                           p["cepat"])))
 
     ch_dhcp.toggled.connect(_segarkan_perintah)
     f_ip.textChanged.connect(_segarkan_perintah)
@@ -526,30 +471,158 @@ def buat_dialog(console):
 
     def _copy():
         QtWidgets.QApplication.clipboard().setText(perintah_txt.toPlainText())
-        console._catat("connection: ethernet command copied")
+        console._catat("connection: network command copied")
 
-    def _apply_admin():
-        if not _iface_sekarang():
-            return
-        p = perintah_ethernet(os.name, _iface_sekarang(),
-                              f_ip.text().strip() or SUBNET_DEFAULT,
-                              dhcp=ch_dhcp.isChecked())
+    import subprocess
+
+    def _platform_key():
         if os.name == "nt":
-            kk = "__%s" % p["cepat"][0]
-            script = ("& %s" % p["cepat"][0])          # netsh ...
-            QtCore.QProcess.startDetached(
-                "powershell",
-                ["-NoProfile", "-Command",
-                 "Start-Process powershell -Verb RunAs -ArgumentList "
-                 "'-NoProfile','-Command','%s'" % script])
-            console._catat("connection: applying IP (UAC) — %s" % kk)
+            return "nt"
+        return "darwin" if sys.platform == "darwin" else "posix"
+
+    def _tulis_ps1(nama, isi):
+        try:
+            import paths
+            d = os.path.join(paths.data_dir(), "update")
+            os.makedirs(d, exist_ok=True)
+            p = os.path.join(d, nama)
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(isi)
+            return p
+        except Exception:                                  # noqa: BLE001
+            return None
+
+    def _apply_linux(iface, ip):
+        """nmcli: mod profil yang ada (atau buat baru), up — aktif langsung."""
+        try:
+            r = subprocess.run(["nmcli", "-t", "-f", "NAME,DEVICE", "con",
+                                "show"], capture_output=True, text=True,
+                               timeout=15)
+            con = ""
+            for baris in (r.stdout or "").splitlines():
+                bagian = baris.split(":")
+                if len(bagian) >= 2 and bagian[-1] == iface:
+                    con = ":".join(bagian[:-1])
+                    break
+            if not con:
+                con = "DeepVertex Robot Tether"
+                subprocess.run(["nmcli", "con", "add", "type", "ethernet",
+                                "ifname", iface, "con-name", con],
+                               capture_output=True, text=True, timeout=20)
+            r1 = subprocess.run(
+                ["nmcli", "con", "mod", con, "ipv4.method", "manual",
+                 "ipv4.addresses", "%s/24" % ip, "ipv4.gateway", "",
+                 "ipv4.never-default", "yes"],
+                capture_output=True, text=True, timeout=20)
+            r2 = subprocess.run(["nmcli", "con", "up", con],
+                                capture_output=True, text=True, timeout=25)
+            ok = (r1.returncode == 0 and r2.returncode == 0)
+            if ok:
+                return True, ("OK — profile “%s” now static %s/24 and ACTIVE "
+                              "(no reboot needed)" % (con, ip))
+            pesan = ((r1.stderr or "") + " " + (r2.stderr or "")).strip()
+            return False, ("nmcli failed: %s — use Manual steps… / Copy "
+                           "commands" % (pesan[:110] or "permission?"))
+        except Exception as exc:                           # noqa: BLE001
+            return False, "nmcli error: %s" % exc
+
+    def _set_network():
+        iface = _iface_sekarang()
+        if not iface:
+            lbl_net.setText("Select the tether adapter first.")
+            return
+        ip = (f_ip.text().strip().split("/")[0] or NET_IP)
+        plat = _platform_key()
+        lbl_net.setStyleSheet("")
+        if plat == "nt":
+            st = network_steps("nt", iface, ip)
+            p = _tulis_ps1("set_network.ps1",
+                           "\r\n".join(["& " + st["apply"][0]]))
+            if p:
+                QtCore.QProcess.startDetached(
+                    "powershell",
+                    ["-NoProfile", "-Command",
+                     "Start-Process powershell -Verb RunAs -ArgumentList "
+                     "'-NoProfile','-ExecutionPolicy','Bypass','-File','%s'" % p])
+                lbl_net.setText("applying %s (click YES on the UAC prompt) — "
+                                "verifying in a few seconds…" % ip)
+                QtCore.QTimer.singleShot(6000, _verify_network)
+                QtCore.QTimer.singleShot(13000, _verify_network)
+            else:
+                lbl_net.setText("Could not write the helper script — use "
+                                "Manual steps…")
+            console._catat("connection: network set (Windows, UAC) — %s" % iface)
+        elif plat == "darwin":
+            st = network_steps("darwin", iface, ip)
+            skrip = st["apply"][0].replace('"', '\\"')
+            subprocess.Popen(["osascript", "-e",
+                              'do shell script "%s" with administrator '
+                              'privileges' % skrip])
+            lbl_net.setText("applying %s (enter your password if asked) — "
+                            "verifying in a few seconds…" % ip)
+            QtCore.QTimer.singleShot(5000, _verify_network)
+            QtCore.QTimer.singleShot(11000, _verify_network)
+            console._catat("connection: network set (macOS) — %s" % iface)
         else:
-            _copy()
-            console._catat("connection: command copied — run it in a terminal "
-                           "(needs sudo)")
+            ok, msg = _apply_linux(iface, ip)
+            lbl_net.setText(msg)
+            lbl_net.setStyleSheet("color:#5CC98F;" if ok else "color:#E8804A;")
+            console._catat("connection: network set (Linux) — " + msg)
+            _verify_network()
+
+    def _verify_network():
+        iface = _iface_sekarang()
+        ip = (f_ip.text().strip().split("/")[0] or NET_IP)
+        plat = _platform_key()
+        ada = False
+        try:
+            cmd = network_steps(plat, iface, ip)["verify"]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+            ada = parse_verify(plat, r.stdout, ip)
+        except Exception:                                  # noqa: BLE001
+            ada = False
+        host = (f_host.text().strip() or "192.168.2.2")
+        robot = False
+        try:
+            s = socket.create_connection((host, 80), timeout=1.5)
+            s.close()
+            robot = True
+        except Exception:                                  # noqa: BLE001
+            pass
+        if ada and robot:
+            txt = ("OK — adapter has %s/24 and the robot answers — network "
+                   "ready. Settings saved; no restart needed." % ip)
+            lbl_net.setStyleSheet("color:#5CC98F;")
+            save(tarik())
+            console._catat("connection: network verify OK (%s) — saved, "
+                           "no restart" % ip)
+        elif ada:
+            txt = ("OK — adapter has %s/24 (robot not answering yet — check "
+                   "ROV power / the tether cable). Settings saved; no restart "
+                   "needed." % ip)
+            lbl_net.setStyleSheet("color:#E8C15C;")
+            save(tarik())
+            console._catat("connection: network verify (adapter only) — saved")
+        else:
+            txt = ("Not applied yet — adapter does not show %s. Wait a few "
+                   "seconds and press Verify, or use Manual steps…" % ip)
+            lbl_net.setStyleSheet("color:#E8804A;")
+        lbl_net.setText(txt)
+
+    def _manual_steps():
+        m = network_steps(_platform_key(), _iface_sekarang() or "<adapter>",
+                          f_ip.text().strip().split("/")[0] or NET_IP)
+        QtWidgets.QMessageBox.information(
+            d, "Manual network steps (official BlueRobotics)",
+            m["manual"] + "\n\nFull guide: "
+            "https://bluerobotics.com/learn/bluerov2-software-setup/"
+            "#network-setup\n\nThis only configures THIS laptop — nothing "
+            "on the robot is changed.")
 
     b_copy.clicked.connect(_copy)
-    b_apply.clicked.connect(_apply_admin)
+    b_net.clicked.connect(_set_network)
+    b_vrf.clicked.connect(_verify_network)
+    b_man.clicked.connect(_manual_steps)
 
     # ---- 3) uji koneksi
     v.addWidget(QtWidgets.QLabel("<b>3. Test connection</b>"))
@@ -582,74 +655,34 @@ def buat_dialog(console):
                 hasil_lbl[k].setStyleSheet("")       # informational
             else:
                 hasil_lbl[k].setStyleSheet("color:#E8804A;")
-        # one-click: RAW gagal + kredensial terisi → nyalakan agent di robot
-        if not h.get("raw", "").startswith("OK") and \
-                f_user.text().strip() and f_passw.text():
-            lbl_ssh.setText("RAW agent is not up — starting it on the robot …")
-            QtWidgets.QApplication.processEvents()
-            if _start_agent(silent=True):
-                hasil_lbl["raw"].setText(
-                    "OK — RAW agent started automatically ✓")
-                hasil_lbl["raw"].setStyleSheet("color:#5CC98F;")
 
     b_uji = QtWidgets.QPushButton("Test now")
     b_uji.clicked.connect(_uji)
     v.addWidget(b_uji)
 
-    baris_ssh = QtWidgets.QHBoxLayout()
-    b_start = QtWidgets.QPushButton("Start RAW agent on the robot")
-    b_start.setObjectName("BtnTiny")
-    lbl_ssh = QtWidgets.QLabel("")
-    lbl_ssh.setObjectName("Faint")
-    lbl_ssh.setWordWrap(True)
-    baris_ssh.addWidget(b_start)
-    baris_ssh.addWidget(lbl_ssh, 1)
-    v.addLayout(baris_ssh)
-
-    def _start_agent(silent=False):
-        c = tarik()
-        host = c["host"] or "192.168.2.2"
-        u, p = c["ssh_user"], c["ssh_pass"]
-        if not u or not p:
-            if not silent:
-                lbl_ssh.setText(
-                    "Fill “Robot SSH user” + “Robot SSH password” above "
-                    "first — the SAME credentials you use for “ssh <user>@"
-                    "%s” in a terminal (they are saved locally)." % host)
-                try:
-                    (f_passw if not p else f_user).setFocus()
-                except Exception:                          # noqa: BLE001
-                    pass
-            return False
-        if not silent:
-            lbl_ssh.setText("starting the agent on %s …" % host)
-            QtWidgets.QApplication.processEvents()
-        try:
-            import robotops
-            ok, msg = robotops.start_agent(host, u, p, c["agent_path"])
-        except Exception as exc:                           # noqa: BLE001
-            ok, msg = False, "robotops error: %s" % exc
-        lbl_ssh.setText(msg)
-        return ok
-
-    def _start_dan_uji():
-        if _start_agent():
-            _uji()
-
-    b_start.clicked.connect(_start_dan_uji)
-
-    # ---- 4) simpan & jalankan ulang
+    # ---- 4) simpan (restart hanya bila endpoint berubah)
     v.addWidget(QtWidgets.QLabel(
-        "Changing endpoints restarts the console with the new connection."))
+        "Network changes work immediately — just Save. Endpoint/port changes "
+        "apply after Save & Restart."))
     bawah = QtWidgets.QHBoxLayout()
     b_tutup = QtWidgets.QPushButton("Close")
     b_tutup.clicked.connect(d.reject)
     b_simpan = QtWidgets.QPushButton("Save && Restart console")
-    b_simpan.setObjectName("BtnPrimary")
+    b_simpan2 = QtWidgets.QPushButton("Save (no restart)")
+    b_simpan2.setObjectName("BtnPrimary")
     bawah.addStretch(1)
     bawah.addWidget(b_tutup)
     bawah.addWidget(b_simpan)
+    bawah.addWidget(b_simpan2)
     v.addLayout(bawah)
+
+    def _simpan_saja():
+        if save(tarik()):
+            console._catat("connection: settings saved (no restart)")
+            d.accept()
+        else:
+            QtWidgets.QMessageBox.warning(d, "Connection",
+                                          "Failed to save koneksi.json")
 
     def _simpan_restart():
         c = tarik()
@@ -702,6 +735,7 @@ def buat_dialog(console):
         QtCore.QTimer.singleShot(150, _lahirkan)
 
     b_simpan.clicked.connect(_simpan_restart)
+    b_simpan2.clicked.connect(_simpan_saja)
     _isi_iface()
     _uji()
     d.exec()

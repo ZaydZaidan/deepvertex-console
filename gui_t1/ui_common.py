@@ -123,13 +123,13 @@ class FlowBox(QtWidgets.QWidget):
             self.setMaximumHeight(perlu)
         self.lay.activate()
         self.lay.setGeometry(self.rect())
-        # v1.0.17: repaint — sisa piksel layout lama jangan tertinggal sebagai
-        # "tulisan berbayang" (laporan pemilik: baris status PRE-FLIGHT dobel).
+        # repaint — sisa piksel layout lama jangan tertinggal sebagai "tulisan
+        # berbayang" (laporan pemilik 17 Okt: ghost teks status di PRE-FLIGHT).
+        # Repaint PENUH induk tiap ada perubahan: strip sempit TIDAK cukup —
+        # elemen di bawah ikut bergeser & area lama bisa tertinggal.
         self.update()
-        if ubah and perlu < lama and self.parentWidget() is not None:
-            # area setinggi layout LAMA yang sekarang di luar widget kami harus
-            # dicat ulang oleh induk, kalau tidak ghost-nya tetap terlihat.
-            self.parentWidget().update(self.x(), self.y(), self.width(), lama)
+        if ubah and self.parentWidget() is not None:
+            self.parentWidget().update()
         self.updateGeometry()
 
     def resizeEvent(self, ev):
