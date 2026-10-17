@@ -48,6 +48,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
+[Dirs]
+Name: "{userdocs}\\DeepVertex"
+
 [Files]
 Source: "..\..\dist\DeepVertexMarineConsole.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\dist\DeepVMDebug.exe"; DestDir: "{app}"; Flags: ignoreversion

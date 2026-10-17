@@ -119,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.1.6"     # versi aplikasi (session.json + update checker)
+__version__ = "1.1.7"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):

@@ -1304,8 +1304,8 @@ def main():
     try:
         import paths as _P67
         p67 = _P67.captures_dir()
-        ok67 = p67.replace("\\", "/").endswith("DeepVertex-ROV-Captures") and \
-            ("Pictures" in p67 or p67.startswith(os.path.expanduser("~")))
+        ok67 = p67.replace("\\", "/").endswith("Documents/DeepVertex") or \
+            p67.replace("\\", "/").endswith("DeepVertex")
         print("   [67] captures_dir=%r" % p67)
         print("[67] folder hasil di Pictures (mudah diakses):", ok67)
         lulus &= bool(ok67)

@@ -4,6 +4,18 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.7] — 2026-10-17
+
+### Changed
+- **One obvious folder for everything: `Documents\DeepVertex`** (created at
+  install and on first run). It holds the session folders (snapshots + videos
+  in `compressed/`, RAW transfers in `raw/`, `mavlink.tlog`, `sensors.csv`)
+  AND the application log at `logs/console.log` — easy to find in the file
+  manager. The per-session “Use default / Choose folder…” prompt from 1.1.6
+  now defaults here (photos are no longer routed to Pictures).
+- Older intermediate releases (1.1.4–1.1.6) were superseded before publishing
+  this build.
+
 ## [1.1.6] — 2026-10-17
 
 ### Added

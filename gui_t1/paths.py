@@ -38,7 +38,8 @@ def saved_dir():
 
 
 def logs_dir():
-    d = os.path.join(data_dir(), "logs")
+    # log aplikasi ikut ke Documents/DeepVertex/logs supaya gampang dicari
+    d = os.path.join(captures_dir(), "logs")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -49,16 +50,16 @@ def aset_json(nama):
 
 
 def captures_dir():
-    """Folder hasil dive (snap/rekaman) — tempat yang GAMPANG diakses.
+    """SATU folder utk semua yang bisa dicari user: Documents/DeepVertex.
 
-    Windows: %USERPROFILE%\\Pictures\\DeepVertex-ROV-Captures (muncul di
-    File Explorer > Pictures). Linux: ~/Pictures/DeepVertex-ROV-Captures.
-    Bila Pictures tidak ada, kembali ke home folder.
+    Windows: %USERPROFILE%\\Documents\\DeepVertex. Linux:
+    ~/Documents/DeepVertex. Isi: folder sesi (compressed/ snap+mkv, raw/, tlog,
+    sensors.csv) DAN logs/console.log — gampang ditemukan lewat file manager.
     """
-    base = os.path.expanduser("~/Pictures")
+    base = os.path.expanduser("~/Documents")
     if not os.path.isdir(base):
         base = os.path.expanduser("~")
-    return os.path.join(base, "DeepVertex-ROV-Captures")
+    return os.path.join(base, "DeepVertex")
 
 
 def file_log():
