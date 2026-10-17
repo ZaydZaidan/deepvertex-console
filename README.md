@@ -15,7 +15,7 @@ pre-flight sensor health, failsafe management, and calibration tools — designe
 run by a dive crew, not by a software engineer.
 
 [![CI](https://github.com/ZaydZaidan/deepvertex-console/actions/workflows/ci.yml/badge.svg)](https://github.com/ZaydZaidan/deepvertex-console/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-1.0.0-00b3d6)
+![Version](https://img.shields.io/badge/version-1.1.7-00b3d6)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu%2024.04-333)
 ![License](https://img.shields.io/badge/license-PolyForm%20Strict-7048e8)
 ![BlueOS](https://img.shields.io/badge/BlueOS-compatible-1f6feb)
