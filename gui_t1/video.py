@@ -22,6 +22,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -331,6 +332,14 @@ def ffmpeg_path():
         pass
     base = os.path.dirname(os.path.abspath(__file__))
     cands += [os.path.join(base, "ffmpeg.exe"), os.path.join(base, "ffmpeg")]
+    # APLIKASI TERPASANG (one-file): ffmpeg.exe ada di sebelah EXE, bukan di
+    # folder bundle sementara (_MEI...) — laporan audit Windows 17 Okt.
+    try:
+        d_exe = os.path.dirname(os.path.abspath(sys.executable))
+        cands += [os.path.join(d_exe, "ffmpeg.exe"),
+                  os.path.join(d_exe, "ffmpeg")]
+    except Exception:                                        # noqa: BLE001
+        pass
     try:
         import paths
         d = paths.data_dir()

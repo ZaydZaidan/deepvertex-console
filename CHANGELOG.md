@@ -4,6 +4,17 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.2] — 2026-10-17
+
+### Fixed
+- **Windows: bundled ffmpeg not detected** — the one-file PyInstaller app
+  searched its temporary bundle folder instead of the install folder next to
+  `DeepVertexMarineConsole.exe`; the search now includes the executable's
+  directory (preview/snapshot/recording work out of the box).
+- Audit instrumentation: the `--shot` handler now logs window state and
+  save results to the session log (and falls back to the data folder) so
+  headless-audit failures are diagnosable.
+
 ## [1.1.1] — 2026-10-17
 
 ### Added

@@ -119,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.1.1"     # versi aplikasi (session.json + update checker)
+__version__ = "1.1.2"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -2910,7 +2910,26 @@ def main():
         QtCore.QTimer.singleShot(1800, _cek_upd)
     if args.shot:
         def _ambil_shot():
-            ok = w.grab().save(args.shot)
+            pm = w.grab()
+            ok = pm.save(args.shot)
+            try:
+                w._catat("shot: vis=%s %dx%d pm-null=%s ok=%s -> %s"
+                         % (w.isVisible(), w.width(), w.height(),
+                            pm.isNull(), ok, args.shot))
+            except Exception:                                # noqa: BLE001
+                pass
+            if not ok:
+                # jalur cadangan: folder data (kalau path utama ditolak sistem)
+                try:
+                    import paths as _sp
+                    alt = os.path.join(_sp.data_dir(), "shot_fallback.png")
+                    ok2 = pm.save(alt)
+                    try:
+                        w._catat("shot fallback: ok=%s -> %s" % (ok2, alt))
+                    except Exception:                        # noqa: BLE001
+                        pass
+                except Exception:                            # noqa: BLE001
+                    pass
             print("shot:", args.shot, "ok" if ok else "FAILED", flush=True)
         QtCore.QTimer.singleShot(int(args.shot_after * 1000), _ambil_shot)
     return app.exec()
