@@ -119,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.1.4"     # versi aplikasi (session.json + update checker)
+__version__ = "1.1.5"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -2827,7 +2827,12 @@ def main():
     ap.add_argument("--left-port", type=int, default=5601)
     ap.add_argument("--right-port", type=int, default=5602)
     ap.add_argument("--raw-agent", default="http://127.0.0.1:8765")
-    ap.add_argument("--outdir", default=os.path.expanduser("~/DeepVertex-ROV-Captures"))
+    try:
+        import paths as _paths_out
+        _out_default = _paths_out.captures_dir()
+    except Exception:                                       # noqa: BLE001
+        _out_default = os.path.expanduser("~/DeepVertex-ROV-Captures")
+    ap.add_argument("--outdir", default=_out_default)
     ap.add_argument("--nama-sesi", "--session-name", default=None,
                     help="session folder name (e.g. 'Coral Survey A'); "
                          "blank string = use 'dive'")

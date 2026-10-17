@@ -1300,6 +1300,19 @@ def main():
         print("[66] ffmpeg backend GAGAL:", repr(exc))
         lulus = False
 
+    # [67] folder hasil dive = Pictures/DeepVertex-ROV-Captures (akses gampang).
+    try:
+        import paths as _P67
+        p67 = _P67.captures_dir()
+        ok67 = p67.replace("\\", "/").endswith("DeepVertex-ROV-Captures") and \
+            ("Pictures" in p67 or p67.startswith(os.path.expanduser("~")))
+        print("   [67] captures_dir=%r" % p67)
+        print("[67] folder hasil di Pictures (mudah diakses):", ok67)
+        lulus &= bool(ok67)
+    except Exception as exc:                                # noqa: BLE001
+        print("[67] captures_dir GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

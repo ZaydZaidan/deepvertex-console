@@ -4,6 +4,16 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.5] — 2026-10-17
+
+### Changed
+- **Dive results now save to `Pictures/DeepVertex-ROV-Captures`** (Windows:
+  File Explorer ▸ Pictures ▸ DeepVertex-ROV-Captures; Linux:
+  ~/Pictures/DeepVertex-ROV-Captures) — easy to reach from the file manager.
+  Falls back to the home folder if Pictures is missing. Sessions from older
+  versions stay where they were; new dives use the new location. The CAPTURE
+  panel already shows the exact path + OPEN FOLDER (v1.1.4).
+
 ## [1.1.4] — 2026-10-17
 
 ### Fixed

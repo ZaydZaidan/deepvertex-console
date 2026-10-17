@@ -48,6 +48,19 @@ def aset_json(nama):
     return os.path.join(saved_dir(), nama)
 
 
+def captures_dir():
+    """Folder hasil dive (snap/rekaman) — tempat yang GAMPANG diakses.
+
+    Windows: %USERPROFILE%\\Pictures\\DeepVertex-ROV-Captures (muncul di
+    File Explorer > Pictures). Linux: ~/Pictures/DeepVertex-ROV-Captures.
+    Bila Pictures tidak ada, kembali ke home folder.
+    """
+    base = os.path.expanduser("~/Pictures")
+    if not os.path.isdir(base):
+        base = os.path.expanduser("~")
+    return os.path.join(base, "DeepVertex-ROV-Captures")
+
+
 def file_log():
     return os.path.join(logs_dir(), "console.log")
 
