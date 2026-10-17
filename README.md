@@ -6,17 +6,17 @@
 
 **BlueROV2 mission console for coral-mapping surveys — ROV mode.**
 
-**BlueOS-compatible. Tested on the BlueROV2.**
+**BlueOS-compatible. Tested on the BlueROV2 (Ubuntu 24.04 and Windows 10/11).**
 
 A QGroundControl-style topside application (PySide6) for the BlueRobotics BlueROV2:
 three live camera streams, full MAVLink telemetry, gamepad teleop with safety
 interlocks, compressed **and** onboard-RAW capture with a clear per-dive file layout,
-pre-flight sensor health, failsafe management, and calibration tools — designed to be
-run by a dive crew, not by a software engineer.
+pre-flight sensor health, failsafe management, calibration tools — and a complete
+per-session sensor log. Designed to be run by a dive crew, not by a software engineer.
 
 [![CI](https://github.com/ZaydZaidan/deepvertex-console/actions/workflows/ci.yml/badge.svg)](https://github.com/ZaydZaidan/deepvertex-console/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-1.1.7-00b3d6)
-![Platform](https://img.shields.io/badge/platform-Ubuntu%2024.04-333)
+![Platform](https://img.shields.io/badge/platform-Ubuntu%2024.04%20%7C%20Windows%2010%2F11-333)
 ![License](https://img.shields.io/badge/license-PolyForm%20Strict-7048e8)
 ![BlueOS](https://img.shields.io/badge/BlueOS-compatible-1f6feb)
 ![Tested on](https://img.shields.io/badge/tested%20on-BlueROV2-00b3d6)
@@ -36,9 +36,12 @@ console is built around that.
 
 - **Safety first** — dead-man enforced teleop, pre-flight sensor health from the
   autopilot itself, leak/battery/temperature/link alerts, and a storage guard that
-  physically blocks REC/SNAP before a dive-critical disk fills up.
+  blocks REC/SNAP before a dive-critical disk fills up.
 - **Two qualities of recording, one clean file tree** — compressed video for quick
   review, uncompressed RAW for photogrammetry, per camera, clearly split on disk.
+- **One obvious folder** — every dive writes to `Documents/DeepVertex` (snaps,
+  videos, RAW transfers, MAVLink tlog, sensor CSV and the application log), with a
+  one-time per-session choice of a custom folder.
 - **Built for the boat** — large legible text at 120% by default, high-contrast ink
   theme for sunlight, everything reachable with the gamepad you already hold.
 
@@ -46,28 +49,19 @@ console is built around that.
 
 | Area | What you get |
 |---|---|
-| **Video** | 3 simultaneous streams (front + stereo L/R via BlueOS), 16:9 tiles, live Hz + health, per-tile recording state |
-| **Telemetry** | Attitude + compass dials, depth/temperature, battery V/A/%, QGC-style sub instruments, MAVLink tlog per session |
-| **Teleop** | PS4 DualShock teleop (evdev), dead-man hold, MAX SPEED 25/50/75/100%, depth-hold, camera tilt + lights with percentages |
-| **Capture** | Per-camera **COMPRESSED \| RAW** REC mode, quick SNAP photos, live time-to-full estimate, safety margins + hard block |
-| **RAW pipeline** | Onboard agent (BlueOS extension) writes uncompressed chunks on the Pi; TRANSFER pulls them into the session with sha256 verification; Pi auto-stop guard |
-| **Pre-flight** | Per-sensor health chips (GYRO / ACCEL / MAG + compass count / BARO / BATTERY / MOTOR / RC), pre-arm bit + latest status text, 15-item Blue Robotics pre-dive checklist with ARM soft-gate |
-| **Safety systems** | Leak latch, battery low/critical, water-temperature alerts (editable), FAILSAFE status, link watchdog; red/amber alert strip + beep |
-| **Vehicle ops** | Arm/disarm, mode switch, SURFACE, accelerometer/compass/level/baro calibration dialogs, thruster test + MOTOR_DETECT, failsafe editor with one-click defaults (4S 10 Ah), parameter browser with SAVE/LOAD |
-| **Maps** | OSM map (offline-capable tile cache), anchor pinning, ROV dead-reckoning track (armed-gated), NED plot |
-| **Gamepad page** | Painted DS4 diagram with live button/stick feedback, one-click remap, named presets (e.g. "Custom A") auto-loaded per machine, pad REC/PHOTO buttons |
-| **UX** | 4 layouts (Pilot Focus / Mapping / Setup / Capture), global text scale (100/120/140%), ink & ivory themes, English-only UI, session naming, per-machine settings in `gui_t1/saved/` |
-
-<table>
-<tr>
-<td><img src="docs/assets/console-setup.png" alt="Setup layout"/></td>
-<td><img src="docs/assets/gamepad-mapping.png" alt="Gamepad mapping page"/></td>
-</tr>
-<tr>
-<td align="center"><em>Setup layout — guided calibration & failsafe</em></td>
-<td align="center"><em>Gamepad mapping — DS4 diagram, remap, presets</em></td>
-</tr>
-</table>
+| **Video** | 3 simultaneous streams (front + stereo L/R via BlueOS), camera panel fitted to the camera resolution (no letterbox), live Hz badge, health state |
+| **Camera ON/OFF** | Per-camera toggle that stops/starts the stream **inside BlueOS** (frees the Pi's CPU/USB), with a red pulsing REC / green SNAP flash animation |
+| **Telemetry** | Attitude + compass, depth/temperature, dual battery bars (ArduPilot remaining + LiPo estimate with 14.8 V = 0 %), sub instruments, MAVLink tlog per session |
+| **Sensor log** | `sensors.csv` at 10 Hz per session (voltage, current, battery, depth, water temp, pressure, attitude, EKF, message count) — logged topside, zero extra load on the robot |
+| **Teleop** | DS4 / Xbox gamepad (evdev on Linux, SDL on Windows), dead-man hold, MAX SPEED 25/50/75/100 %, depth-hold, camera tilt + lights with percentages |
+| **Capture** | Per-camera **COMPRESSED \| RAW** mode, SNAP photos, REC videos, live time-to-full estimate, safety margins + hard block |
+| **RAW pipeline** | Onboard agent writes uncompressed chunks on the Pi; the RAW panel has per-file checkboxes, SELECT ALL and bulk TRANSFER (sha256-verified) / DELETE; Pi auto-stop guard |
+| **Pre-flight** | Sensor health chips (GYRO/ACCEL/MAG + compass count/BARO/BATTERY/MOTOR/RC), pre-arm bit, 15-item Blue Robotics pre-dive checklist with ARM soft-gate |
+| **Safety systems** | Leak latch, battery low/critical, water-temperature alerts, FAILSAFE status, link watchdog; alert strip + beep |
+| **Vehicle ops** | Arm/disarm, mode switch, SURFACE, accelerometer/compass/level/baro calibration, thruster test + MOTOR_DETECT, failsafe editor with one-click defaults (4S 10 Ah), parameter browser |
+| **Connection** | Official BlueRobotics network setup built in: one button sets the laptop tether adapter to **192.168.2.1** (Linux `nmcli` live, Windows `netsh` via UAC, macOS `networksetup`), with Verify (adapter + robot reachability) and manual steps as fallback — the robot is never modified |
+| **Maps** | OSM map with offline tile cache (Indonesia pre-cache tool included), manual anchor input (COORDS…), anchor persistence across sessions, dead-reckoning track, NED plot |
+| **UX** | 4 layouts (Pilot Focus / Mapping / Setup / Capture), global text scale, ink & ivory themes, English-only UI, session naming, wheel-guard (scroll over a slider/dropdown only acts after a click), single-instance guard |
 
 ## Hardware & software
 
@@ -75,187 +69,96 @@ console is built around that.
 |---|---|
 | ROV | BlueRobotics BlueROV2 (Navigator + Raspberry Pi 4, BlueOS) |
 | Front camera | Blue Robotics Low-Light HD USB (RAW ≤ 640×480 over USB2) |
-| Stereo camera | **Arducam B0495C** — 2× AR0234 global shutter, YUYV 1920×1200 (streams at 1280×720@30) |
+| Stereo camera | Arducam B0495C — 2× AR0234 global shutter (streams at 1280×720@30) |
 | Battery | Tattu 4S 10000 mAh LiPo (25C) — failsafe defaults preset for this pack |
-| Topside | Ubuntu 24.04 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
-| Controller | Sony DualShock 4 (USB) |
+| Topside | Ubuntu 24.04 or Windows 10/11 laptop, tether via Fathom-X (BlueOS at `192.168.2.2`) |
+| Controller | DualShock 4 or Xbox controller (USB) |
 
-## Windows: camera video shows "waiting for stream"?
+## Quick start
 
-Windows blocks incoming UDP unless allowed. The application needs inbound UDP on
-**ports 5600-5602** (camera video) and **14550** (MAVLink). If telemetry works but
-the camera tiles stay black, add the rule once in an admin PowerShell:
+1. **Install** — run the Windows installer from the releases page (per-user, no
+   admin needed; shows the End-User Terms and lets you choose the install folder).
+2. **Network (official BlueRobotics flow)** — plug the tether, open
+   **Connection ▸ Set up network**: the laptop adapter becomes `192.168.2.1`;
+   press **Verify** (adapter + robot answer). No restart needed — press **Save**.
+3. **Launch** — the console connects to `udpin:0.0.0.0:14550` and shows telemetry.
+   The first SNAP/RECORD of each dive asks once: **Use default** (
+   `Documents/DeepVertex`) or **Choose folder…**.
+4. **Dive** — REC/SNAP per camera, watch the pre-flight chip row, arm and fly.
+
+Windows note: if the camera tiles stay black while telemetry works, allow the
+video ports once in an admin PowerShell (Windows blocks UDP by default):
 
 ```powershell
 New-NetFirewallRule -DisplayName "DeepVertex Video UDP In" -Direction Inbound `
   -Protocol UDP -LocalPort 5600-5602 -Action Allow -Profile Any
 ```
 
-(The MAVLink port rule is normally created by the app's earlier setup; video ports
-are not covered by Windows' defaults — this is a Windows behaviour, not the robot.)
+## Where your files live
 
-## Downloads (v1.0.17)
+```
+Documents/DeepVertex/                    <- created at install / first run
+├─ logs/console.log                      <- application log (easy to find)
+└─ <YYYYMMDD_HHMMSS>_<session-name>/     <- one folder per dive
+    ├─ compressed/                       <- snap .png + recording .mkv
+    ├─ raw/                              <- uncompressed chunks transferred from the Pi
+    ├─ mavlink.tlog                      <- full-fidelity MAVLink log
+    └─ sensors.csv                       <- 10 Hz sensor log (topside)
+```
 
-Available on the release page:
-<https://github.com/ZaydZaidan/deepvertex-console/releases/tag/v1.0.17>
+Settings (connection, gamepad presets) live per user next to the app data and
+are never touched by updates or uninstall. Details:
+[docs/data-and-paths.md](docs/data-and-paths.md).
 
-| Platform | Artifact | For |
-|---|---|---|
-| **Linux (Ubuntu/Debian-based)** | `deepvertex-console-v1.0.17-linux.tar.gz` | Topside laptop (full feature set: teleop, streams, recorder, calibration…) |
-| **Windows (installer)** | `DeepVertexMarineConsole-Setup-1.0.17.exe` | Shows the End-User Terms (“I accept”), lets you choose the install folder, creates Start Menu entry + uninstaller; in-app updates are delivered through this package |
+## Downloads
 
-### A. Install on Ubuntu / other Linux (terminal)
+Release page: <https://github.com/ZaydZaidan/deepvertex-console/releases/latest>
+
+| Platform | Artifact |
+|---|---|
+| **Windows 10/11** | `DeepVertexMarineConsole-Setup-<version>.exe` — installer with End-User Terms, install-folder choice, Start Menu entry and uninstaller. Bundles `ffmpeg.exe`, so camera preview, snapshots and recording work out of the box. |
+
+Only the final installer is distributed through the release page. The application
+checks for updates on startup (silent when offline); opt out with `--no-update`
+or `DV_NO_UPDATE=1`.
+
+## Testing
+
+The suite runs without hardware (own fake autopilot + GStreamer test pipelines):
 
 ```bash
-# 1) Download & extract
-wget https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.7/deepvertex-console-v1.0.17-linux.tar.gz
-tar xzf deepvertex-console-v1.0.17-linux.tar.gz
-cd deepvertex-console-1.0.17
-
-# 2) One-time install: shows the End-User Terms (type "agree"), then asks
-#    WHERE to install (default: ~/DeepVertexMarineConsole) and builds the
-#    runtime there (.venv: PySide6, evdev, pymavlink, numpy).
-./install/install_topside.sh
-#    non-interactive (CI/automation):
-#    ./install/install_topside.sh --yes --dir="$HOME/DeepVertexMarineConsole"
-
-# 3) Launch (robot on the tether, BlueOS at 192.168.2.2)
-~/DeepVertexMarineConsole/gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
-
-# Optional launcher for future sessions (add ~/.bashrc):
-echo 'alias deepvertexrov="'$HOME'/DeepVertexMarineConsole/gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765 --tema ink --teks 1.2"' >> ~/.bashrc
-source ~/.bashrc && deepvertexrov        # == same console, one word
+cd gui_t1
+.venv/bin/python ../tests/test_console.py     # 68 checks — PASS
+.venv/bin/python ../tests/test_video.py
+.venv/bin/python ../tests/test_raw.py
+.venv/bin/python ../tests/probe_layout.py     # geometry/truncation scan, 4 layouts
+.venv/bin/python ../tests/probe_scroll.py     # no-clip + scroll reachability scan
 ```
 
-Then (from the tar.gz walk-through): the script **installs everything it
-needs** into `gui_t1/.venv` — you do not need a system-wide Python install;
-`--mavlink`, `--outdir`, `--preset`, `--nama-sesi`, see `run_console_real.sh
---help` for the full option list.
-
-### B. Install on Windows
-
-**Recommended — installer:** download
-**`DeepVertexMarineConsole-Setup-1.0.5.exe`** and run it. It shows the
-End-User Terms (you must accept to continue), offers the install folder (a
-default is pre-filled — change it if you like), installs per-user (no admin
-required) and creates a Start Menu entry, an optional desktop shortcut and an
-uninstaller.
-
-All editions:
-
-1. The console connects to the MAVLink feed (`udpin:0.0.0.0:14550` by default)
-   and opens the console window.
-2. Optional for **camera recording**: install the
-   [GStreamer runtime](https://gstreamer.freedesktop.org/download/)
-   (*runtime MSI + the matching "devel" pack*), then make sure its `bin`
-   folder is on PATH — `gst-launch-1.0` must resolve in a terminal.
-3. The gamepad teleop side is Linux-only for now (evdev); the EXE shows an
-   honest "not available on this platform" instead of breaking (**recording,
-   telemetry and all panels stay usable**).
-
-Terminal option list (works for both): `--help` shows `--mavlink`,
-`--outdir`, `--preset`, `--nama-sesi`, ports and more.
-
-**Terms of use**: downloading & running the console means you accept the
-[End-User Terms](docs/END-USER-TERMS.txt) (PolyForm Strict 1.0.0 — free to
-use, no redistribution/modification, commercial use needs written permission:
-founders@deepvertex.tech).
-
-### Keeping it up to date
-
-Both platforms check GitHub Releases **each time the console starts** (needs
-internet; offline = silent). When a newer release exists, a popup shows the
-version + release notes with two choices: **Update now** — the console
-downloads the right artifact and applies it (Windows swaps the .EXE; Linux
-updates the source tree, keeping `.venv`) and restarts itself — or **Nanti**
-(skip for now). Opt out per run: `--no-update` or `DV_NO_UPDATE=1`.
-
-Where your files live (settings, logs, captures — and what updates/
-uninstalls never touch): [docs/data-and-paths.md](docs/data-and-paths.md).
-
-Use terminal equivalents on Windows:
-
-```powershell
-# from PowerShell
-Invoke-WebRequest -Uri "https://github.com/ZaydZaidan/deepvertex-console/releases/download/v1.0.5/DeepVertexMarineConsole.exe" -OutFile "DeepVertexMarineConsole.exe"
-.\DeepVertexMarineConsole.exe           # console starts
-.\DeepVertexMarineConsole.exe --help    # option list (session dir, ports…)
-```
-
-Windows scope note: the .EXE runs MAVLink telemetry, camera **recording** &
-snapshots (with the GStreamer runtime), parameter/preflight panels, capture
-management and the full organize/layout system — the same application, the
-same pixel-for-pixel rendering (the OS display scale is deliberately ignored)
-and the same 47-check suite as Linux. Live **video preview** and the
-**gamepad** are Linux-side (PyGObject/evdev) for now. **Tested on a real
-Windows laptop (Win10 19045, 1920x1080 at 150% display scale)** — the full
-Windows/Linux 1:1 feature audit lives in
-[docs/platform-parity.md](docs/platform-parity.md).
-`DeepVMDebug.exe` is the console-mode build for troubleshooting (it prints the
-full stack on error). Sources remain buildable everywhere (this repository).
-
-## Quick start
-
-```bash
-# 1) Topside install (venv + PySide6 + GStreamer checks)./install/install_topside.sh
-
-# 2) Launch (defaults: ink theme, 120% text, RAW agent at the robot)./gui_t1/run_console_real.sh --raw-agent http://192.168.2.2:8765
-
-# …or the launcher installed on the field laptop:
-deepvertexrov
-```
-
-First run asks for a **session name**; everything from that dive lands in
-`~/DeepVertex-ROV-Captures/<date>_<time>_<name>/` (see
-[docs/files-and-storage.md](docs/files-and-storage.md)).
-
-Full documentation index: [docs/](#documentation).
+CI runs the same suite headlessly on every push
+(see `.github/workflows/ci.yml`).
 
 ## Documentation
 
 | Document | For |
 |---|---|
-| [docs/installation.md](docs/installation.md) | Topside + onboard install, tether & BlueOS setup, verification |
+| [docs/installation.md](docs/installation.md) | Topside install, tether & BlueOS setup, verification |
 | [docs/quickstart.md](docs/quickstart.md) | Your first 15 minutes: pre-flight, arm, fly, record, transfer |
 | [docs/user-guide.md](docs/user-guide.md) | Every panel, layout, alert and menu — the operator manual |
-| [docs/gamepad.md](docs/gamepad.md) | Default DS4 mapping, remapping, named presets, safety blocking |
-| [docs/files-and-storage.md](docs/files-and-storage.md) | Session folder layout, compressed vs RAW, storage guard, `saved/` |
+| [docs/gamepad.md](docs/gamepad.md) | Default mapping, remapping, named presets, safety blocking |
+| [docs/files-and-storage.md](docs/files-and-storage.md) | Session layout, compressed vs RAW, storage guard |
 | [docs/architecture.md](docs/architecture.md) | Modules, threads, MAVLink layer, agent protocol, theming |
 | [docs/testing.md](docs/testing.md) | Test suite, probes, fake vehicle, agent test mode |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | Field-proven fixes for the issues we actually hit |
-| [docs/roadmap.md](docs/roadmap.md) | Autonomy + VIO (next), known limitations |
-| [CHANGELOG.md](CHANGELOG.md) | Release history |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev environment, conventions, PR flow |
-| [SECURITY.md](SECURITY.md) | Vulnerability reporting & scope |
-
-## Repository layout
-
-```
-gui_t1/          The console (PySide6) — see gui_t1/README_WORKING_NOTES.md for work notes
-onboard/         raw_agent.py + BlueOS extension scaffold (onboard RAW recorder)
-tests/           Hardware-free suite (30 checks), layout/scroll/pad probes,
-                 fake_vehicle.py, tether link check, parameter dump tools
-install/         install_topside.sh — one-shot topside setup
-docs/            Operator & developer documentation (this folder)
-progress/        Engineering log for the delivery (chronological)
-```
-
-## Testing
-
-The full suite runs without hardware (own fake autopilot + GStreamer test pipelines):
-
-```bash
-cd gui_t1.venv/bin/python../tests/test_console.py     # 30 checks — PASS.venv/bin/python../tests/test_video.py.venv/bin/python../tests/test_raw.py.venv/bin/python../tests/probe_layout.py     # geometry/truncation scan, 4 layouts.venv/bin/python../tests/probe_scroll.py     # no-clip + scroll reachability scan.venv/bin/python../tests/probe_padmap.py     # gamepad page + live-highlight shots
-```
-
-CI runs the same suite headlessly on every push (see `.github/workflows/ci.yml`).
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Field-proven fixes (including the Windows video firewall) |
+| [docs/platform-parity.md](docs/platform-parity.md) | Windows/Linux feature audit |
+| [CHANGELOG.md](CHANGELOG.md) | Full release history |
 
 ## Status & roadmap
 
-**ROV mode is feature-complete and field-tested** on the real BlueROV2 over
-the tether — teleop, capture, RAW transfer, failsafe and calibration flows were all
-exercised on hardware. autonomy (next) locks in autonomous operation (AUV mode + VIO) on the
-Orin companion. Known limitations are listed in [docs/roadmap.md](docs/roadmap.md).
+**ROV mode is feature-complete and field-tested** on the real BlueROV2 over the
+tether, on both Ubuntu and Windows: teleop, capture, RAW transfer, pre-flight,
+failsafe and calibration flows. Next (2.x): autonomous operation (AUV mode + VIO)
+on the Orin companion. Known limitations: [docs/roadmap.md](docs/roadmap.md).
 
 ## Links
 
@@ -274,5 +177,6 @@ software for any **noncommercial** purpose. You may **not** distribute it or mak
 license** — contact [founders@deepvertex.tech](mailto:founders@deepvertex.tech).
 DeepVertex names, logos and branding must never be removed or altered.
 See [LICENSE](LICENSE); third-party components keep their own licenses
-([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — PySide6/Qt/GStreamer under
-LGPL, dynamically linked, unmodified).
+([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — PySide6/Qt under LGPL,
+dynamically linked, unmodified; bundled ffmpeg is used as an unmodified
+separate executable).
