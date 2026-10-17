@@ -32,51 +32,20 @@ itself, and a sensor record you can take home after every session.
 
 ## ⭐ Flagship features
 
-**🗺️ The mapping workflow, engineered end-to-end**
-Most ground stations stop at *“record video”*. This console delivers a *survey*:
-every dive lands in its own session folder with **photogrammetry-grade RAW and
-compressed video captured at the same time, per camera**, a 10 Hz sensor CSV, the
-full MAVLink tlog — and map anchors that remember where yesterday ended.
-The dive decides the format. Not the app.
+| Feature | What it does |
+|---|---|
+| 🗺️ **Mapping-first capture** | RAW (photogrammetry) + compressed video at the same time, per camera · per-session folder with 10 Hz sensor CSV + MAVLink tlog · map anchor saved between sessions |
+| 🤖 **Zero load on the robot** | Sensor logging, storage math, map tiles and RAW-transfer control run topside · camera ON/OFF stops the stream inside BlueOS to free the Pi's CPU |
+| 📡 **One-click connect** | Sets the laptop adapter to 192.168.2.1 (official BlueRobotics flow) and verifies it live — no terminal, no IP homework · the robot is never modified |
+| 🎥 **Cameras scale with the mission** | Front + stereo out of the box · add more cameras by configuration (resolution, port, source) |
+| 💾 **Storage that guards the dive** | Time-to-full estimate, warning margins and a hard block before a disk fills · RAW transfers sha256-verified, bulk clear and select-all |
+| 🧰 **Crew-grade setup** | 7-step new-ROV guide · one-click failsafe defaults · guided accel/compass/baro calibration · thruster test · 15-point pre-dive checklist gating ARM |
+| 🕹️ **Gamepad-first controls** | Dead-man enforced · custom named mappings, swappable between pilots · sunlight-readable theme · wheel-guard |
 
-**🤖 The robot has one job: fly. Everything else runs topside.**
-Sensor logging, storage math, map rendering, RAW transfer control — all computed
-on your laptop, none on the vehicle. The camera **ON/OFF buttons stop the stream
-inside BlueOS itself**, so the Raspberry Pi stops encoding the moment you stop
-watching. Less CPU on the robot means cooler electronics and longer bottom time.
-
-**📡 One click to connect — the official way.**
-Pick the tether adapter, press one button: your laptop becomes **192.168.2.1**,
-and **Verify** proves it live — adapter state plus a real answer from the robot.
-No terminal, no forum hunting, no guesswork. And nothing on the robot is ever
-modified.
-
-**🎥 Cameras scale with the mission.**
-Front and stereo today — a fourth, fifth, sixth camera tomorrow. The video
-pipeline is modular by design: resolution, ports and sources are configuration,
-not code. Your console grows with your payload.
-
-**💾 Storage that refuses to lose your dive.**
-A live time-to-full estimate, soft margins, and a **hard block before a
-dive-critical disk fills up**. RAW chunks transfer sha256-verified and clear in
-bulk. Every session stays in its own folder, one button away.
-
-**🧰 Setup that a dive crew can actually follow.**
-A 7-step new-ROV guide, **one-click failsafe defaults** for the 4S pack, guided
-accelerometer/compass/barometer calibration, a thruster test, and a 15-point
-pre-dive checklist that gates ARM. Engineer-grade depth, crew-grade clarity.
-
-**🕹️ Ergonomics learned on real decks.**
-Dead-man enforced gamepad teleop, **custom named mappings you can swap between
-pilots**, a sunlight-readable theme, 120% type by default, and a wheel-guard so
-scrolling never bumps a slider or dropdown by accident.
-
-**Coming from a generic GCS? Here's everything you're adding:**
-an onboard RAW pipeline with verified bulk transfer · per-camera RAW/compressed
-modes · a storage guard that can actually block capture · session folders with
-saved map anchors · topside sensor CSV · one-button official network setup ·
-capture controls that free the robot's CPU. *That's the difference between a
-flight tool and a survey tool.*
+**Coming from a generic GCS?** Everything you're adding: onboard RAW pipeline with
+verified bulk transfer · per-camera RAW/compressed modes · storage guard that can
+block capture · session folders with saved anchors · topside sensor CSV ·
+one-button official network setup · capture controls that free the robot's CPU.
 
 ## 📸 Every layout, one keystroke
 
@@ -103,19 +72,25 @@ switch presets between pilots.
 No terminal required: choose the adapter, apply the official BlueRobotics setting,
 verify it live. The robot side is never touched.
 
-![Connection dialog](docs/assets/gui-connection-117.png)
+<img src="docs/assets/gui-connection-117.png" width="620" alt="Connection dialog"/>
 
-## ⚡ Quick start
+## ⚡ Install & run
 
-1. **Install** — run the Windows installer from the releases page (per-user, no
-   admin needed; shows the End-User Terms and lets you choose the install folder).
-   Ubuntu runs from the project's virtual environment.
-2. **Connect** — plug the tether, open **Connection ▸ Set up network**, apply and
-   **Verify**. No restart needed — press **Save**.
-3. **Launch** — telemetry comes alive on `udpin:0.0.0.0:14550`. The first
-   SNAP/RECORD of each dive asks once: default folder (`Documents/DeepVertex`) or
-   choose your own.
-4. **Dive** — pick a layout, record what matters, fly.
+**Windows 10/11**
+1. Download `DeepVertexMarineConsole-Setup-1.1.7.exe` from the [latest release](https://github.com/ZaydZaidan/deepvertex-console/releases/latest).
+2. Run it — accept the End-User Terms, choose the install folder (per-user, no admin needed).
+3. Launch it from the Start Menu. Everything it writes lives in `Documents\DeepVertex`.
+
+**Ubuntu 24.04**
+1. Clone the repository and `cd gui_t1`.
+2. Create the virtual environment and install `requirements.txt` (details in [docs/installation.md](docs/installation.md)).
+3. Run `.venv/bin/python rov_console_real.py`.
+
+**Connect & fly**
+1. Plug in the tether → **Connection ▸ Set up network** → **Apply** → **Verify** → **Save** (no restart needed).
+2. Telemetry comes alive on `udpin:0.0.0.0:14550`.
+3. The first SNAP/RECORD of a session asks once where to save (default: `Documents\DeepVertex`).
+4. Pick a layout, record, fly.
 
 **Windows note:** if camera tiles stay black while telemetry works, allow the
 video ports once in an admin PowerShell (Windows blocks inbound UDP by default):
