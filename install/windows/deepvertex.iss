@@ -51,6 +51,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Files]
 Source: "..\..\dist\DeepVertexMarineConsole.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\dist\DeepVMDebug.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\..\docs\END-USER-TERMS.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 

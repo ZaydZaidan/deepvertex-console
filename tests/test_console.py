@@ -1278,6 +1278,28 @@ def main():
         print("[65] peta GAGAL:", repr(exc))
         lulus = False
 
+    # [66] backend ffmpeg Windows: SDP + pemisah JPEG + pencarian ffmpeg.
+    try:
+        import video as _V66
+        s66 = _V66.sdp_untuk(5600)
+        ok66 = ("m=video 5600 RTP/AVP 96" in s66
+                and "a=rtpmap:96 H264/90000" in s66
+                and "a=recvonly" in s66)
+        fj66 = b"\xff\xd8AAA\xff\xd9" + b"\xff\xd8BB\xff\xd9" + b"\xff\xd8par"
+        fr66, sisa66 = _V66.baca_mjpeg(fj66)
+        ok66 = ok66 and len(fr66) == 2 and sisa66 == b"\xff\xd8par"
+        ok66 = ok66 and hasattr(_V66, "StreamPlayerFf")
+        ok66 = ok66 and (_V66.ffmpeg_path() is None
+                         or os.path.isfile(_V66.ffmpeg_path()))
+        print("   [66] sdp-ok=%s frames=%d sisa=%d ffmpeg=%r"
+              % ("m=video 5600" in s66, len(fr66), len(sisa66),
+                 _V66.ffmpeg_path()))
+        print("[66] backend ffmpeg (SDP+JPEG+discovery):", ok66)
+        lulus &= bool(ok66)
+    except Exception as exc:                                # noqa: BLE001
+        print("[66] ffmpeg backend GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

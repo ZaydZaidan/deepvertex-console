@@ -4,6 +4,25 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.1] — 2026-10-17
+
+### Added
+- **Windows live video preview / snapshot / recording** (parity with Linux):
+  an **ffmpeg backend** selected automatically when GStreamer is absent. It
+  reads the RTP H.264 stream through a generated SDP, decodes to MJPEG on a
+  pipe (light; frame size follows the source — modular for any camera) and
+  feeds the same camera tiles. Recording = a second `ffmpeg -c copy` fed by a
+  local UDP forwarder (same `tee` pattern as the GStreamer path); snapshots
+  use the decoded frame.
+- The Windows installer now **bundles ffmpeg.exe**, so preview works out of
+  the box. Search order: `DV_FFMPEG` env → PATH → app folder → data `tools/`.
+
+### Verified
+- Local synthetic-stream test: 184 frames decoded @ 25 fps, snapshot saved,
+  recording produced a valid `.mkv` (786 kB).
+- Suite extended with check #66 (SDP builder + JPEG splitter + ffmpeg
+  discovery) — green.
+
 ## [1.1.0] — 2026-10-17
 
 ### Added

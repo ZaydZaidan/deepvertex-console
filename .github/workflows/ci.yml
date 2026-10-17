@@ -108,6 +108,15 @@ jobs:
             gui_t1/windows_entry.py
           ls dist
 
+      - name: Ambil ffmpeg untuk preview video (Windows)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ff.zip
+          Expand-Archive ff.zip -DestinationPath ffx -Force
+          $exe = Get-ChildItem ffx -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          Copy-Item $exe.FullName dist\ffmpeg.exe
+          "ffmpeg.exe: " + (Get-Item dist\ffmpeg.exe).Length
+
       - name: Build installer (Inno Setup — license page + folder page)
         shell: pwsh
         run: |
