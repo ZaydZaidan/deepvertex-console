@@ -28,57 +28,55 @@ itself, and a sensor record you can take home after every session.
 
 ---
 
-## 🧭 Why mapping crews pick this console
+> ## 🚀 A ground station that completes the mission — not just flies it.
 
-Most ground stations are built to *fly* a vehicle. This one is built to *survey* —
-everything below is here because a coral-mapping dive needed it.
+## ⭐ Flagship features
 
-> ### 🗺️ Mapping-first, from the file tree up
-> Every dive lands in its own session folder: **uncompressed RAW for photogrammetry
-> and compressed video at the same time**, per camera, plus a 10 Hz **sensor CSV**
-> (voltage, current, depth, water temp, pressure, attitude, EKF) and the full
-> **MAVLink tlog**. Anchors persist between sessions, the OSM map works from an
-> offline tile cache, and the ROV track draws itself while you fly.
+**🗺️ The mapping workflow, engineered end-to-end**
+Most ground stations stop at *“record video”*. This console delivers a *survey*:
+every dive lands in its own session folder with **photogrammetry-grade RAW and
+compressed video captured at the same time, per camera**, a 10 Hz sensor CSV, the
+full MAVLink tlog — and map anchors that remember where yesterday ended.
+The dive decides the format. Not the app.
 
-> ### 🤖 Your robot keeps its CPU for flying
-> Everything computing-heavy runs **topside**: sensor logging, storage math, map
-> rendering, RAW-transfer control. The camera **ON/OFF buttons stop the stream
-> inside BlueOS itself**, so the Pi stops encoding when you don't need it — not
-> just a preview hidden behind a dark rectangle.
+**🤖 The robot has one job: fly. Everything else runs topside.**
+Sensor logging, storage math, map rendering, RAW transfer control — all computed
+on your laptop, none on the vehicle. The camera **ON/OFF buttons stop the stream
+inside BlueOS itself**, so the Raspberry Pi stops encoding the moment you stop
+watching. Less CPU on the robot means cooler electronics and longer bottom time.
 
-> ### 📡 One-click connect — zero IP homework
-> The **official BlueRobotics network setup is built in**: pick the tether adapter,
-> one button sets **192.168.2.1**, and **Verify** shows the live result (adapter
-> state + does the robot answer). Manual step-by-step and copy-paste commands stay
-> as fallback. Windows, Ubuntu and macOS are all handled — and the robot is never
-> modified.
+**📡 One click to connect — the official way.**
+Pick the tether adapter, press one button: your laptop becomes **192.168.2.1**,
+and **Verify** proves it live — adapter state plus a real answer from the robot.
+No terminal, no forum hunting, no guesswork. And nothing on the robot is ever
+modified.
 
-> ### 🎥 Cameras are open-ended
-> Front + stereo L/R work out of the box, and the video pipeline is **modular by
-> design** — resolution, port and camera type are config, not a rewrite. Need a
-> fourth camera later? It's a config line, not a new program.
+**🎥 Cameras scale with the mission.**
+Front and stereo today — a fourth, fifth, sixth camera tomorrow. The video
+pipeline is modular by design: resolution, ports and sources are configuration,
+not code. Your console grows with your payload.
 
-> ### 💾 Storage that guards itself
-> Per-camera **COMPRESSED | RAW** choice, a live **time-to-full estimate**, soft
-> margins and a **hard block before a dive-critical disk fills up**. RAW chunks are
-> check-listed, sha256-verified when transferred and deletable in bulk — with
-> per-session folders one click away from the operator.
+**💾 Storage that refuses to lose your dive.**
+A live time-to-full estimate, soft margins, and a **hard block before a
+dive-critical disk fills up**. RAW chunks transfer sha256-verified and clear in
+bulk. Every session stays in its own folder, one button away.
 
-> ### 🧰 Setup a non-engineer can follow
-> A 7-step new-ROV guide, **one-click failsafe defaults** for the 4S pack,
-> accelerometer / compass / level / barometer calibration, thruster test with
-> MOTOR_DETECT, and a 15-item pre-dive checklist that soft-gates ARM.
+**🧰 Setup that a dive crew can actually follow.**
+A 7-step new-ROV guide, **one-click failsafe defaults** for the 4S pack, guided
+accelerometer/compass/barometer calibration, a thruster test, and a 15-point
+pre-dive checklist that gates ARM. Engineer-grade depth, crew-grade clarity.
 
-> ### 🕹️ Controls that fit the boat
-> Gamepad-first: **dead-man enforced**, named custom mappings you can save and
-> switch, a sunlight-readable ink theme, 120% type by default, and a wheel-guard so
-> scroll never nudges a slider or a dropdown by accident.
+**🕹️ Ergonomics learned on real decks.**
+Dead-man enforced gamepad teleop, **custom named mappings you can swap between
+pilots**, a sunlight-readable theme, 120% type by default, and a wheel-guard so
+scrolling never bumps a slider or dropdown by accident.
 
-**Things you won't find in a generic GCS:** an onboard RAW pipeline with verified
-bulk transfer · per-camera raw/compressed modes · a storage guard that can actually
-block capture · session-folder discipline with saved map anchors · topside sensor
-CSV · one-button official network setup · capture controls that free the robot's
-CPU. That's the difference between a flight tool and a survey tool.
+**Coming from a generic GCS? Here's everything you're adding:**
+an onboard RAW pipeline with verified bulk transfer · per-camera RAW/compressed
+modes · a storage guard that can actually block capture · session folders with
+saved map anchors · topside sensor CSV · one-button official network setup ·
+capture controls that free the robot's CPU. *That's the difference between a
+flight tool and a survey tool.*
 
 ## 📸 Every layout, one keystroke
 
