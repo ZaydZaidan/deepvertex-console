@@ -1313,6 +1313,23 @@ def main():
         print("[67] captures_dir GAGAL:", repr(exc))
         lulus = False
 
+    # [68] folder media per sesi: default sesi/compressed; custom = root/<sesi>/compressed.
+    try:
+        ok68 = True
+        p68a = w._folder_media()
+        ok68 = ok68 and p68a.endswith("compressed") and os.path.isdir(p68a)
+        w.media_root = "/tmp/dv_media_custom"
+        p68b = w._folder_media()
+        ok68 = ok68 and p68b.startswith("/tmp/dv_media_custom") and \
+            os.path.isdir(p68b)
+        w.media_root = None
+        print("   [68] default=%r custom=%r" % (p68a, p68b))
+        print("[68] folder media per sesi (ask sekali, custom/default):", ok68)
+        lulus &= bool(ok68)
+    except Exception as exc:                                # noqa: BLE001
+        print("[68] folder media GAGAL:", repr(exc))
+        lulus = False
+
     ok_pre = tunggu(lambda: w.bridge.state.get("prearm_ok") is True, 8)
     print("[16] bit PREARM dari SYS_STATUS:", ok_pre)
     lulus &= bool(ok_pre)

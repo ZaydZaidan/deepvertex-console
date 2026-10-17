@@ -119,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.1.5"     # versi aplikasi (session.json + update checker)
+__version__ = "1.1.6"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -301,6 +301,9 @@ class RovConsole(QtWidgets.QMainWindow):
         self._anim_fase = False
         self._anim_timer = QtCore.QTimer(self)
         self._anim_timer.timeout.connect(self._anim_tick)
+        # Folder media per sesi (tanya SEKALI saat snap/rekaman pertama).
+        self.media_root = None            # None = default (sesi/compressed)
+        self._folder_ask_done = False
         # log sensor topside 10 Hz (lihat _log_tick)
         self._att_last = (None, None, None)
         self._log_timer = QtCore.QTimer(self)
@@ -1981,6 +1984,7 @@ class RovConsole(QtWidgets.QMainWindow):
         """REC dengan mode RAW: kendalikan agen onboard (chunk di Pi → panel RAW)."""
         kam = self._RAW_KAM.get(nama, "left")
         if on:
+            self._tanya_folder_sesi()
             _st = getattr(self.rawpanel, "last_status", {}) or {}
             _free = _st.get("disk_free_mb")
             _min = float(_st.get("min_free_mb") or 0)
@@ -2048,6 +2052,8 @@ class RovConsole(QtWidgets.QMainWindow):
             QtCore.QTimer.singleShot(320, lambda bb=b2: bb.setStyleSheet(""))
 
     def _toggle_rec(self, nama, on):
+        if on:
+            self._tanya_folder_sesi()
         cb = self.cb_mode.get(nama)
         if cb is not None and cb.currentText() == "RAW":
             self._raw_rec(nama, on)
@@ -2059,7 +2065,7 @@ class RovConsole(QtWidgets.QMainWindow):
             return
         p = self.players[nama]
         if on:
-            path = os.path.join(self.sesi, "compressed", "%s_%s" % (
+            path = os.path.join(self._folder_media(), "%s_%s" % (
                 nama.replace(" ", "_"), time.strftime("%H%M%S")))
             if p.start_record(path):
                 self._rec_aktif.add(nama)
@@ -2071,6 +2077,52 @@ class RovConsole(QtWidgets.QMainWindow):
             p.stop_record()
             self._rec_aktif.discard(nama)
             self._anim_stop(nama)
+
+    def _folder_media(self):
+        """Folder compressed/ untuk sesi ini (default sesi/compressed atau custom)."""
+        if self.media_root:
+            d = os.path.join(self.media_root, os.path.basename(self.sesi),
+                             "compressed")
+        else:
+            d = os.path.join(self.sesi, "compressed")
+        try:
+            os.makedirs(d, exist_ok=True)
+        except OSError:
+            pass
+        return d
+
+    def _tanya_folder_sesi(self):
+        """Sekali per sesi (snap/rekaman pertama): default Pictures atau custom?"""
+        if self._folder_ask_done:
+            return
+        self._folder_ask_done = True
+        if getattr(self.args, "no_prompt", False):
+            return                        # otomasi: pakai default tanpa dialog
+        try:
+            import paths as _pp
+            default_root = _pp.captures_dir()
+            msg = QtWidgets.QMessageBox(self)
+            msg.setWindowTitle("Where to save this dive?")
+            msg.setText("Snaps and recordings for THIS session are saved "
+                        "together in one folder.")
+            msg.setInformativeText("Default (easy to find):\n%s\n\n"
+                                   "You can also pick a custom folder." % self.sesi)
+            b_def = msg.addButton("Use default", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            b_pick = msg.addButton("Choose folder\u2026", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+            msg.addButton("Cancel", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+            msg.exec()
+            if msg.clickedButton() is b_pick:
+                d = QtWidgets.QFileDialog.getExistingDirectory(
+                    self, "Choose a folder for this dive's results",
+                    default_root)
+                if d:
+                    self.media_root = d
+                    self._catat("dive results folder: %s" % self._folder_media())
+            elif msg.clickedButton() is b_def:
+                self._catat("dive results folder: default (%s)"
+                            % self._folder_media())
+        except Exception as exc:                            # noqa: BLE001
+            self._catat("save-folder prompt failed: %r" % exc)
 
     def _mcm_pesan(self, tag, d):
         d = d or {}
@@ -2216,6 +2268,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("pad action error: %r" % exc)
 
     def _snap(self, nama):
+        self._tanya_folder_sesi()
         cb = self.cb_mode.get(nama)
         if cb is not None and cb.currentText() == "RAW":
             kam = self._RAW_KAM.get(nama, "front")
@@ -2232,7 +2285,7 @@ class RovConsole(QtWidgets.QMainWindow):
             self._catat("SNAP blocked — topside storage full (< %d MB free). "
                         "Transfer/clean up first." % MIN_FREE_TOP_MB)
             return
-        path = os.path.join(self.sesi, "compressed", "snap_%s_%s.png" % (
+        path = os.path.join(self._folder_media(), "snap_%s_%s.png" % (
             nama.replace(" ", "_"), time.strftime("%H%M%S_")))
         ok = self.players[nama].snapshot(path)
         if ok:

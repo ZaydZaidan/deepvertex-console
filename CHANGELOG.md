@@ -4,6 +4,16 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.6] — 2026-10-17
+
+### Added
+- **Once-per-session save-folder prompt**: the first SNAP or RECORD of a dive
+  asks “Where to save this dive?” — *Use default* (Pictures ▸
+  DeepVertex-ROV-Captures) or *Choose folder…* (any folder via the OS picker;
+  media then goes to `<chosen>/<session>/compressed`). Asked exactly once per
+  session; automation (`--no-prompt`) silently uses the default. The chosen
+  path is written to the notifications log.
+
 ## [1.1.5] — 2026-10-17
 
 ### Changed
