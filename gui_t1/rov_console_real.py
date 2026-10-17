@@ -119,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.1.3"     # versi aplikasi (session.json + update checker)
+__version__ = "1.1.4"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -1388,6 +1388,20 @@ class RovConsole(QtWidgets.QMainWindow):
         self.lbl_sesi.setObjectName("Faint")
         self.lbl_sesi.setWordWrap(True)
         self.lbl_sesi.setToolTip(self.sesi)
+        row_buka = QtWidgets.QHBoxLayout()
+        b_buka = QtWidgets.QPushButton("OPEN FOLDER")
+        b_buka.setObjectName("BtnTiny")
+        b_buka.setToolTip("open this session folder (snaps and recordings live "
+                          "in compressed/):\n" + self.sesi)
+        b_buka.clicked.connect(self._buka_folder_sesi)
+        self.lbl_path_sesi = QtWidgets.QLabel(self.sesi)
+        self.lbl_path_sesi.setObjectName("Faint")
+        self.lbl_path_sesi.setWordWrap(True)
+        self.lbl_path_sesi.setToolTip("everything for this dive is saved HERE "
+                                      "(local to this laptop)")
+        row_buka.addWidget(b_buka)
+        row_buka.addWidget(self.lbl_path_sesi, 1)
+        p.body_layout.addLayout(row_buka)
         p.body_layout.addWidget(self.lbl_sesi)
         row_sesi = QtWidgets.QHBoxLayout()
         b_sesi = QtWidgets.QPushButton("SESSION NAME…")
@@ -2115,6 +2129,18 @@ class RovConsole(QtWidgets.QMainWindow):
             b.blockSignals(True)
             b.setText("ON" if on else "OFF")
             b.blockSignals(False)
+
+    def _buka_folder_sesi(self):
+        """Buka folder sesi di file manager OS (path LOKAL laptop ini)."""
+        try:
+            if os.name == "nt":
+                os.startfile(self.sesi)                     # noqa: S606
+            else:
+                import subprocess as _sp
+                _sp.Popen(["xdg-open", self.sesi])
+            self._catat("opened session folder: " + self.sesi)
+        except Exception as exc:                            # noqa: BLE001
+            self._catat("open folder failed: %r (path: %s)" % (exc, self.sesi))
 
     def _ganti_nama_sesi_dialog(self):
         nama, ok = QtWidgets.QInputDialog.getText(
@@ -2847,14 +2873,13 @@ def main():
     args.port_stereo_R = args.right_port
 
     app = QtWidgets.QApplication(sys.argv)
-    # SINGLE INSTANCE (laporan 17 Okt: dua konsol berebut UDP 5600 -> video mati).
+    # SINGLE INSTANCE v2 (QSharedMemory - QLockFile tidak andal di build
+    # one-file; laporan 17 Okt: dua konsol berebut UDP 5600 -> video mati).
     _kunci_app = None
     try:
-        import paths as _pp
-        _kunci_app = QtCore.QLockFile(os.path.join(_pp.data_dir(),
-                                                   "console.lock"))
-        _kunci_app.setStaleLockTime(15000)
-        if not _kunci_app.tryLock(3000):
+        _kunci_app = QtCore.QSharedMemory("DeepVertexMarineConsole Instance")
+        if not _kunci_app.create(1):
+            _kunci_app.attach()
             QtWidgets.QMessageBox.warning(
                 None, "DeepVertex Marine Console",
                 "The console is already running.\nClose the other window first "

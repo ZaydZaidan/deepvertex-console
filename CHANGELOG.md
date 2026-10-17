@@ -4,6 +4,24 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.4] — 2026-10-17
+
+### Fixed
+- **Windows preview smoothness** (owner report: glitchy pixels vs Linux):
+  the ffmpeg preview no longer uses `nobuffer`/`low_delay` (they produced torn
+  frames), RTP jitter is buffered (`-max_delay 300000`, `reorder_queue_size`),
+  and the MJPEG pipeline runs at quality q3 with bicubic scaling (was q7 —
+  visible 8x8 blocking). Snapshots inherit the cleaner frames; recordings are
+  unaffected (they are always a direct `-c copy` of the 1080p stream).
+- **Single-instance guard actually works now** — `QLockFile` proved unreliable
+  in the one-file build (no lock file was ever created); replaced with
+  `QSharedMemory`, which cannot be bypassed and releases itself on crash.
+
+### Added
+- **CAPTURE panel shows the session folder path** under the session name and a
+  one-click **OPEN FOLDER** button — snaps and recordings live in that folder's
+  `compressed/` subdirectory (per-laptop local; never a shared path).
+
 ## [1.1.3] — 2026-10-17
 
 ### Fixed

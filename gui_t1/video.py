@@ -428,12 +428,15 @@ class StreamPlayerFf(QtCore.QObject):
 
     def _cmd_preview(self):
         ff = ffmpeg_path()
+        # v1.1.4 (laporan glitch pemilik): tanpa nobuffer/low_delay, jitter
+        # RTP ditahan max_delay, kualitas MJPEG dinaikkan (q3, bicubic).
         return [ff, "-hide_banner", "-loglevel", "error",
                 "-protocol_whitelist", "file,udp,rtp",
-                "-fflags", "nobuffer", "-flags", "low_delay",
+                "-max_delay", "300000", "-reorder_queue_size", "500",
                 "-i", self._sdp(self.relay_port), "-an",
+                "-sws_flags", "bicubic",
                 "-vf", "scale=min(1280\\,iw):-2",
-                "-f", "mjpeg", "-q:v", "7", "pipe:1"]
+                "-f", "mjpeg", "-q:v", "3", "pipe:1"]
 
     def _forward_loop(self):
         """Bind port utama; teruskan datagram ke preview (+ recorder)."""
