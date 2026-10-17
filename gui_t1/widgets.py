@@ -520,7 +520,9 @@ class CameraTile(QtWidgets.QWidget):
 
         # strip atas hanya dipakai kalau ada judul atau laju (mockup: kotak kamera depan
         # tidak punya judul di dalam kotak — judul panel sudah menyebutnya)
-        top = 16 if (getattr(self, "gambar_judul", True) or self._rate is not None) else 1
+        # Strip atas HANYA utk judul; laju (Hz) = badge overlay di atas gambar
+        # supaya video memakai SELURUH kotak (center sempurna - laporan 17 Okt).
+        top = 16 if getattr(self, "gambar_judul", True) else 1
         area = QRectF(1, top, self.width() - 2, self.height() - top - 1)
         f = p.font()
         if self._img is None and (self._off is not None or self._muted is not None):
@@ -581,8 +583,23 @@ class CameraTile(QtWidgets.QWidget):
             f.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0)
             f.setPixelSize(theme.px(9))
             p.setFont(f)
-            p.drawText(QRectF(6, 0, self.width() - 12, top), Qt.AlignRight | Qt.AlignVCenter,
-                       f"{self._rate:5.1f} Hz")
+            teks = f"{self._rate:5.1f} Hz"
+            if getattr(self, "gambar_judul", True):
+                p.drawText(QRectF(6, 0, self.width() - 12, top),
+                           Qt.AlignRight | Qt.AlignVCenter, teks)
+            elif self._img is not None:
+                # badge overlay pojok kanan-atas GAMBAR (tidak memakan tinggi)
+                fm = p.fontMetrics()
+                wt = fm.horizontalAdvance(teks) + 12
+                r = QRectF(self.width() - wt - 8, 7, wt, fm.height() + 4)
+                p.save()
+                p.setPen(QtCore.Qt.NoPen)
+                p.setBrush(QtGui.QColor(0, 0, 0, 150))
+                p.drawRoundedRect(r, 4, 4)
+                p.setPen(QtGui.QColor(theme.OK if self._rate > 15
+                                      else theme.WARN))
+                p.drawText(r, Qt.AlignCenter, teks)
+                p.restore()
         p.end()
 
 

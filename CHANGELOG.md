@@ -4,6 +4,18 @@ All notable changes to the DeepVertex Marine Technology Console (ROV mode).
 This project follows [Keep a Changelog](https://keepachangelog.com/) and SemVer for
 the application package (`MAJOR.MINOR.PATCH` — autonomy (next) features will ship as 2.x).
 
+## [1.1.3] — 2026-10-17
+
+### Fixed
+- **Camera tile: video now truly centered** — the 16 px top strip was reserved
+  whenever a frame-rate was present, pushing the picture down; the strip is
+  now reserved only when a tile has an in-image title, and the Hz reading is
+  drawn as a semi-transparent badge overlay on the picture (verified
+  pixel-exact: symmetric 9/9 px gaps).
+- **Single-instance guard** — a second console used to fight the first over
+  the video UDP ports (both consoles went black); launching twice now shows
+  a clear message instead (stale-lock safe for Save & Restart).
+
 ## [1.1.2] — 2026-10-17
 
 ### Fixed

@@ -119,7 +119,7 @@ def _buat_dir_sesi(root, nama=""):
     return d
 
 
-__version__ = "1.1.2"     # versi aplikasi (session.json + update checker)
+__version__ = "1.1.3"     # versi aplikasi (session.json + update checker)
 
 
 class RovConsole(QtWidgets.QMainWindow):
@@ -2847,6 +2847,21 @@ def main():
     args.port_stereo_R = args.right_port
 
     app = QtWidgets.QApplication(sys.argv)
+    # SINGLE INSTANCE (laporan 17 Okt: dua konsol berebut UDP 5600 -> video mati).
+    _kunci_app = None
+    try:
+        import paths as _pp
+        _kunci_app = QtCore.QLockFile(os.path.join(_pp.data_dir(),
+                                                   "console.lock"))
+        _kunci_app.setStaleLockTime(15000)
+        if not _kunci_app.tryLock(3000):
+            QtWidgets.QMessageBox.warning(
+                None, "DeepVertex Marine Console",
+                "The console is already running.\nClose the other window first "
+                "(two instances fight over the video stream).")
+            return 1
+    except Exception:                                       # noqa: BLE001
+        _kunci_app = None
     try:
         import wheelguard
         wheelguard.pasang(app)
