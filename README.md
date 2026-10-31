@@ -164,14 +164,14 @@ on the Orin companion. Known limitations: [docs/roadmap.md](docs/roadmap.md).
 - 🌐 Website — [deepvertex.asia](https://deepvertex.asia)
 - 📷 Instagram — [@deepvertex](https://instagram.com/deepvertex)
 - 💼 LinkedIn — [DeepVertex](https://www.linkedin.com/company/deepvertex)
-- ✉️ Business & licensing — founders@deepvertex.tech
+- ✉️ Business & licensing — founder@deepvertex.asia
 
 ## 📄 License
 
 **PolyForm Strict 1.0.0 — source-available.** You may read, run and use this
 software for any **noncommercial** purpose. You may **not** distribute it or make
 **changes / new works** based on it, and commercial use requires a **written
-license** — contact [founders@deepvertex.tech](mailto:founders@deepvertex.tech).
+license** — contact [founder@deepvertex.asia](mailto:founder@deepvertex.asia).
 DeepVertex names, logos and branding must never be removed or altered.
 See [LICENSE](LICENSE); third-party components keep their own licenses
 ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — PySide6/Qt under LGPL,
