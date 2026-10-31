@@ -161,7 +161,7 @@ on the Orin companion. Known limitations: [docs/roadmap.md](docs/roadmap.md).
 
 ## 🔗 Links
 
-- 🌐 Website — [deepvertex.tech](https://deepvertex.tech)
+- 🌐 Website — [deepvertex.asia](https://deepvertex.asia)
 - 📷 Instagram — [@deepvertex](https://instagram.com/deepvertex)
 - 💼 LinkedIn — [DeepVertex](https://www.linkedin.com/company/deepvertex)
 - ✉️ Business & licensing — founders@deepvertex.tech
